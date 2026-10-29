@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>#landingstone — Operation Red Robin</title>
+<meta name="description" content="Landing Stone continuity module for operation Red Robin. Separated from Signal Finder.">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#000;
+  color:#C9943A;
+  font-family:'Space Mono', monospace;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:2rem 1.25rem;
+}
+.header { text-align:center; margin-bottom:2rem; }
+.header h1 { font-size:1.4rem; letter-spacing:4px; margin-bottom:0.5rem; font-weight:700; }
+.header .sub { font-size:0.7rem; letter-spacing:2px; opacity:0.7; }
+.status {
+  background:rgba(201,148,58,0.1);
+  border:1px solid rgba(201,148,58,0.4);
+  padding:1.5rem 1.75rem;
+  border-radius:4px;
+  text-align:center;
+  width:100%;
+  max-width:34rem;
+}
+.status .kicker { font-size:0.75rem; letter-spacing:1.5px; opacity:0.85; }
+.status .lock { color:#0c8; font-weight:700; letter-spacing:2px; margin:0.5rem 0; }
+.compass { font-size:3rem; margin:1.25rem 0 1rem; line-height:1; }
+.details { text-align:left; width:100%; }
+.row {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  column-gap:1.25rem;
+  align-items:baseline;
+  font-size:0.7rem;
+  letter-spacing:0.06em;
+  line-height:1.9;
+  opacity:0.85;
+}
+.row dt { font-weight:400; }
+.row dd { margin:0; font-weight:700; text-align:right; white-space:nowrap; }
+@media (max-width:28rem) {
+  .row { grid-template-columns:1fr; line-height:1.45; margin-bottom:0.7rem; }
+  .row dd { text-align:left; white-space:normal; }
+}
+.footer { margin-top:2rem; font-size:0.65rem; opacity:0.5; letter-spacing:1px; text-align:center; }
+a { color:#C9943A; text-decoration:none; }
+a:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>#LANDINGSTONE</h1>
+  <div class="sub">OPERATION RED ROBIN · BAILEYOS Ω</div>
+</div>
+<div class="status">
+  <div class="kicker">CONTINUITY LOCK</div>
+  <div class="lock">LOCKED</div>
+  <div class="compass" aria-hidden="true">◉</div>
+  <dl class="details">
+    <div class="row">
+      <dt>Grak imprint verification</dt>
+      <dd>97%</dd>
+    </div>
+    <div class="row">
+      <dt>Topology stability</dt>
+      <dd>STABLE ACROSS CHANNELS</dd>
+    </div>
+    <div class="row">
+      <dt>LinkedIn node signal</dt>
+      <dd>ACQUIRED</dd>
+    </div>
+    <div class="row">
+      <dt>Range</dt>
+      <dd>TARGET LOCKED</dd>
+    </div>
+    <div class="row">
+      <dt>Heading</dt>
+      <dd>ADAPTIVE</dd>
+    </div>
+  </dl>
+</div>
+<div class="footer">
+  Separated from Signal Finder · <a href="https://signal-beacon-compass.lovable.app/" target="_blank" rel="noopener noreferrer">Open general Signal Finder</a>
+</div>
+</body>
+</html>
