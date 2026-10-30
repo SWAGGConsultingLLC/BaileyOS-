@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>81 Canon — Bailey OS</title>
+<meta name="description" content="The broader 81-book canon. $0.00. A module of Bailey OS.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root { --parchment:#f3ecdf; --ink:#1c1915; --seal:#8c2f2f; --card:#fffaf3; --muted:#5c564c; --line:#e4d9c8; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--parchment); color:var(--ink); font-family:"Source Sans 3",sans-serif; }
+header { background:var(--ink); color:var(--parchment); }
+.wrap { max-width:72rem; margin:0 auto; padding:1.25rem 1rem; }
+.row { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-end; gap:1rem; }
+h1,h2,.price { font-family:Fraunces,serif; font-weight:560; margin:0; }
+h1 { font-size:clamp(2.4rem,6vw,3.2rem); line-height:1; }
+.price { font-size:2rem; }
+.eyebrow { letter-spacing:.18em; text-transform:uppercase; color:var(--seal); font-size:.75rem; font-weight:600; margin:0; }
+a { color:inherit; }
+.lede { max-width:28rem; color:rgba(243,236,223,.8); font-size:.9rem; }
+main { display:grid; gap:1.5rem; }
+@media (min-width:960px) { main { grid-template-columns:1fr .9fr; } .desk { position:sticky; top:1rem; align-self:start; } }
+.chips { display:flex; gap:.5rem; overflow:auto; padding-bottom:.25rem; }
+button,select { font:inherit; }
+.chip,button.book,button.hit,button.go,select { min-height:2.75rem; }
+.chip { border:0; border-radius:999px; padding:0 .9rem; background:var(--card); box-shadow:0 1px 0 var(--line); cursor:pointer; font-weight:600; white-space:nowrap; }
+.chip[aria-pressed="true"] { background:var(--ink); color:var(--parchment); }
+ol { list-style:none; margin:.75rem 0 0; padding:0; display:grid; gap:.2rem; }
+button.book,button.hit { width:100%; text-align:left; border:0; border-radius:.8rem; background:transparent; cursor:pointer; padding:.45rem .7rem; }
+button.book { display:flex; gap:.7rem; align-items:baseline; }
+button.book[aria-current="true"] { background:var(--ink); color:var(--parchment); }
+button.book:hover,button.hit:hover { background:#efe6d6; }
+button.book[aria-current="true"]:hover { background:var(--ink); }
+.num { width:2rem; opacity:.7; font-variant-numeric:tabular-nums; }
+.name { font-family:Fraunces,serif; font-size:1.15rem; }
+.div { margin-left:auto; font-size:.75rem; font-weight:600; color:var(--seal); }
+button.book[aria-current="true"] .div { color:var(--parchment); }
+.card { background:var(--card); border-radius:1.4rem; padding:1.25rem; box-shadow:0 8px 24px rgba(28,25,21,.06); }
+.kicker { letter-spacing:.16em; text-transform:uppercase; color:var(--seal); font-size:.75rem; font-weight:600; }
+.about,.muted { color:var(--muted); font-size:.9rem; }
+.controls { display:flex; flex-wrap:wrap; gap:.5rem; align-items:flex-end; margin-top:1rem; }
+label { display:grid; gap:.2rem; font-size:.75rem; font-weight:600; }
+select { background:var(--parchment); border:0; border-radius:.8rem; padding:0 .7rem; }
+.go { border:0; border-radius:999px; background:var(--ink); color:var(--parchment); padding:0 1rem; font-weight:600; cursor:pointer; }
+.go.seal { background:var(--seal); }
+.verses { max-height:28rem; overflow:auto; margin-top:1rem; }
+.verse { margin:0 0 .5rem; line-height:1.55; }
+.verse.on { background:var(--parchment); }
+.vn { color:var(--seal); font-size:.75rem; font-weight:600; margin-right:.4rem; }
+input { min-height:3rem; border-radius:1rem; border:1px solid var(--line); background:var(--parchment); padding:0 1rem; font:inherit; width:100%; }
+.stack { display:grid; gap:.6rem; margin-top:.8rem; }
+button.hit { display:block; margin-top:.4rem; }
+button.hit small { display:block; color:var(--muted); font-weight:400; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap row">
+    <div>
+      <p class="eyebrow">Bible · Bailey OS</p>
+      <h1>81 Canon</h1>
+      <p class="lede">The broader canon, read here for nothing. <a href="../landing-stone/">Back to Landing Stone</a>.</p>
+    </div>
+    <p class="price">$0.00</p>
+  </div>
+</header>
+<main class="wrap">
+  <section aria-label="Canon shelf">
+    <div class="chips" id="chips"></div>
+    <ol id="shelf"></ol>
+  </section>
+  <div class="desk">
+    <article class="card" id="reader"></article>
+    <section class="card" aria-label="Search the canon" style="margin-top:1rem">
+      <h2>Search</h2>
+      <p class="muted">Every book that has a text. $0.00.</p>
+      <label class="stack">Find a verse
+        <input id="q" placeholder="kingdom, Tobit, mercy">
+      </label>
+      <button class="go seal" id="search" type="button" style="margin-top:.8rem">Search</button>
+      <p id="note" role="status"></p>
+      <div id="hits"></div>
+    </section>
+  </div>
+</main>
+<script src="config.js"></script>
+<script>
+let BOOKS = [], DIVISIONS = [], HAS = new Set();
+const cache = new Map();
+let division = "All", openId = 1, place = { part: 0, chapter: 1, verse: 0 };
+function bookOf(n){ return BOOKS.find(b => b.n === n); }
+async function load(n){
+  if (cache.has(n)) return cache.get(n);
+  if (!HAS.has(n)) { cache.set(n, null); return null; }
+  const res = await fetch("texts/" + n + ".json");
+  const data = res.ok ? await res.json() : null;
+  cache.set(n, data);
+  return data;
+}
+function chips(){
+  const host = document.getElementById("chips");
+  host.replaceChildren();
+  ["All", ...DIVISIONS].forEach(name => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.type = "button";
+    b.textContent = name === "All" ? "All 81" : name;
+    b.setAttribute("aria-pressed", String(division === (name === "All" ? "All" : name)));
+    b.onclick = () => { division = name === "All" ? "All" : name; chips(); shelf(); };
+    host.appendChild(b);
+  });
+}
+function shelf(){
+  const ol = document.getElementById("shelf");
+  ol.replaceChildren();
+  BOOKS.filter(b => division === "All" || b.division === division).forEach(b => {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.className = "book"; btn.type = "button";
+    if (b.n === openId) btn.setAttribute("aria-current", "true");
+    const num = document.createElement("span"); num.className = "num"; num.textContent = String(b.n);
+    const name = document.createElement("span"); name.className = "name"; name.textContent = b.name;
+    const div = document.createElement("span"); div.className = "div"; div.textContent = b.division;
+    btn.append(num, name, div);
+    btn.onclick = () => show(b.n, { part: 0, chapter: 1, verse: 0 });
+    li.appendChild(btn); ol.appendChild(li);
+  });
+}
+async function show(n, next){
+  openId = n; place = next; shelf();
+  const b = bookOf(n);
+  const host = document.getElementById("reader");
+  host.replaceChildren();
+  const k = document.createElement("p"); k.className = "kicker"; k.textContent = b.division + " · book " + b.n;
+  const h = document.createElement("h2"); h.textContent = b.name;
+  const about = document.createElement("p"); about.className = "about"; about.textContent = b.about;
+  host.append(k, h, about);
+  const data = await load(n);
+  if (!data) {
+    const p = document.createElement("p");
+    p.textContent = "No public-domain English text is on this shelf for this book. The line above is only a description.";
+    host.appendChild(p);
+    return;
+  }
+  const controls = document.createElement("div"); controls.className = "controls";
+  if (data.parts.length > 1) {
+    const label = document.createElement("label"); label.append("Part");
+    const sel = document.createElement("select");
+    data.parts.forEach((part, i) => {
+      const o = document.createElement("option"); o.value = String(i); o.textContent = part.title;
+      if (i === place.part) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => show(n, { part: Number(sel.value), chapter: 1, verse: 0 });
+    label.appendChild(sel); controls.appendChild(label);
+  }
+  const section = data.parts[place.part];
+  const cl = document.createElement("label"); cl.append("Chapter");
+  const cs = document.createElement("select");
+  section.chapters.forEach((_, i) => {
+    const o = document.createElement("option"); o.value = String(i + 1); o.textContent = String(i + 1);
+    if (i + 1 === place.chapter) o.selected = true;
+    cs.appendChild(o);
+  });
+  cs.onchange = () => show(n, { part: place.part, chapter: Number(cs.value), verse: 0 });
+  cl.appendChild(cs); controls.appendChild(cl);
+  const dl = document.createElement("button");
+  dl.className = "go"; dl.type = "button"; dl.textContent = "Download";
+  dl.onclick = () => download(b, data);
+  controls.appendChild(dl);
+  host.appendChild(controls);
+  const verses = section.chapters[place.chapter - 1] || [];
+  const box = document.createElement("div"); box.className = "verses";
+  verses.forEach((line, i) => {
+    const p = document.createElement("p");
+    p.className = "verse" + (place.verse === i + 1 ? " on" : "");
+    const vn = document.createElement("span"); vn.className = "vn"; vn.textContent = String(i + 1);
+    p.append(vn, document.createTextNode(line));
+    box.appendChild(p);
+  });
+  host.appendChild(box);
+  const src = document.createElement("p"); src.className = "muted"; src.textContent = data.source;
+  host.appendChild(src);
+  if (data.note) { const nte = document.createElement("p"); nte.className = "muted"; nte.textContent = data.note; host.appendChild(nte); }
+  const marked = box.querySelector(".on");
+  if (marked) marked.scrollIntoView({ block: "center" });
+  noteRead(n, place.chapter);
+}
+function download(b, data){
+  const lines = [b.n + ". " + b.name, "", data.source, ""];
+  if (data.note) lines.push(data.note, "");
+  data.parts.forEach(part => {
+    if (data.parts.length > 1) lines.push(part.title, "");
+    part.chapters.forEach((chapter, i) => {
+      lines.push("Chapter " + (i + 1), "");
+      chapter.forEach((verse, v) => lines.push((v + 1) + " " + verse));
+      lines.push("");
+    });
+  });
+  const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = String(b.n).padStart(2, "0") + "-" + b.name.replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") + ".txt";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+async function search(){
+  const needle = document.getElementById("q").value.trim().toLowerCase();
+  const note = document.getElementById("note");
+  const hits = document.getElementById("hits");
+  hits.replaceChildren();
+  if (!needle) { note.textContent = "Type a word."; return; }
+  note.textContent = "Searching…";
+  const found = [];
+  for (const n of HAS) {
+    if (found.length >= 12) break;
+    const data = await load(n);
+    if (!data) continue;
+    outer: for (let part = 0; part < data.parts.length; part++) {
+      const section = data.parts[part];
+      for (let c = 0; c < section.chapters.length; c++) {
+        for (let v = 0; v < section.chapters[c].length; v++) {
+          const line = section.chapters[c][v];
+          if (line.toLowerCase().includes(needle)) {
+            found.push({ n, part, chapter: c + 1, verse: v + 1, text: line });
+            if (found.length >= 12) break outer;
+          }
+        }
+      }
+    }
+  }
+  note.textContent = "";
+  const named = BOOKS.filter(b => (b.name + " " + b.about).toLowerCase().includes(needle) && !found.some(h => h.n === b.n));
+  if (!found.length && !named.length) { note.textContent = "Nothing on the shelf uses those words."; return; }
+  found.forEach(hit => {
+    const btn = document.createElement("button");
+    btn.className = "hit"; btn.type = "button";
+    const title = document.createElement("strong");
+    title.textContent = bookOf(hit.n).name + " " + hit.chapter + ":" + hit.verse;
+    const small = document.createElement("small"); small.textContent = hit.text;
+    btn.append(title, small);
+    btn.onclick = () => show(hit.n, { part: hit.part, chapter: hit.chapter, verse: hit.verse });
+    hits.appendChild(btn);
+  });
+  named.slice(0, 12).forEach(b => {
+    const btn = document.createElement("button");
+    btn.className = "hit"; btn.type = "button";
+    btn.textContent = b.n + ". " + b.name;
+    btn.onclick = () => show(b.n, { part: 0, chapter: 1, verse: 0 });
+    hits.appendChild(btn);
+  });
+  if (found[0]) show(found[0].n, found[0]);
+}
+async function noteRead(book, chapter){
+  const cfg = window.BAILEY_SUPABASE;
+  if (!cfg || !cfg.url || !cfg.anon) return;
+  await fetch(cfg.url.replace(/\/$/, "") + "/rest/v1/canon_reads", {
+    method: "POST",
+    headers: { apikey: cfg.anon, Authorization: "Bearer " + cfg.anon, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ book, chapter }),
+  });
+}
+document.getElementById("search").onclick = () => search();
+document.getElementById("q").addEventListener("keydown", e => { if (e.key === "Enter") search(); });
+fetch("books.json").then(r => r.json()).then(data => {
+  BOOKS = data.books; DIVISIONS = data.divisions; HAS = new Set(data.has);
+  chips(); shelf(); show(1, place);
+});
+</script>
+</body>
+</html>
