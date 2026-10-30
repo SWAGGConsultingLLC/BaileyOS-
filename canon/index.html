@@ -80,7 +80,7 @@ button.hit small { display:block; color:var(--muted); font-weight:400; }
     <article class="card" id="reader"></article>
     <section class="card" id="log" aria-label="Reading log" style="margin-top:1rem">
       <h2>Log</h2>
-      <p class="muted">Chapters opened, kept in Supabase. $0.00.</p>
+      <p class="muted">Opens again on the last chapter. $0.00.</p>
       <div id="log-rows"></div>
     </section>
     <section class="card" aria-label="Search the canon" style="margin-top:1rem">
@@ -137,7 +137,7 @@ function shelf(){
     li.appendChild(btn); ol.appendChild(li);
   });
 }
-async function show(n, next){
+async function show(n, next, options){
   openId = n; place = next; shelf();
   const b = bookOf(n);
   const host = document.getElementById("reader");
@@ -195,7 +195,8 @@ async function show(n, next){
   if (data.note) { const nte = document.createElement("p"); nte.className = "muted"; nte.textContent = data.note; host.appendChild(nte); }
   const marked = box.querySelector(".on");
   if (marked) marked.scrollIntoView({ block: "center" });
-  noteRead(n, place.chapter);
+  if (options && options.log === false) paintLog();
+  else noteRead(n, place.part, place.chapter);
 }
 function download(b, data){
   const lines = [b.n + ". " + b.name, "", data.source, ""];
@@ -262,18 +263,13 @@ async function search(){
   });
   if (found[0]) show(found[0].n, found[0]);
 }
-async function noteRead(book, chapter){
+async function paintLog(){
   const cfg = window.BAILEY_SUPABASE;
-  if (!cfg || !cfg.url || !cfg.anon) return;
-  await fetch(cfg.url.replace(/\/$/, "") + "/rest/v1/canon_reads", {
-    method: "POST",
-    headers: { apikey: cfg.anon, Authorization: "Bearer " + cfg.anon, "Content-Type": "application/json", Prefer: "return=minimal" },
-    body: JSON.stringify({ book, chapter }),
-  });
-  const res = await fetch(cfg.url.replace(/\/$/, "") + "/rest/v1/canon_reads?select=book,chapter,created_at&order=created_at.desc&limit=8", {
+  if (!cfg || !cfg.url || !cfg.anon) return [];
+  const res = await fetch(cfg.url.replace(/\/$/, "") + "/rest/v1/canon_reads?select=book,part,chapter,created_at&order=created_at.desc&limit=8", {
     headers: { apikey: cfg.anon, Authorization: "Bearer " + cfg.anon },
   });
-  if (!res.ok) return;
+  if (!res.ok) return [];
   const rows = await res.json();
   const host = document.getElementById("log-rows");
   host.replaceChildren();
@@ -284,12 +280,26 @@ async function noteRead(book, chapter){
     p.textContent = (named ? named.name : "Book " + row.book) + " " + row.chapter + " · " + new Date(row.created_at).toLocaleString();
     host.appendChild(p);
   });
+  return rows;
+}
+async function noteRead(book, part, chapter){
+  const cfg = window.BAILEY_SUPABASE;
+  if (!cfg || !cfg.url || !cfg.anon) return;
+  await fetch(cfg.url.replace(/\/$/, "") + "/rest/v1/canon_reads", {
+    method: "POST",
+    headers: { apikey: cfg.anon, Authorization: "Bearer " + cfg.anon, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ book, part, chapter }),
+  });
+  await paintLog();
 }
 document.getElementById("search").onclick = () => search();
 document.getElementById("q").addEventListener("keydown", e => { if (e.key === "Enter") search(); });
-fetch("books.json").then(r => r.json()).then(data => {
+fetch("books.json").then(r => r.json()).then(async data => {
   BOOKS = data.books; DIVISIONS = data.divisions; HAS = new Set(data.has);
-  chips(); shelf(); show(1, place);
+  chips();
+  const rows = await paintLog();
+  const last = rows[0];
+  show(last ? last.book : 1, { part: last && last.part ? last.part : 0, chapter: last ? last.chapter : 1, verse: 0 }, { log: false });
 });
 </script>
 </body>

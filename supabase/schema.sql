@@ -5,6 +5,7 @@
 create table if not exists public.canon_reads (
   id bigint generated always as identity primary key,
   book int not null check (book between 1 and 81),
+  part int not null default 0 check (part >= 0),
   chapter int not null check (chapter >= 1),
   created_at timestamptz not null default now()
 );
