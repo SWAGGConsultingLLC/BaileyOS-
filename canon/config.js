@@ -1,3 +1,4 @@
-// Leave both empty until a Supabase project exists.
-// window.BAILEY_SUPABASE = { url: "https://YOUR.supabase.co", anon: "YOUR_ANON_KEY" };
-window.BAILEY_SUPABASE = null;
+window.BAILEY_SUPABASE = {
+  url: "https://rxckxwdvhjszzuqsvxdk.supabase.co",
+  anon: "sb_publishable_mB491R7--jxePQQnzQExtg_OF5bW2BD",
+};

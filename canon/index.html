@@ -73,6 +73,11 @@ button.hit small { display:block; color:var(--muted); font-weight:400; }
   </section>
   <div class="desk">
     <article class="card" id="reader"></article>
+    <section class="card" id="log" aria-label="Reading log" style="margin-top:1rem">
+      <h2>Log</h2>
+      <p class="muted">Chapters opened, kept in Supabase. $0.00.</p>
+      <div id="log-rows"></div>
+    </section>
     <section class="card" aria-label="Search the canon" style="margin-top:1rem">
       <h2>Search</h2>
       <p class="muted">Every book that has a text. $0.00.</p>
@@ -259,6 +264,20 @@ async function noteRead(book, chapter){
     method: "POST",
     headers: { apikey: cfg.anon, Authorization: "Bearer " + cfg.anon, "Content-Type": "application/json", Prefer: "return=minimal" },
     body: JSON.stringify({ book, chapter }),
+  });
+  const res = await fetch(cfg.url.replace(/\/$/, "") + "/rest/v1/canon_reads?select=book,chapter,created_at&order=created_at.desc&limit=8", {
+    headers: { apikey: cfg.anon, Authorization: "Bearer " + cfg.anon },
+  });
+  if (!res.ok) return;
+  const rows = await res.json();
+  const host = document.getElementById("log-rows");
+  host.replaceChildren();
+  rows.forEach(row => {
+    const named = BOOKS.find(item => item.n === row.book);
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = (named ? named.name : "Book " + row.book) + " " + row.chapter + " · " + new Date(row.created_at).toLocaleString();
+    host.appendChild(p);
   });
 }
 document.getElementById("search").onclick = () => search();

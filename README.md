@@ -13,4 +13,5 @@ GitHub Pages, from the repository root: [Landing Stone](https://swaggconsultingl
 
 ## Supabase
 
-Supabase is not attached. There is no project URL on this repo. [`supabase/schema.sql`](supabase/schema.sql) is the reading-log table to run later. [`canon/config.js`](canon/config.js) stays empty until that project exists.
+The reading log uses the project **BaileyOS Signal Finder Compass** (`rxckxwdvhjszzuqsvxdk`). Opening a chapter writes a row to `public.canon_reads`. The table has row-level security: anyone may insert and read that log, and nothing else. The publishable key is in [`canon/config.js`](canon/config.js).
+
