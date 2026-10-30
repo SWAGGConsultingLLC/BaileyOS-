@@ -20,6 +20,8 @@ h1 { font-size:clamp(2.4rem,6vw,3.2rem); line-height:1; }
 .eyebrow { letter-spacing:.18em; text-transform:uppercase; color:var(--seal); font-size:.75rem; font-weight:600; margin:0; }
 a { color:inherit; }
 .lede { max-width:28rem; color:rgba(243,236,223,.8); font-size:.9rem; }
+.back { display:inline-flex; align-items:center; min-height:2.75rem; padding:0 1rem; border-radius:999px; border:1px solid rgba(243,236,223,.45); font-weight:600; text-decoration:none; }
+.back:hover { background:rgba(243,236,223,.08); }
 main { display:grid; gap:1.5rem; }
 @media (min-width:960px) { main { grid-template-columns:1fr .9fr; } .desk { position:sticky; top:1rem; align-self:start; } }
 .chips { display:flex; gap:.5rem; overflow:auto; padding-bottom:.25rem; }
@@ -61,9 +63,12 @@ button.hit small { display:block; color:var(--muted); font-weight:400; }
     <div>
       <p class="eyebrow">Bible · Bailey OS</p>
       <h1>81 Canon</h1>
-      <p class="lede">The broader canon, read here for nothing. <a href="../landing-stone/">Back to Landing Stone</a>.</p>
+      <p class="lede">The broader canon, read here for nothing.</p>
     </div>
-    <p class="price">$0.00</p>
+    <div>
+      <a class="back" href="../landing-stone/">Back</a>
+      <p class="price" style="margin-top:.75rem;text-align:right">$0.00</p>
+    </div>
   </div>
 </header>
 <main class="wrap">
