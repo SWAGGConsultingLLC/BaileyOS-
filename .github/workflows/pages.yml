@@ -23,6 +23,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # The Next.js app lives in this repo for Vercel. It is not part of the static site.
+      - name: Leave the Next.js app out of the Pages site
+        run: rm -rf baileyos-app
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
