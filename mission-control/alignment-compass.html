@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SWAGG Alignment Compass</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #222222;
+    --accent: #f0c040;
+    --accent-dim: #3a2e00;
+    --text: #e8e8e8;
+    --muted: #555555;
+    --confirm: #1a3a1a;
+    --confirm-border: #2d6a2d;
+    --confirm-text: #6dda6d;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 20px 60px;
+  }
+
+  .shell {
+    width: 100%;
+    max-width: 680px;
+  }
+
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px;
+    margin-bottom: 36px;
+  }
+
+  .header-label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .header-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+  }
+
+  .header-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+    letter-spacing: 0.05em;
+  }
+
+  .block {
+    margin-bottom: 32px;
+  }
+
+  .q-label {
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .q-number {
+    color: var(--accent);
+    margin-right: 6px;
+  }
+
+  .q-text {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 14px;
+    letter-spacing: 0.02em;
+  }
+
+  .toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .toggle {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 9px 18px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    user-select: none;
+  }
+
+  .toggle:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .toggle.selected {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .toggle.selected::before {
+    content: '▸ ';
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 4px 0 28px;
+  }
+
+  .text-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    padding: 12px 14px;
+    resize: vertical;
+    min-height: 80px;
+    outline: none;
+    transition: border-color 0.12s;
+    letter-spacing: 0.03em;
+  }
+
+  .text-input:focus {
+    border-color: var(--accent);
+  }
+
+  .text-input::placeholder {
+    color: var(--muted);
+  }
+
+  .submit-btn {
+    margin-top: 12px;
+    width: 100%;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 14px 20px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .submit-btn:hover { opacity: 0.88; }
+  .submit-btn:active { opacity: 0.75; }
+
+  /* Summary */
+  .summary {
+    display: none;
+    background: var(--confirm);
+    border: 1px solid var(--confirm-border);
+    padding: 24px;
+    margin-top: 8px;
+  }
+
+  .summary.visible { display: block; }
+
+  .summary-title {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--confirm-text);
+    margin-bottom: 18px;
+    font-weight: 700;
+  }
+
+  .summary-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .summary-key {
+    color: var(--muted);
+    min-width: 180px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 10px;
+    padding-top: 2px;
+  }
+
+  .summary-val {
+    color: var(--confirm-text);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .copy-btn {
+    margin-top: 20px;
+    background: transparent;
+    border: 1px solid var(--confirm-border);
+    color: var(--confirm-text);
+    padding: 8px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+
+  .copy-btn:hover {
+    background: var(--confirm-border);
+  }
+
+  .reset-btn {
+    margin-top: 8px;
+    margin-left: 10px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+
+  .reset-btn:hover { color: var(--text); border-color: var(--text); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="header">
+    <div class="header-label">SWAGG Consulting LLC · Identity Architecture</div>
+    <div class="header-title">⧉ ALIGNMENT COMPASS</div>
+    <div class="header-sub">Select your answers. Build your tiers.</div>
+  </div>
+
+  <div id="form-section">
+
+    <!-- Q1 -->
+    <div class="block">
+      <div class="q-label"><span class="q-number">01</span>HappyCampersColorado</div>
+      <div class="q-text">What is the current status of this identity?</div>
+      <div class="toggles" data-group="hcc">
+        <button class="toggle" data-group="hcc" data-val="Still Active">Still Active</button>
+        <button class="toggle" data-group="hcc" data-val="Folded into SWAGG">Folded into SWAGG</button>
+        <button class="toggle" data-group="hcc" data-val="Dormant / On Hold">Dormant / On Hold</button>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Q2 -->
+    <div class="block">
+      <div class="q-label"><span class="q-number">02</span>BringMeJoyStudio</div>
+      <div class="q-text">How does this entity relate to SWAGG?</div>
+      <div class="toggles" data-group="bmj">
+        <button class="toggle" data-group="bmj" data-val="Separate Business">Separate Business</button>
+        <button class="toggle" data-group="bmj" data-val="Subdivision of SWAGG">Subdivision of SWAGG</button>
+        <button class="toggle" data-group="bmj" data-val="Personal / Side Project">Personal / Side Project</button>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Q3 -->
+    <div class="block">
+      <div class="q-label"><span class="q-number">03</span>AmericasBailey</div>
+      <div class="q-text">What is the scope of this persona?</div>
+      <div class="toggles" data-group="ab">
+        <button class="toggle" data-group="ab" data-val="Public-Facing">Public-Facing</button>
+        <button class="toggle" data-group="ab" data-val="Internal / System Only">Internal / System Only</button>
+        <button class="toggle" data-group="ab" data-val="Both">Both</button>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Q4 -->
+    <div class="block">
+      <div class="q-label"><span class="q-number">04</span>Missing Entities</div>
+      <div class="q-text">Any other brands, handles, or identities to include?</div>
+      <textarea
+        class="text-input"
+        id="missing-entities"
+        placeholder="e.g. other brand names, social handles, sub-projects, aliases..."
+      ></textarea>
+    </div>
+
+    <button class="submit-btn" onclick="buildTiers()">Build My Tiers →</button>
+
+  </div>
+
+  <!-- Summary -->
+  <div class="summary" id="summary">
+    <div class="summary-title">✓ Alignment Captured — Ready to Build</div>
+    <div id="summary-rows"></div>
+    <div>
+      <button class="copy-btn" onclick="copyResults()">Copy Results</button>
+      <button class="reset-btn" onclick="resetForm()">Reset</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const selections = { hcc: null, bmj: null, ab: null };
+
+  document.querySelectorAll('.toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const group = btn.dataset.group;
+      document.querySelectorAll(`.toggle[data-group="${group}"]`).forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selections[group] = btn.dataset.val;
+    });
+  });
+
+  function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+  function buildTiers() {
+    const missing = document.getElementById('missing-entities').value.trim();
+    const labels = {
+      hcc: 'HappyCampersColorado',
+      bmj: 'BringMeJoyStudio',
+      ab: 'AmericasBailey'
+    };
+    const rows = document.getElementById('summary-rows');
+    rows.innerHTML = '';
+
+    Object.entries(selections).forEach(([key, val]) => {
+      const row = document.createElement('div');
+      row.className = 'summary-row';
+      row.innerHTML = `<span class="summary-key">${labels[key]}</span><span class="summary-val">${val || '— not selected'}</span>`;
+      rows.appendChild(row);
+    });
+
+    if (missing) {
+      const row = document.createElement('div');
+      row.className = 'summary-row';
+      row.innerHTML = `<span class="summary-key">Additional Entities</span><span class="summary-val">${escHtml(missing)}</span>`;
+      rows.appendChild(row);
+    }
+
+    document.getElementById('summary').classList.add('visible');
+    document.getElementById('summary').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function copyResults() {
+    const labels = { hcc: 'HappyCampersColorado', bmj: 'BringMeJoyStudio', ab: 'AmericasBailey' };
+    let text = 'SWAGG ALIGNMENT COMPASS — RESULTS\n\n';
+    Object.entries(selections).forEach(([key, val]) => {
+      text += `${labels[key]}: ${val || 'not selected'}\n`;
+    });
+    const missing = document.getElementById('missing-entities').value.trim();
+    if (missing) text += `\nAdditional Entities: ${missing}`;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.querySelector('.copy-btn');
+      btn.textContent = 'Copied ✓';
+      setTimeout(() => btn.textContent = 'Copy Results', 2000);
+    });
+  }
+
+  function resetForm() {
+    Object.keys(selections).forEach(k => selections[k] = null);
+    document.querySelectorAll('.toggle').forEach(b => b.classList.remove('selected'));
+    document.getElementById('missing-entities').value = '';
+    document.getElementById('summary').classList.remove('visible');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>
