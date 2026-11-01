@@ -3,12 +3,119 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="refresh" content="0; url=landing-stone/">
-<link rel="canonical" href="landing-stone/">
-<title>BaileyOS — Landing Stone</title>
-<script>location.replace("landing-stone/");</script>
+<title>BaileyOS</title>
+<meta name="description" content="BaileyOS home. Open Landing Stone, Signal Ark, 81 Canon, or Signal Finder.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  color: #C9943A;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  min-height: 100vh;
+  padding: 2.5rem 1.25rem 3rem;
+}
+main {
+  width: 100%;
+  max-width: 36rem;
+  margin: 0 auto;
+}
+header { text-align: center; margin-bottom: 2rem; }
+.kicker {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  opacity: 0.75;
+  margin-bottom: 0.55rem;
+}
+h1 {
+  font-size: clamp(1.4rem, 6vw, 1.75rem);
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  margin-bottom: 0.65rem;
+}
+.lede {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+}
+nav ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+nav a {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 5.75rem;
+  background: rgba(201, 148, 58, 0.1);
+  border: 1px solid rgba(201, 148, 58, 0.5);
+  border-radius: 4px;
+  color: #C9943A;
+  text-decoration: none;
+  padding: 1.15rem 1.25rem;
+}
+nav a:hover {
+  background: rgba(201, 148, 58, 0.18);
+  border-color: #C9943A;
+}
+nav a:focus-visible {
+  outline: 3px solid #C9943A;
+  outline-offset: 3px;
+  border-color: #C9943A;
+}
+.name {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.desc {
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+</style>
 </head>
 <body>
-<p><a href="landing-stone/">Landing Stone</a></p>
+<main>
+  <header>
+    <p class="kicker">OPERATION RED ROBIN</p>
+    <h1>BaileyOS</h1>
+    <p class="lede">Choose an app.</p>
+  </header>
+  <nav aria-label="Apps">
+    <ul>
+      <li>
+        <a href="landing-stone/">
+          <span class="name">Landing Stone</span>
+          <span class="desc">Continuity module for operation Red Robin.</span>
+        </a>
+      </li>
+      <li>
+        <a href="signal-ark/">
+          <span class="name">Signal Ark</span>
+          <span class="desc">Beneficiary dashboard and 81 Canon reader. Needs a sign-in.</span>
+        </a>
+      </li>
+      <li>
+        <a href="https://signal-beacon-compass.lovable.app/" target="_blank" rel="noopener noreferrer">
+          <span class="name">Signal Finder</span>
+          <span class="desc">Compass, bearing, and signal tools. Opens in a new tab.</span>
+        </a>
+      </li>
+      <li>
+        <a href="canon/">
+          <span class="name">81 Canon</span>
+          <span class="desc">The broader canon, read here for nothing.</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+</main>
 </body>
 </html>

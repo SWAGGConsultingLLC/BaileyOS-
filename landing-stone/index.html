@@ -54,9 +54,24 @@ body {
 .footer { margin-top:2rem; font-size:0.65rem; opacity:0.5; letter-spacing:1px; text-align:center; }
 a { color:#C9943A; text-decoration:none; }
 a:hover { text-decoration:underline; }
+.home {
+  position:fixed;
+  top:0.5rem;
+  left:0.5rem;
+  z-index:5;
+  display:inline-flex;
+  align-items:center;
+  min-height:44px;
+  min-width:44px;
+  padding:0.45rem 0.65rem;
+  font-size:0.7rem;
+  letter-spacing:1px;
+}
+.home:focus-visible { outline:2px solid #C9943A; outline-offset:3px; }
 </style>
 </head>
 <body>
+<a class="home" href="../">Home</a>
 <div class="header">
   <h1>#LANDINGSTONE</h1>
   <div class="sub">OPERATION RED ROBIN · BAILEYOS Ω</div>
