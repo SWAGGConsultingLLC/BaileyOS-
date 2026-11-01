@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>81 Canon Burst Engine — Preview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0d0d;
+    color: #e8e8e8;
+    font-family: 'Courier New', Courier, monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem;
+  }
+  h1 {
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    color: #666;
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+  }
+  .controls {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  button {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #ccc;
+    padding: 0.5rem 1.2rem;
+    font-family: inherit;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  button:hover { background: #222; border-color: #666; color: #fff; }
+  button.active { background: #1c2a1c; border-color: #4a7c4a; color: #7fbd7f; }
+  .burst-box {
+    width: 100%;
+    max-width: 680px;
+    border: 1px solid #2a2a2a;
+    padding: 1.5rem 2rem;
+    background: #111;
+  }
+  .burst-header {
+    border-bottom: 1px solid #2a2a2a;
+    padding-bottom: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .burst-number {
+    color: #b8a060;
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+  }
+  .burst-theme {
+    color: #888;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-top: 0.25rem;
+  }
+  .burst-time {
+    color: #555;
+    font-size: 0.7rem;
+    margin-top: 0.2rem;
+  }
+  .section { margin-bottom: 1.5rem; }
+  .section:last-child { margin-bottom: 0; }
+  .section-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+  }
+  .stoic-label { color: #7a9fbf; }
+  .bible-label  { color: #bf9a7a; }
+  .quote-text {
+    color: #ddd;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    font-style: italic;
+    padding-left: 1rem;
+    border-left: 2px solid #2a2a2a;
+  }
+  .attribution {
+    color: #555;
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+    padding-left: 1rem;
+  }
+  .divider {
+    border: none;
+    border-top: 1px solid #1e1e1e;
+    margin: 1.5rem 0;
+  }
+  .schedule {
+    margin-top: 2rem;
+    font-size: 0.72rem;
+    color: #444;
+    letter-spacing: 0.1em;
+    text-align: center;
+  }
+  .schedule span { color: #666; margin: 0 0.5rem; }
+  #counter {
+    font-size: 0.7rem;
+    color: #444;
+    text-align: center;
+    margin-top: 1rem;
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+
+<h1>★ 81 Canon Burst Engine</h1>
+
+<div class="controls">
+  <button id="btn-both" class="active" onclick="setMode('both')">⚡✝ Both</button>
+  <button id="btn-stoic" onclick="setMode('stoic')">⚡ Stoic Only</button>
+  <button id="btn-bible" onclick="setMode('bible')">✝ Bible Only</button>
+  <button onclick="nextBurst()">→ Next Burst</button>
+  <button onclick="randomBurst()">⟳ Random</button>
+</div>
+
+<div class="burst-box">
+  <div class="burst-header">
+    <div class="burst-number" id="burst-num">★ CANON BURST #01</div>
+    <div class="burst-theme" id="burst-theme">THEME: RESILIENCE</div>
+    <div class="burst-time" id="burst-time"></div>
+  </div>
+
+  <div class="section" id="stoic-section">
+    <div class="section-label stoic-label">⚡ Stoic</div>
+    <div class="quote-text" id="stoic-quote"></div>
+    <div class="attribution" id="stoic-author"></div>
+  </div>
+
+  <hr class="divider" id="divider">
+
+  <div class="section" id="bible-section">
+    <div class="section-label bible-label">✝ Bible</div>
+    <div class="quote-text" id="bible-verse"></div>
+    <div class="attribution" id="bible-ref"></div>
+  </div>
+</div>
+
+<div class="schedule">
+  Daily bursts:
+  <span>6:30 AM</span>·<span>10:54 AM</span>·<span>3:18 PM</span>·<span>7:42 PM</span>·<span>12:06 AM</span>
+</div>
+
+<div id="counter"></div>
+
+<script>
+const library = [
+  // RESILIENCE
+  { theme:"RESILIENCE", stoic:{quote:"The impediment to action advances action. What stands in the way becomes the way.",author:"Marcus Aurelius"}, bible:{verse:"And we know that in all things God works for the good of those who love him.",ref:"Romans 8:28"} },
+  { theme:"RESILIENCE", stoic:{quote:"You have power over your mind — not outside events. Realize this, and you will find strength.",author:"Marcus Aurelius"}, bible:{verse:"I can do all this through him who gives me strength.",ref:"Philippians 4:13"} },
+  { theme:"RESILIENCE", stoic:{quote:"He who fears death will never do anything worthy of a man who is alive.",author:"Seneca"}, bible:{verse:"Even though I walk through the darkest valley, I will fear no evil, for you are with me.",ref:"Psalm 23:4"} },
+  { theme:"RESILIENCE", stoic:{quote:"Difficulties strengthen the mind, as labor does the body.",author:"Seneca"}, bible:{verse:"Consider it pure joy whenever you face trials of many kinds, because the testing of your faith produces perseverance.",ref:"James 1:2-3"} },
+  { theme:"RESILIENCE", stoic:{quote:"Our life is what our thoughts make it.",author:"Marcus Aurelius"}, bible:{verse:"Finally, brothers and sisters, whatever is true, whatever is noble... think about such things.",ref:"Philippians 4:8"} },
+  { theme:"RESILIENCE", stoic:{quote:"No man is more unhappy than he who never faces adversity.",author:"Seneca"}, bible:{verse:"Blessed is the one who perseveres under trial because, having stood the test, they will receive the crown of life.",ref:"James 1:12"} },
+  { theme:"RESILIENCE", stoic:{quote:"Where the disease is greatest, the remedy must be strongest.",author:"Seneca"}, bible:{verse:"My grace is sufficient for you, for my power is made perfect in weakness.",ref:"2 Corinthians 12:9"} },
+  { theme:"RESILIENCE", stoic:{quote:"Waste no more time arguing about what a good man should be. Be one.",author:"Marcus Aurelius"}, bible:{verse:"Be strong and courageous. Do not be afraid; do not be discouraged, for the Lord your God will be with you.",ref:"Joshua 1:9"} },
+  { theme:"RESILIENCE", stoic:{quote:"Fall seven times, stand up eight.",author:"Epictetus"}, bible:{verse:"Though the righteous fall seven times, they rise again.",ref:"Proverbs 24:16"} },
+  // DISCIPLINE
+  { theme:"DISCIPLINE", stoic:{quote:"No man is free who is not master of himself.",author:"Epictetus"}, bible:{verse:"Like a city whose walls are broken through is a person who lacks self-control.",ref:"Proverbs 25:28"} },
+  { theme:"DISCIPLINE", stoic:{quote:"Endure and renounce.",author:"Epictetus"}, bible:{verse:"Everyone who competes in the games goes into strict training.",ref:"1 Corinthians 9:25"} },
+  { theme:"DISCIPLINE", stoic:{quote:"First say to yourself what you would be; and then do what you have to do.",author:"Epictetus"}, bible:{verse:"Commit to the Lord whatever you do, and he will establish your plans.",ref:"Proverbs 16:3"} },
+  { theme:"DISCIPLINE", stoic:{quote:"Confine yourself to the present.",author:"Marcus Aurelius"}, bible:{verse:"Do not worry about tomorrow, for tomorrow will worry about itself.",ref:"Matthew 6:34"} },
+  { theme:"DISCIPLINE", stoic:{quote:"You become what you give your attention to.",author:"Epictetus"}, bible:{verse:"Set your minds on things above, not on earthly things.",ref:"Colossians 3:2"} },
+  { theme:"DISCIPLINE", stoic:{quote:"Small deeds done are better than great deeds planned.",author:"Peter Marshall"}, bible:{verse:"Whatever you do, work at it with all your heart, as working for the Lord.",ref:"Colossians 3:23"} },
+  { theme:"DISCIPLINE", stoic:{quote:"The first and greatest victory is to conquer yourself.",author:"Plato"}, bible:{verse:"But I discipline my body and keep it under control.",ref:"1 Corinthians 9:27"} },
+  { theme:"DISCIPLINE", stoic:{quote:"Do not indulge in expectations of what you cannot control.",author:"Epictetus"}, bible:{verse:"You ought to say, 'If it is the Lord's will...'",ref:"James 4:13-15"} },
+  { theme:"DISCIPLINE", stoic:{quote:"How long are you going to wait before you demand the best for yourself?",author:"Epictetus"}, bible:{verse:"Wake up, sleeper, rise from the dead, and Christ will shine on you.",ref:"Ephesians 5:14"} },
+  // WISDOM
+  { theme:"WISDOM", stoic:{quote:"It is the mark of an educated mind to be able to entertain a thought without accepting it.",author:"Marcus Aurelius"}, bible:{verse:"The heart of the discerning acquires knowledge, for the ears of the wise seek it out.",ref:"Proverbs 18:15"} },
+  { theme:"WISDOM", stoic:{quote:"Seek not the good in external things; seek it in yourself.",author:"Epictetus"}, bible:{verse:"For the Lord gives wisdom; from his mouth come knowledge and understanding.",ref:"Proverbs 2:6"} },
+  { theme:"WISDOM", stoic:{quote:"If you are distressed by anything external, the pain is not due to the thing itself but to your own estimate of it.",author:"Marcus Aurelius"}, bible:{verse:"Do not conform to the pattern of this world, but be transformed by the renewing of your mind.",ref:"Romans 12:2"} },
+  { theme:"WISDOM", stoic:{quote:"Know thyself.",author:"Socrates"}, bible:{verse:"For who knows a person's thoughts except their own spirit within them?",ref:"1 Corinthians 2:11"} },
+  { theme:"WISDOM", stoic:{quote:"The more we value things outside our control, the less control we have.",author:"Epictetus"}, bible:{verse:"But seek first his kingdom and his righteousness, and all these things will be given to you as well.",ref:"Matthew 6:33"} },
+  { theme:"WISDOM", stoic:{quote:"Very little is needed to make a happy life; it is all within yourself, in your way of thinking.",author:"Marcus Aurelius"}, bible:{verse:"Godliness with contentment is great gain.",ref:"1 Timothy 6:6"} },
+  { theme:"WISDOM", stoic:{quote:"He is a wise man who does not grieve for the things which he has not, but rejoices for those which he has.",author:"Epictetus"}, bible:{verse:"I have learned, in whatsoever state I am, therewith to be content.",ref:"Philippians 4:11"} },
+  { theme:"WISDOM", stoic:{quote:"Accept wise counsel.",author:"Marcus Aurelius"}, bible:{verse:"Plans fail for lack of counsel, but with many advisers they succeed.",ref:"Proverbs 15:22"} },
+  { theme:"WISDOM", stoic:{quote:"Every new beginning comes from some other beginning's end.",author:"Seneca"}, bible:{verse:"See, I am doing a new thing! Now it springs up; do you not perceive it?",ref:"Isaiah 43:19"} },
+  // COURAGE
+  { theme:"COURAGE", stoic:{quote:"He who is brave is free.",author:"Seneca"}, bible:{verse:"For the Spirit God gave us does not make us timid, but gives us power, love and self-discipline.",ref:"2 Timothy 1:7"} },
+  { theme:"COURAGE", stoic:{quote:"Luck is what happens when preparation meets opportunity.",author:"Seneca"}, bible:{verse:"Whatever your hand finds to do, do it with all your might.",ref:"Ecclesiastes 9:10"} },
+  { theme:"COURAGE", stoic:{quote:"Begin at once to live, and count each day as a separate life.",author:"Seneca"}, bible:{verse:"This is the day the Lord has made; let us rejoice and be glad in it.",ref:"Psalm 118:24"} },
+  { theme:"COURAGE", stoic:{quote:"Act bravely.",author:"Marcus Aurelius"}, bible:{verse:"For I am not ashamed of the gospel, because it is the power of God that brings salvation.",ref:"Romans 1:16"} },
+  { theme:"COURAGE", stoic:{quote:"It is not because things are difficult that we do not dare; it is because we do not dare that they are difficult.",author:"Seneca"}, bible:{verse:"Have I not commanded you? Be strong and courageous.",ref:"Joshua 1:9"} },
+  { theme:"COURAGE", stoic:{quote:"Throw me to the wolves and I will return leading the pack.",author:"Seneca"}, bible:{verse:"No weapon forged against you will prevail.",ref:"Isaiah 54:17"} },
+  { theme:"COURAGE", stoic:{quote:"The greatest bravery is the courage of every-day life.",author:"Epictetus"}, bible:{verse:"Be on your guard; stand firm in the faith; be courageous; be strong.",ref:"1 Corinthians 16:13"} },
+  { theme:"COURAGE", stoic:{quote:"He who has a why to live can bear almost any how.",author:"Nietzsche"}, bible:{verse:"For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you.",ref:"Jeremiah 29:11"} },
+  { theme:"COURAGE", stoic:{quote:"Courage is knowing what not to fear.",author:"Plato"}, bible:{verse:"There is no fear in love. But perfect love drives out fear.",ref:"1 John 4:18"} },
+  // PEACE
+  { theme:"PEACE", stoic:{quote:"Nowhere can man find a quieter or more untroubled retreat than in his own soul.",author:"Marcus Aurelius"}, bible:{verse:"And the peace of God, which transcends all understanding, will guard your hearts and your minds in Christ Jesus.",ref:"Philippians 4:7"} },
+  { theme:"PEACE", stoic:{quote:"True happiness is to enjoy the present, without anxious dependence upon the future.",author:"Seneca"}, bible:{verse:"Cast all your anxiety on him because he cares for you.",ref:"1 Peter 5:7"} },
+  { theme:"PEACE", stoic:{quote:"Never let the future disturb you. You will meet it with the same weapons of reason which today arm you against the present.",author:"Marcus Aurelius"}, bible:{verse:"Do not be anxious about anything, but in every situation, by prayer and petition... present your requests to God.",ref:"Philippians 4:6"} },
+  { theme:"PEACE", stoic:{quote:"To bear trials with a calm mind robs misfortune of its strength and burden.",author:"Seneca"}, bible:{verse:"You will keep in perfect peace those whose minds are steadfast, because they trust in you.",ref:"Isaiah 26:3"} },
+  { theme:"PEACE", stoic:{quote:"Ask yourself at every moment, 'Is this necessary?'",author:"Marcus Aurelius"}, bible:{verse:"Be still, and know that I am God.",ref:"Psalm 46:10"} },
+  { theme:"PEACE", stoic:{quote:"The things that hurt, instruct.",author:"Seneca"}, bible:{verse:"For our light and momentary troubles are achieving for us an eternal glory that far outweighs them all.",ref:"2 Corinthians 4:17"} },
+  { theme:"PEACE", stoic:{quote:"Peace is not absence of conflict, it is the ability to handle conflict by peaceful means.",author:"Marcus Aurelius"}, bible:{verse:"Blessed are the peacemakers, for they will be called children of God.",ref:"Matthew 5:9"} },
+  { theme:"PEACE", stoic:{quote:"Concentrate the mind on the present moment.",author:"Marcus Aurelius"}, bible:{verse:"Give your entire attention to what God is doing right now.",ref:"Matthew 6:34"} },
+  { theme:"PEACE", stoic:{quote:"Man is not worried by real problems so much as by his imagined anxieties about real problems.",author:"Epictetus"}, bible:{verse:"Humble yourselves, therefore, under God's mighty hand, that he may lift you up in due time.",ref:"1 Peter 5:6"} },
+  // GRATITUDE
+  { theme:"GRATITUDE", stoic:{quote:"Wealth consists not in having great possessions, but in having few wants.",author:"Epictetus"}, bible:{verse:"Give thanks in all circumstances; for this is God's will for you in Christ Jesus.",ref:"1 Thessalonians 5:18"} },
+  { theme:"GRATITUDE", stoic:{quote:"He who is not satisfied with a little, is satisfied with nothing.",author:"Epicurus"}, bible:{verse:"The Lord is my shepherd; I shall not want.",ref:"Psalm 23:1"} },
+  { theme:"GRATITUDE", stoic:{quote:"Receive without pride, relinquish without struggle.",author:"Marcus Aurelius"}, bible:{verse:"The Lord gave, and the Lord has taken away; blessed be the name of the Lord.",ref:"Job 1:21"} },
+  { theme:"GRATITUDE", stoic:{quote:"Do not spoil what you have by desiring what you have not.",author:"Epicurus"}, bible:{verse:"Better one handful with tranquility than two handfuls with toil.",ref:"Ecclesiastes 4:6"} },
+  { theme:"GRATITUDE", stoic:{quote:"Enjoy the present pleasures in such a way as not to injure the future ones.",author:"Seneca"}, bible:{verse:"Every good and perfect gift is from above, coming down from the Father of the heavenly lights.",ref:"James 1:17"} },
+  { theme:"GRATITUDE", stoic:{quote:"Amor fati: Love your fate, which is in fact your life.",author:"Marcus Aurelius"}, bible:{verse:"In everything give thanks: for this is the will of God in Christ Jesus concerning you.",ref:"1 Thessalonians 5:18"} },
+  { theme:"GRATITUDE", stoic:{quote:"A grateful mind is a great mind which eventually attracts to itself great things.",author:"Plato"}, bible:{verse:"Let the peace of Christ rule in your hearts... And be thankful.",ref:"Colossians 3:15"} },
+  { theme:"GRATITUDE", stoic:{quote:"Real riches are the riches possessed inside.",author:"Seneca"}, bible:{verse:"But godliness with contentment is great gain.",ref:"1 Timothy 6:6-7"} },
+  { theme:"GRATITUDE", stoic:{quote:"It is not the man who has too little, but the man who craves more, that is poor.",author:"Seneca"}, bible:{verse:"I have learned, in whatever situation I am, to be content.",ref:"Philippians 4:11"} },
+  // PURPOSE
+  { theme:"PURPOSE", stoic:{quote:"Man is disturbed not by things, but by the opinions about things.",author:"Epictetus"}, bible:{verse:"For we are God's handiwork, created in Christ Jesus to do good works, which God prepared in advance for us to do.",ref:"Ephesians 2:10"} },
+  { theme:"PURPOSE", stoic:{quote:"The purpose of life is to live in agreement with nature.",author:"Zeno of Citium"}, bible:{verse:"Before I formed you in the womb I knew you, before you were born I set you apart.",ref:"Jeremiah 1:5"} },
+  { theme:"PURPOSE", stoic:{quote:"You can foresee the future by looking at the past.",author:"Marcus Aurelius"}, bible:{verse:"Many are the plans in a person's heart, but it is the Lord's purpose that prevails.",ref:"Proverbs 19:21"} },
+  { theme:"PURPOSE", stoic:{quote:"He suffers more than necessary, who suffers before it is necessary.",author:"Seneca"}, bible:{verse:"For everything there is a season, and a time for every matter under heaven.",ref:"Ecclesiastes 3:1"} },
+  { theme:"PURPOSE", stoic:{quote:"Life is long if you know how to use it.",author:"Seneca"}, bible:{verse:"Teach us to number our days, that we may gain a heart of wisdom.",ref:"Psalm 90:12"} },
+  { theme:"PURPOSE", stoic:{quote:"Wherever there is a human being, there is an opportunity for a kindness.",author:"Seneca"}, bible:{verse:"Whatever you did for one of the least of these brothers and sisters of mine, you did for me.",ref:"Matthew 25:40"} },
+  { theme:"PURPOSE", stoic:{quote:"If it is not right do not do it; if it is not true do not say it.",author:"Marcus Aurelius"}, bible:{verse:"Do not let any unwholesome talk come out of your mouths, but only what is helpful for building others up.",ref:"Ephesians 4:29"} },
+  { theme:"PURPOSE", stoic:{quote:"Let us not become weary in doing good.",author:"Marcus Aurelius"}, bible:{verse:"Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.",ref:"Galatians 6:9"} },
+  { theme:"PURPOSE", stoic:{quote:"What man actually needs is not a tensionless state but rather the striving and struggling for a worthwhile goal.",author:"Epictetus"}, bible:{verse:"Run in such a way as to get the prize.",ref:"1 Corinthians 9:24"} },
+  // HUMILITY
+  { theme:"HUMILITY", stoic:{quote:"You are a little soul carrying around a corpse.",author:"Marcus Aurelius"}, bible:{verse:"For all have sinned and fall short of the glory of God.",ref:"Romans 3:23"} },
+  { theme:"HUMILITY", stoic:{quote:"If someone shows me I'm wrong, I will happily change.",author:"Marcus Aurelius"}, bible:{verse:"Pride goes before destruction, a haughty spirit before a fall.",ref:"Proverbs 16:18"} },
+  { theme:"HUMILITY", stoic:{quote:"Never esteem anything as of advantage to you that will make you break your word or lose your self-respect.",author:"Marcus Aurelius"}, bible:{verse:"Do nothing out of selfish ambition or vain conceit. Rather, in humility value others above yourselves.",ref:"Philippians 2:3"} },
+  { theme:"HUMILITY", stoic:{quote:"The happiness of your life depends upon the quality of your thoughts.",author:"Marcus Aurelius"}, bible:{verse:"For those who exalt themselves will be humbled, and those who humble themselves will be exalted.",ref:"Matthew 23:12"} },
+  { theme:"HUMILITY", stoic:{quote:"Accept the things to which fate binds you.",author:"Marcus Aurelius"}, bible:{verse:"Humble yourselves before the Lord, and he will lift you up.",ref:"James 4:10"} },
+  { theme:"HUMILITY", stoic:{quote:"Do not think of what is absent as already lost.",author:"Marcus Aurelius"}, bible:{verse:"The Lord is close to the brokenhearted and saves those who are crushed in spirit.",ref:"Psalm 34:18"} },
+  { theme:"HUMILITY", stoic:{quote:"Make the best use of what is in your power, and take the rest as it happens.",author:"Epictetus"}, bible:{verse:"Casting all your care upon him; for he careth for you.",ref:"1 Peter 5:7"} },
+  { theme:"HUMILITY", stoic:{quote:"The world is a mere change of scene. Time is a river.",author:"Marcus Aurelius"}, bible:{verse:"What is your life? You are a mist that appears for a little while and then vanishes.",ref:"James 4:14"} },
+  { theme:"HUMILITY", stoic:{quote:"If you really want to escape the things that harass you, what you're needing is not to be in a different place but to be a different person.",author:"Seneca"}, bible:{verse:"Therefore, if anyone is in Christ, the new creation has come: The old has gone, the new is here!",ref:"2 Corinthians 5:17"} },
+  // HOPE
+  { theme:"HOPE", stoic:{quote:"The sun also rises.",author:"Marcus Aurelius"}, bible:{verse:"The steadfast love of the Lord never ceases; his mercies never come to an end; they are new every morning.",ref:"Lamentations 3:22-23"} },
+  { theme:"HOPE", stoic:{quote:"This too shall pass.",author:"Persian proverb"}, bible:{verse:"Weeping may stay for the night, but rejoicing comes in the morning.",ref:"Psalm 30:5"} },
+  { theme:"HOPE", stoic:{quote:"While there is life there is hope.",author:"Cicero"}, bible:{verse:"But those who hope in the Lord will renew their strength. They will soar on wings like eagles.",ref:"Isaiah 40:31"} },
+  { theme:"HOPE", stoic:{quote:"Turn your wounds into wisdom.",author:"Epictetus"}, bible:{verse:"He heals the brokenhearted and binds up their wounds.",ref:"Psalm 147:3"} },
+  { theme:"HOPE", stoic:{quote:"If you are going through hell, keep going.",author:"Seneca"}, bible:{verse:"Even though I walk through the darkest valley, I will fear no evil, for you are with me.",ref:"Psalm 23:4"} },
+  { theme:"HOPE", stoic:{quote:"The bravest sight in the world is to see a great man struggling against adversity.",author:"Seneca"}, bible:{verse:"We are hard pressed on every side, but not crushed; perplexed, but not in despair.",ref:"2 Corinthians 4:8"} },
+  { theme:"HOPE", stoic:{quote:"A gem cannot be polished without friction, nor a man perfected without trials.",author:"Seneca"}, bible:{verse:"See, I have refined you, though not as silver; I have tested you in the furnace of affliction.",ref:"Isaiah 48:10"} },
+  { theme:"HOPE", stoic:{quote:"What we plant in the soil of contemplation, we shall reap in the harvest of action.",author:"Meister Eckhart"}, bible:{verse:"Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.",ref:"Galatians 6:9"} },
+  { theme:"HOPE", stoic:{quote:"After winter, spring.",author:"Marcus Aurelius"}, bible:{verse:"For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.",ref:"Jeremiah 29:11"} },
+];
+
+let currentIndex = 0;
+let mode = 'both';
+
+function setMode(m) {
+  mode = m;
+  ['both','stoic','bible'].forEach(x => document.getElementById('btn-'+x).classList.remove('active'));
+  document.getElementById('btn-'+m).classList.add('active');
+  renderCurrent();
+}
+
+function nextBurst() {
+  currentIndex = (currentIndex + 1) % library.length;
+  renderCurrent();
+}
+
+function randomBurst() {
+  currentIndex = Math.floor(Math.random() * library.length);
+  renderCurrent();
+}
+
+function renderCurrent() {
+  const e = library[currentIndex];
+  const now = new Date();
+  const t = now.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', hour12:true});
+
+  document.getElementById('burst-num').textContent = `★  CANON BURST #${String(currentIndex+1).padStart(2,'0')}`;
+  document.getElementById('burst-theme').textContent = `THEME: ${e.theme}`;
+  document.getElementById('burst-time').textContent = t;
+
+  const stoicSec = document.getElementById('stoic-section');
+  const bibleSec = document.getElementById('bible-section');
+  const divider  = document.getElementById('divider');
+
+  if (mode === 'both' || mode === 'stoic') {
+    stoicSec.style.display = 'block';
+    document.getElementById('stoic-quote').textContent = `"${e.stoic.quote}"`;
+    document.getElementById('stoic-author').textContent = `— ${e.stoic.author}`;
+  } else {
+    stoicSec.style.display = 'none';
+  }
+
+  divider.style.display = (mode === 'both') ? 'block' : 'none';
+
+  if (mode === 'both' || mode === 'bible') {
+    bibleSec.style.display = 'block';
+    document.getElementById('bible-verse').textContent = `"${e.bible.verse}"`;
+    document.getElementById('bible-ref').textContent = `— ${e.bible.ref}`;
+  } else {
+    bibleSec.style.display = 'none';
+  }
+
+  document.getElementById('counter').textContent =
+    `Canon ${currentIndex+1} of 81  ·  ${library.filter((x,i)=>i<=currentIndex&&x.theme===e.theme).length} of 9 in ${e.theme}`;
+}
+
+renderCurrent();
+</script>
+</body>
+</html>

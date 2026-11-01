@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+html, body { background: #05080f; color: #e5e7eb; }
+.leaflet-container { background: #0b1220; font-family: inherit; }
+
+/* Darken OpenStreetMap tiles to match the theme */
+.osm-dark { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9); }
