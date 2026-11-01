@@ -61,4 +61,4 @@ Login emails send people back to this address. If it is missing, the map still o
 
 ## 4. Point the home screen at the real address
 
-The GitHub Pages home screen uses `https://baileyos.vercel.app` as a stand-in. After you know the real Vercel address, replace that link in the repository file `index.html` (there is a TODO comment beside it) and let GitHub Pages publish the change.
+The GitHub Pages home screen links to `https://baileyos-app.vercel.app`.
