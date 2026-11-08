@@ -4,10 +4,34 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>◉ Bailey ARK — Living Archive</title>
+<script>
+/* First paint. Same rule as ArchiveGate.rememberedYes: a yes with a future expires. */
+(function () {
+  var open = false;
+  try {
+    var raw = JSON.parse(localStorage.getItem('bailey_agegate') || 'null');
+    open = !!(raw && raw.state === 'yes' && typeof raw.expires === 'number' && isFinite(raw.expires) && Date.now() < raw.expires);
+  } catch (e) {}
+  document.documentElement.classList.add(open ? 'age-open' : 'age-hold');
+})();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+  html:not(.age-open) body > *:not(#archive-age-gate) { visibility:hidden !important; pointer-events:none !important; }
+  html:not(.age-open), html:not(.age-open) body { overflow:hidden !important; }
+  #archive-age-gate { position:fixed; inset:0; z-index:2147483647; background:#05080f; color:#F4F1EA; display:flex; align-items:center; justify-content:center; padding:24px; }
+  html.age-open #archive-age-gate { display:none !important; }
+  #archive-age-gate .gate-card { max-width:28rem; width:100%; text-align:center; }
+  #archive-age-gate h1 { font-family:'Space Mono',monospace; font-size:clamp(1.4rem, 6vw, 2rem); letter-spacing:0.12em; margin:0 0 0.75rem; }
+  #archive-age-gate p { font-family:'Space Mono',monospace; font-size:0.95rem; line-height:1.5; margin:0 0 1rem; }
+  #archive-age-gate .gate-actions { display:flex; flex-wrap:wrap; gap:12px; justify-content:center; }
+  #archive-age-gate button.gate-choice { font-family:'Space Mono',monospace; font-size:1rem; letter-spacing:0.04em; min-height:48px; min-width:44px; padding:12px 18px; border-radius:8px; cursor:pointer; }
+  #archive-age-gate #archive-age-yes { background:#C9943A; color:#111; border:2px solid #C9943A; }
+  #archive-age-gate #archive-age-no { background:transparent; color:#F4F1EA; border:2px solid #C9943A; }
+  #archive-age-gate button.gate-choice:focus-visible { outline:3px solid #fff; outline-offset:3px; }
+  #archive-age-gate .gate-note { font-size:0.75rem; color:rgba(244,241,234,0.75); }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:#000; min-height:100vh; font-family:'Space Mono','Courier New',monospace; overflow:hidden; user-select:none; }
 
@@ -202,6 +226,19 @@
 </head>
 <body>
 
+<div id="archive-age-gate" role="dialog" aria-modal="true" aria-labelledby="archive-age-title" aria-describedby="archive-age-text age-log-status">
+  <div class="gate-card">
+    <h1 id="archive-age-title">Living Archive</h1>
+    <p id="archive-age-text">This is a self-check, not an age or identity verification, and it is not a security barrier. Are you 18 or older?</p>
+    <div class="gate-actions">
+      <button type="button" class="gate-choice" id="archive-age-yes">Yes, I confirm I am 18 or older</button>
+      <button type="button" class="gate-choice" id="archive-age-no">No, exit</button>
+    </div>
+    <p class="gate-note">Self-confirmed only. No name or birth date is stored. A yes on another site does not count here. Grand Junction, CO.</p>
+    <p id="age-log-status" class="gate-note" role="status">No log sent yet.</p>
+  </div>
+</div>
+
 <div id="purg-msg">
   <div style="color:#C9943A;font-size:10px;letter-spacing:3px;margin-bottom:14px;">◉ SIGNAL ARK · PURGATORY</div>
   <div style="color:#fff;font-size:17px;font-weight:700;margin-bottom:10px;line-height:1.4;">You chose to exit.<br><span style="color:#f44;">There is no exit.</span></div>
@@ -268,12 +305,12 @@
       <div class="sidebar-section">
         <div class="sidebar-label" style="margin-top:14px;">AGE GATE STATUS</div>
         <div class="age-gate-status">
-          <div class="ags-label">GATE READINESS</div>
-          <div class="ags-row"><span class="ags-key">TABLE</span><span class="ags-val g">✓ LIVE</span></div>
-          <div class="ags-row"><span class="ags-key">LOGGING</span><span class="ags-val g">✓ ACTIVE</span></div>
-          <div class="ags-row"><span class="ags-key">PII</span><span class="ags-val g">✓ ZERO</span></div>
-          <div class="ags-row"><span class="ags-key">SOURCE</span><span class="ags-val">BAILEY-OASIS</span></div>
-          <div class="ags-row"><span class="ags-key">REALTIME</span><span class="ags-val g" id="rt-status">◌ INIT</span></div>
+          <div class="ags-label">SELF-CHECK ONLY</div>
+          <p style="font-size:10px;line-height:1.45;color:rgba(201,148,58,0.75);margin:6px 0 8px;">This page asks its own question. It does not receive Oasis storage, bailey:agegate, or window.BaileyAgeGate from another site. A database row is not an age check.</p>
+          <div class="ags-row"><span class="ags-key">LISTENER</span><span class="ags-val">NONE</span></div>
+          <div class="ags-row"><span class="ags-key">PROOF</span><span class="ags-val">SELF-CONFIRMED</span></div>
+          <div class="ags-row"><span class="ags-key">LOG</span><span class="ags-val">SEE GATE STATUS</span></div>
+          <div class="ags-row"><span class="ags-key">REALTIME</span><span class="ags-val" id="rt-status">◌ INIT</span></div>
         </div>
       </div>
 
@@ -330,6 +367,7 @@
   </div>
 </div>
 
+<script src="archive-gate.js"></script>
 <script>
 if (new URLSearchParams(window.location.search).get('purgatory')==='1')
   document.getElementById('purg-msg').style.display='block';
@@ -367,14 +405,15 @@ function flashEvent(record){
 
 // Supabase
 const SB_URL='https://aklxxrmytplbrjqunkpg.supabase.co';
+/* Publishable anon key already used by this page. Not a service-role key. */
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrbHh4cm15dHBsYnJqcXVua3BnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMzc0NDcsImV4cCI6MjA4NzgxMzQ0N30.7NBf784LfeulBFH2u8HAdVHJgPIksfeAor7iA5R36f0';
 let db=null;
 
 function setLiveDot(state){
   const el=document.getElementById('live-dot'), rt=document.getElementById('rt-status');
-  if(state==='live'){el.textContent='◉ LIVE';el.style.color='rgba(0,200,100,0.8)';if(rt){rt.textContent='◉ LIVE';rt.style.color='#0c8';}}
-  else if(state==='connect'){el.textContent='◌ CONNECTING…';el.style.color='rgba(201,148,58,0.5)';if(rt){rt.textContent='◌ INIT';rt.style.color='rgba(201,148,58,0.6)';}}
-  else{el.textContent='◌ OFFLINE';el.style.color='rgba(255,80,80,0.5)';if(rt){rt.textContent='✗ OFF';rt.style.color='#f55';}}
+  if(state==='live'){el.textContent='◉ LIVE';el.style.color='rgba(0,200,100,0.8)';if(rt){rt.textContent='SOCKET OPEN';rt.style.color='rgba(201,148,58,0.85)';}}
+  else if(state==='connect'){el.textContent='◌ CONNECTING…';el.style.color='rgba(201,148,58,0.5)';if(rt){rt.textContent='SOCKET INIT';rt.style.color='rgba(201,148,58,0.6)';}}
+  else{el.textContent='◌ OFFLINE';el.style.color='rgba(255,80,80,0.5)';if(rt){rt.textContent='SOCKET OFF';rt.style.color='#f55';}}
 }
 
 function bootLive(){
@@ -701,6 +740,7 @@ new p5(function(p){
     p.beginShape();p.vertex(-s*0.5,0);p.vertex(-s*0.78,-s*0.3);p.vertex(-s*0.72,0);p.vertex(-s*0.78,s*0.3);p.endShape(p.CLOSE);
   }
 });
+ArchiveGate.boot({ url: SB_URL, key: SB_KEY });
 </script>
 </body>
 </html>
