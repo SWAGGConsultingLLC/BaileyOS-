@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   authRedirectUrl,
   callbackKind,
+  decideSessionExposure,
   interpretMagicLink,
   interpretRecoverySend,
   interpretSignIn,
@@ -21,8 +22,9 @@ test('signup without a session asks for email confirmation', () => {
   assert.match(noticeText(notice), /not a signed-in member/);
 });
 
-test('signup that already has a session is signed in', () => {
-  assert.equal(interpretSignUp({ error: null, session: { access_token: 't' } }).kind, 'signed-in');
+test('signup that already has a session is signed in only when the email is confirmed', () => {
+  assert.equal(interpretSignUp({ error: null, session: { access_token: 't' }, emailConfirmedAt: '2024-01-01T00:00:00Z' }).kind, 'signed-in');
+  assert.equal(interpretSignUp({ error: null, session: { access_token: 't' }, emailConfirmedAt: null }).kind, 'confirm-email');
 });
 
 test('signup failure does not say the email is registered', () => {
@@ -31,8 +33,9 @@ test('signup failure does not say the email is registered', () => {
   if (notice.kind === 'error') assert.doesNotMatch(notice.message, /already registered/i);
 });
 
-test('confirmed sign-in requires a session', () => {
-  assert.equal(interpretSignIn({ error: null, session: { access_token: 't' } }).kind, 'signed-in');
+test('confirmed sign-in requires a session and a confirmation timestamp', () => {
+  assert.equal(interpretSignIn({ error: null, session: { access_token: 't' }, emailConfirmedAt: '2024-01-01T00:00:00Z' }).kind, 'signed-in');
+  assert.equal(interpretSignIn({ error: null, session: { access_token: 't' }, emailConfirmedAt: null }).kind, 'unconfirmed');
   assert.equal(interpretSignIn({ error: null, session: null }).kind, 'error');
 });
 
@@ -55,6 +58,7 @@ test('expired session is not usable', () => {
 test('recovery callback is recognized and a send does not claim the mailbox exists', () => {
   assert.equal(callbackKind('https://baileyos-app.vercel.app/#access_token=abc&type=recovery'), 'recovery');
   assert.equal(callbackKind('https://baileyos-app.vercel.app/?code=abc&type=recovery'), 'recovery');
+  assert.equal(callbackKind('https://baileyos-app.vercel.app/?type=recovery'), null);
   assert.equal(callbackKind('https://baileyos-app.vercel.app/#type=signup'), 'signup');
   assert.equal(callbackKind('https://baileyos-app.vercel.app/'), null);
   const sent = interpretRecoverySend({ error: null });
@@ -81,8 +85,47 @@ test('profile fields reject blanks, overflow, and control characters', () => {
   assert.equal(validatePassword('long-enough').ok, true);
 });
 
-test('redirect url has no trailing slash', () => {
+test('redirect url is origin only', () => {
   assert.equal(authRedirectUrl('https://baileyos-app.vercel.app/'), 'https://baileyos-app.vercel.app');
+  assert.equal(authRedirectUrl('https://baileyos-app.vercel.app/phish?next=https://evil.example'), 'https://baileyos-app.vercel.app');
+  assert.throws(() => authRedirectUrl('javascript:alert(1)'));
+});
+
+const confirmed = { access_token: 't', expires_at: 500, user: { id: 'user-a', email_confirmed_at: '2024-01-01T00:00:00Z' } };
+
+test('recovery session cannot link a placement until the password is replaced', () => {
+  const recovery = decideSessionExposure({ event: 'PASSWORD_RECOVERY', recoveryPending: true, session: confirmed, nowSec: 100 });
+  assert.equal(recovery.exposeToken, null);
+  assert.equal(recovery.resetPassword, true);
+  assert.equal(recovery.userId, 'user-a');
+  const after = decideSessionExposure({ event: 'USER_UPDATED', recoveryPending: false, session: confirmed, nowSec: 100 });
+  assert.equal(after.exposeToken, 't');
+  assert.equal(after.resetPassword, false);
+});
+
+test('a bare recovery query does not demote an existing confirmed session', () => {
+  const normal = decideSessionExposure({ event: 'SIGNED_IN', recoveryPending: false, session: confirmed, nowSec: 100 });
+  assert.equal(normal.exposeToken, 't');
+  assert.equal(normal.resetPassword, false);
+});
+
+test('an unconfirmed session is dropped and not exposed', () => {
+  const dropped = decideSessionExposure({
+    event: 'SIGNED_IN',
+    recoveryPending: false,
+    session: { access_token: 't', expires_at: 500, user: { id: 'user-a', email_confirmed_at: null } },
+    nowSec: 100,
+  });
+  assert.equal(dropped.dropUnconfirmed, true);
+  assert.equal(dropped.exposeToken, null);
+});
+
+test('the account panel uses the session decision instead of a bare recovery query', () => {
+  const src = readFileSync(new URL('../components/AccountPanel.tsx', import.meta.url), 'utf8');
+  assert.match(src, /decideSessionExposure\(/);
+  assert.match(src, /hasRecoveryCredential\(/);
+  assert.doesNotMatch(src, /callbackKind\(window\.location\.href\)/);
+  assert.doesNotMatch(src, /onAccessToken\(session\.access_token\)/);
 });
 
 test('profile migration does not use security definer or user metadata', () => {

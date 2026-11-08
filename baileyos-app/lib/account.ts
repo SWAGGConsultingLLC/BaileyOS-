@@ -41,19 +41,60 @@ export function validatePassword(raw: string): { ok: true } | { ok: false; error
   return { ok: true };
 }
 
+/** Same-origin only. Paths, queries, and non-http schemes are discarded so this cannot be an open redirect. */
 export function authRedirectUrl(origin: string): string {
-  return origin.replace(/\/$/, '');
+  const url = new URL(origin);
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('Redirect must be http or https');
+  return url.origin;
+}
+
+const AUTH_PARAMS = ['access_token', 'refresh_token', 'expires_in', 'expires_at', 'token_type', 'type', 'code', 'provider_token', 'provider_refresh_token'];
+
+function authParams(href: string): { hash: URLSearchParams; query: URLSearchParams } | null {
+  try {
+    const url = new URL(href);
+    return {
+      hash: new URLSearchParams(url.hash.startsWith('#') ? url.hash.slice(1) : url.hash),
+      query: url.searchParams,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function param(parts: { hash: URLSearchParams; query: URLSearchParams }, key: string): string | null {
+  return parts.hash.get(key) || parts.query.get(key);
+}
+
+/** A recovery callback must carry a token or code. A bare ?type=recovery is not one. */
+export function hasRecoveryCredential(href: string): boolean {
+  const parts = authParams(href);
+  if (!parts || param(parts, 'type') !== 'recovery') return false;
+  return Boolean(param(parts, 'access_token') || param(parts, 'refresh_token') || param(parts, 'code'));
 }
 
 /** Implicit-flow email links put type in the hash. PKCE links use the query string. */
 export function callbackKind(href: string): 'recovery' | 'signup' | null {
-  let url: URL;
-  try { url = new URL(href); } catch { return null; }
-  const hash = new URLSearchParams(url.hash.startsWith('#') ? url.hash.slice(1) : url.hash);
-  const type = hash.get('type') || url.searchParams.get('type');
-  if (type === 'recovery') return 'recovery';
+  const parts = authParams(href);
+  if (!parts) return null;
+  const type = param(parts, 'type');
+  if (type === 'recovery') return hasRecoveryCredential(href) ? 'recovery' : null;
   if (type === 'signup' || type === 'email') return 'signup';
   return null;
+}
+
+/** Drop tokens from the address bar after they have been read. Fragments are not a place to leave a session. */
+export function stripAuthParams(href: string): string {
+  const url = new URL(href);
+  for (const key of AUTH_PARAMS) url.searchParams.delete(key);
+  const hash = new URLSearchParams(url.hash.startsWith('#') ? url.hash.slice(1) : url.hash);
+  if (AUTH_PARAMS.some(key => hash.has(key))) url.hash = '';
+  const search = url.searchParams.toString();
+  return url.origin + url.pathname + (search ? `?${search}` : '') + url.hash;
+}
+
+export function emailIsConfirmed(emailConfirmedAt: string | null | undefined): boolean {
+  return typeof emailConfirmedAt === 'string' && emailConfirmedAt.length > 0;
 }
 
 export function sessionIsUsable(
@@ -65,14 +106,15 @@ export function sessionIsUsable(
   return true;
 }
 
-export function interpretSignUp(result: { error: AuthErrorLike; session: unknown | null }): AuthNotice {
+export function interpretSignUp(result: { error: AuthErrorLike; session: unknown | null; emailConfirmedAt?: string | null }): AuthNotice {
   if (result.error) return { kind: 'error', message: 'Could not create the account. If you already have one, sign in.' };
-  if (result.session) return { kind: 'signed-in' };
+  if (result.session && emailIsConfirmed(result.emailConfirmedAt)) return { kind: 'signed-in' };
   return { kind: 'confirm-email' };
 }
 
-export function interpretSignIn(result: { error: AuthErrorLike; session: unknown | null }): AuthNotice {
-  if (!result.error && result.session) return { kind: 'signed-in' };
+export function interpretSignIn(result: { error: AuthErrorLike; session: unknown | null; emailConfirmedAt?: string | null }): AuthNotice {
+  if (!result.error && result.session && emailIsConfirmed(result.emailConfirmedAt)) return { kind: 'signed-in' };
+  if (!result.error && result.session) return { kind: 'unconfirmed' };
   if (!result.error) return { kind: 'error', message: 'Sign-in did not start a session.' };
   const code = result.error.code || '';
   const message = (result.error.message || '').toLowerCase();
@@ -89,6 +131,44 @@ export function interpretRecoverySend(result: { error: AuthErrorLike }): AuthNot
 export function interpretMagicLink(result: { error: AuthErrorLike }): AuthNotice {
   if (result.error) return { kind: 'error', message: 'Could not send a sign-in link. Create an account if you do not have one.' };
   return { kind: 'link-sent' };
+}
+
+export type MemberSession = {
+  access_token?: string;
+  expires_at?: number;
+  user?: { id?: string; email_confirmed_at?: string | null };
+} | null;
+
+export type SessionDecision = {
+  exposeToken: string | null;
+  userId: string | null;
+  resetPassword: boolean;
+  dropUnconfirmed: boolean;
+};
+
+/**
+ * A recovery session may set a new password and nothing else.
+ * A normal session is not turned into recovery by a bare ?type=recovery link.
+ * An unconfirmed email does not become a member session.
+ */
+export function decideSessionExposure(input: {
+  event: string | null;
+  recoveryPending: boolean;
+  session: MemberSession;
+  nowSec: number;
+}): SessionDecision {
+  const session = input.session;
+  const usable = sessionIsUsable(session, input.nowSec);
+  if (!usable || !session?.access_token || !session.user?.id) {
+    return { exposeToken: null, userId: null, resetPassword: false, dropUnconfirmed: false };
+  }
+  if (!emailIsConfirmed(session.user.email_confirmed_at)) {
+    return { exposeToken: null, userId: null, resetPassword: false, dropUnconfirmed: true };
+  }
+  if (input.event === 'PASSWORD_RECOVERY' || input.recoveryPending) {
+    return { exposeToken: null, userId: session.user.id, resetPassword: true, dropUnconfirmed: false };
+  }
+  return { exposeToken: session.access_token, userId: session.user.id, resetPassword: false, dropUnconfirmed: false };
 }
 
 export function noticeText(notice: AuthNotice): string {

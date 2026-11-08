@@ -1,5 +1,28 @@
 \set ON_ERROR_STOP on
 
+do $$
+declare cols text;
+declare n int;
+begin
+  select string_agg(column_name, ',' order by column_name) into cols
+    from information_schema.columns
+   where table_schema = 'public' and table_name = 'profiles';
+  if cols <> 'bio,created_at,display_name,updated_at,user_id' then
+    raise exception 'unexpected profiles columns: %', cols;
+  end if;
+  select count(*) into n from information_schema.role_table_grants
+   where table_schema = 'public' and table_name = 'profiles' and grantee = 'anon';
+  if n <> 0 then raise exception 'anon has % grants on profiles', n; end if;
+  select count(*) into n from information_schema.role_table_grants
+   where table_schema = 'public' and table_name = 'profiles'
+     and grantee = 'authenticated' and privilege_type = 'DELETE';
+  if n <> 0 then raise exception 'authenticated can delete profiles'; end if;
+  select count(*) into n from information_schema.role_table_grants
+   where table_schema = 'public' and table_name in ('placements', 'desk_accounts', 'placed_count')
+     and grantee = 'authenticated' and privilege_type in ('INSERT', 'UPDATE', 'DELETE');
+  if n <> 0 then raise exception 'profile migration granted member writes on older tables'; end if;
+end $$;
+
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.test'),
   ('22222222-2222-2222-2222-222222222222', 'b@example.test');

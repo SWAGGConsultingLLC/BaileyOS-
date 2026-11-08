@@ -1,16 +1,17 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import {
   authRedirectUrl,
-  callbackKind,
+  decideSessionExposure,
+  hasRecoveryCredential,
   interpretMagicLink,
   interpretRecoverySend,
   interpretSignIn,
   interpretSignUp,
   noticeText,
-  sessionIsUsable,
+  stripAuthParams,
   validateBio,
   validateDisplayName,
   validatePassword,
@@ -37,27 +38,55 @@ export function AccountPanel({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<AuthNotice | null>(null);
   const [savedName, setSavedName] = useState<string | null>(null);
+  const [dropUnconfirmed, setDropUnconfirmed] = useState(false);
+  const hrefAtLoad = useState(() => (typeof window === 'undefined' ? '' : window.location.href))[0];
+  const recoveryRef = useRef(hasRecoveryCredential(hrefAtLoad));
+
+  function applySession(event: string | null, session: Session | null) {
+    if (event === 'PASSWORD_RECOVERY') recoveryRef.current = true;
+    const decision = decideSessionExposure({
+      event,
+      recoveryPending: recoveryRef.current,
+      session,
+      nowSec: Math.floor(Date.now() / 1000),
+    });
+    if (decision.dropUnconfirmed) {
+      setDropUnconfirmed(true);
+      onAccessToken(null);
+      setUserId(null);
+      setSettingPassword(false);
+      setNotice({ kind: 'unconfirmed' });
+      return;
+    }
+    setSettingPassword(decision.resetPassword);
+    onAccessToken(decision.exposeToken);
+    setUserId(decision.userId);
+  }
+
+  useEffect(() => {
+    if (!dropUnconfirmed || !client) return;
+    let cancel = false;
+    client.auth.signOut().finally(() => { if (!cancel) setDropUnconfirmed(false); });
+    return () => { cancel = true; };
+  }, [dropUnconfirmed, client]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !hrefAtLoad) return;
+    const clean = stripAuthParams(window.location.href);
+    if (clean !== window.location.href) window.history.replaceState(null, '', clean);
+  }, [hrefAtLoad]);
 
   useEffect(() => {
     if (!client) return;
     let stop = false;
-    const apply = (session: Session | null) => {
+    client.auth.getSession().then(({ data }) => { if (!stop) applySession(null, data.session); }).catch(() => {
       if (stop) return;
-      if (!session || !sessionIsUsable(session, Math.floor(Date.now() / 1000))) {
-        onAccessToken(null);
-        setUserId(null);
-        return;
-      }
-      onAccessToken(session.access_token);
-      setUserId(session.user.id);
-    };
-    client.auth.getSession().then(({ data }) => apply(data.session)).catch(() => {
       onAccessToken(null);
       setUserId(null);
       setNotice({ kind: 'expired' });
     });
     const { data: sub } = client.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') setSettingPassword(true);
+      if (stop) return;
       if (event === 'SIGNED_OUT') {
         onAccessToken(null);
         setUserId(null);
@@ -65,9 +94,8 @@ export function AccountPanel({
         setSavedName(null);
         return;
       }
-      apply(session);
+      applySession(event, session);
     });
-    if (typeof window !== 'undefined' && callbackKind(window.location.href) === 'recovery') setSettingPassword(true);
     return () => { stop = true; sub.subscription.unsubscribe(); };
   }, [client, onAccessToken]);
 
@@ -102,7 +130,8 @@ export function AccountPanel({
     });
     setBusy(false);
     setPassword('');
-    const result = interpretSignUp({ error, session: data.session });
+    const result = interpretSignUp({ error, session: data.session, emailConfirmedAt: data.user?.email_confirmed_at });
+    if (result.kind === 'confirm-email' && data.session) setDropUnconfirmed(true);
     setNotice(result);
     if (result.kind === 'confirm-email') {
       try { sessionStorage.setItem(PENDING_NAME, name.value); } catch { /* ignore */ }
@@ -117,9 +146,9 @@ export function AccountPanel({
     const { data, error } = await client.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
     setPassword('');
-    const result = interpretSignIn({ error, session: data.session });
+    const result = interpretSignIn({ error, session: data.session, emailConfirmedAt: data.user?.email_confirmed_at });
+    if (result.kind === 'unconfirmed') setDropUnconfirmed(true);
     setNotice(result);
-    if (result.kind === 'expired') onAccessToken(null);
   }
 
   async function onResend() {
@@ -170,8 +199,11 @@ export function AccountPanel({
     const { error } = await client.auth.updateUser({ password });
     setBusy(false);
     setPassword('');
-    if (error) { setNotice({ kind: 'error', message: 'Could not update the password.' }); return; }
+    if (error) { setNotice({ kind: 'error', message: 'Could not update the password. The recovery session was not given other access.' }); return; }
+    recoveryRef.current = false;
     setSettingPassword(false);
+    const { data } = await client.auth.getSession();
+    applySession('USER_UPDATED', data.session);
     setNotice({ kind: 'password-updated' });
   }
 

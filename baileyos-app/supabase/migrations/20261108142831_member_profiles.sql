@@ -1,3 +1,14 @@
+-- Refuses to replace an existing profiles table or trigger function.
+do $$
+begin
+  if to_regclass('public.profiles') is not null then
+    raise exception 'public.profiles already exists; this migration will not alter it';
+  end if;
+  if to_regprocedure('public.profiles_touch_updated_at()') is not null then
+    raise exception 'public.profiles_touch_updated_at already exists; this migration will not replace it';
+  end if;
+end $$;
+
 -- Private member profile for the BaileyOS map.
 -- Authorization is auth.uid() only. raw_user_meta_data and raw_app_meta_data are not read.
 -- There is no role column. A row here does not grant steward, owner, or admin.
@@ -30,6 +41,7 @@ comment on table public.profiles is
 create function public.profiles_touch_updated_at()
 returns trigger
 language plpgsql
+set search_path = pg_catalog
 as $$
 begin
   new.updated_at := now();

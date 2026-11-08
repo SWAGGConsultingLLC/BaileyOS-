@@ -13,6 +13,8 @@ Checked against Supabase docs on 8 Nov 2026:
 - Password recovery is `resetPasswordForEmail`, then `updateUser` after the `PASSWORD_RECOVERY` event. The recovery link must open on an allowed redirect URL.
 - Resend uses `auth.resend` with `type: 'signup'`.
 - A magic link for an existing account uses `signInWithOtp` with `shouldCreateUser: false`, so it does not create a member.
+- A session is used only when `email_confirmed_at` is present. Otherwise the client signs it out. Hosted Auth must keep Confirm email enabled; this repository does not change that setting.
+- Password recovery is recognized from the `PASSWORD_RECOVERY` event or from a callback that actually carries a token or code. A bare `?type=recovery` does not open the reset form. Until the new password is saved, that session is not passed to placement linking. Redirects sent to Auth are `window.location.origin` only.
 - RLS policies must use `auth.uid()`. `raw_user_meta_data` is user-editable and is not used for authorization. The profile table has no role column.
 - `UPDATE` includes a `SELECT` policy so a member can update their own row.
 - No new `SECURITY DEFINER` function was added. The `updated_at` trigger is security invoker.
