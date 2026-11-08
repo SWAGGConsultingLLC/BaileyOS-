@@ -18,7 +18,7 @@ Do this before the first deploy. If Root Directory stays the repository root, Ve
 
 In the same Vercel import screen (or later under **Project → Settings → Environment Variables**), add the names below. Paste each value into Vercel only. Do not put secret values in git, in this file, or in a chat.
 
-The public map settings, the public Supabase address, and the publishable anon key are already written in `.env.local.example` in this folder. Copy those. The two secret values are not in that file. Get them as described below.
+The public map settings and the public Supabase address are in `.env.local.example`. Copy those. Copy the publishable key from Supabase → Project Settings → API into `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The secret values are not in git. Get them as described below.
 
 **Required**
 
@@ -30,7 +30,7 @@ The public map settings, the public Supabase address, and the publishable anon k
 | `NEXT_PUBLIC_BAND_KM` | Size of each distance band. Copy from `.env.local.example`. |
 | `NEXT_PUBLIC_SECTOR_DEG` | Width of each direction slice. Copy from `.env.local.example`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Public Supabase project URL. Copy from `.env.local.example`, or from Supabase → **Project Settings → API**. |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable anon key (safe in the browser). Copy from `.env.local.example`, or the anon key on that same Supabase API page. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable key from Supabase → Project Settings → API. Paste it into Vercel only. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Secret. Supabase → **Project Settings → API** → service role key. Never commit this. |
 | `PLACEMENT_SECRET` | Secret. A long random string, at least 32 characters. On a computer you can run `openssl rand -hex 32` and paste the result into Vercel only. |
 
@@ -46,7 +46,7 @@ Apply the variables to **Production**. Add the same ones to **Preview** if you w
 
 Then click **Deploy**.
 
-The database tables for this map are already on the BaileyOS Supabase project. You do not need to run SQL for that project. If you ever point the variables at a brand-new Supabase project, run `supabase/migrations/001_init.sql` in the Supabase SQL editor first.
+The placement tables for this map are already on the BaileyOS Supabase project. The member profile table is not applied by a deploy. Run `supabase/migrations/20261108142831_member_profiles.sql` in the Supabase SQL editor before members can save a profile. Placement keeps working if that file has not been run. See `AUTH.md` for the Auth settings to confirm and for rollback. If you point the variables at a brand-new Supabase project, run `supabase/migrations/001_init.sql` first, then the profile migration.
 
 ## 3. Allow the live site in Supabase login
 
@@ -55,9 +55,10 @@ After Vercel finishes, copy the live address it gives you (it looks like `https:
 1. Open the Supabase dashboard for this project.
 2. Go to **Authentication → URL Configuration**.
 3. Set **Site URL** to that live address.
-4. Add the same address under **Redirect URLs**.
+4. Add the same address under **Redirect URLs**. Also add `http://localhost:3000` if you test mail locally.
+5. Leave **Confirm email** enabled, and set the minimum password length to at least 8.
 
-Login emails send people back to this address. If it is missing, the map still opens, but the email login link will not return them to the map.
+Login and confirmation emails send people back to this address. If it is missing, the map still opens, but the email link will not return them to the map. Do not turn off email confirmation to make signup look instant. An unconfirmed account is not signed in.
 
 ## 4. Point the home screen at the real address
 
