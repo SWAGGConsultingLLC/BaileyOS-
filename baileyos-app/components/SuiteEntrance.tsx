@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { suiteStatusText } from '@/lib/steward/decide';
-import { SUITE_PROVIDER, suiteAuthorizeHref, suiteConfig, suiteEnabled } from '@/lib/suite/verify';
+import { suiteAuthorizeHref, suiteConfig, suiteEnabled, suiteProvider } from '@/lib/suite/verify';
 
 export type SuiteContinuePhase =
   | { state: 'hidden' }
@@ -50,7 +50,7 @@ export async function prepareSuiteHref(redirectTo: string): Promise<PrepareResul
       options?: { redirectTo?: string; skipBrowserRedirect?: boolean };
     }) => Promise<{ data?: { url?: string | null }; error?: { message?: string } | null }>;
     const result = await startOAuth({
-      provider: SUITE_PROVIDER,
+      provider: suiteProvider(),
       options: { redirectTo, skipBrowserRedirect: true },
     });
     const href = result.data?.url ? suiteAuthorizeHref(result.data.url, config) : null;

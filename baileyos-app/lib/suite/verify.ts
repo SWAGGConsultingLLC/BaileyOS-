@@ -1,6 +1,11 @@
 /** 360° Brewing Auth issuer. Verified from that project's public discovery document. */
 export const SUITE_ISSUER = 'https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1';
+/** Current Data Nest provider. It sends LinkedIn a PKCE challenge. */
 export const SUITE_PROVIDER = 'custom:app-oidc';
+/** Built-in Supabase provider. It does not send LinkedIn a PKCE challenge. */
+export const SUITE_LINKEDIN_PROVIDER = 'linkedin_oidc';
+const SUITE_PROVIDERS = [SUITE_PROVIDER, SUITE_LINKEDIN_PROVIDER] as const;
+export type SuiteProviderName = (typeof SUITE_PROVIDERS)[number];
 
 const USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -35,6 +40,12 @@ export function suiteConfig(env: {
 
 export function suiteEnabled(env?: { suiteUrl?: string; suiteKey?: string }): boolean {
   return suiteConfig(env) !== null;
+}
+
+/** Stays on the custom provider until LinkedIn (OIDC) is enabled and this is set to linkedin_oidc. */
+export function suiteProvider(env: { suiteProvider?: string } = {}): SuiteProviderName {
+  const requested = (env.suiteProvider ?? process.env.NEXT_PUBLIC_SUITE_PROVIDER ?? '').trim();
+  return (SUITE_PROVIDERS as readonly string[]).includes(requested) ? requested as SuiteProviderName : SUITE_PROVIDER;
 }
 
 export type SuiteCallback =
@@ -103,7 +114,8 @@ export function suiteAuthorizeHref(candidate: string, config: SuiteConfig): stri
     const allowed = new URL(config.url);
     if (target.origin !== allowed.origin) return null;
     if (target.pathname !== '/auth/v1/authorize') return null;
-    if (target.searchParams.get('provider') !== SUITE_PROVIDER) return null;
+    const provider = target.searchParams.get('provider');
+    if (provider !== SUITE_PROVIDER && provider !== SUITE_LINKEDIN_PROVIDER) return null;
     const redirectTo = target.searchParams.get('redirect_to');
     if (!redirectTo) return null;
     const back = new URL(redirectTo);

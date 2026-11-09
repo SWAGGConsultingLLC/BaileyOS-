@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'node:test';
 import { SuiteContinue } from '../../components/SuiteEntrance.tsx';
-import { SUITE_ISSUER, decideSuiteSubject, suiteAuthorizeHref, suiteCallbackMessage, suiteConfig, suiteEnabled, suiteReturnTarget } from './verify.ts';
+import { SUITE_ISSUER, decideSuiteSubject, suiteAuthorizeHref, suiteCallbackMessage, suiteConfig, suiteEnabled, suiteProvider, suiteReturnTarget } from './verify.ts';
 
 const SUBJECT = '11111111-1111-4111-8111-111111111111';
 
@@ -80,10 +80,18 @@ test('a code that lands on the map root is sent to /suite', () => {
   assert.equal(suiteReturnTarget('https://baileyos-app.vercel.app/?code=abc#access_token=abc'), null);
 });
 
+test('the continue provider stays custom until LinkedIn (OIDC) is selected', () => {
+  assert.equal(suiteProvider({ suiteProvider: '' }), 'custom:app-oidc');
+  assert.equal(suiteProvider({ suiteProvider: 'github' }), 'custom:app-oidc');
+  assert.equal(suiteProvider({ suiteProvider: 'linkedin_oidc' }), 'linkedin_oidc');
+});
+
 test('only a 360 authorize link that returns to this map is kept', () => {
   const config = { url: 'https://shedpnosbkwkmwgqkefj.supabase.co', publishableKey: 'publishable' };
   const good = 'https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=custom%3Aapp-oidc&redirect_to=https%3A%2F%2Fbaileyos-app.vercel.app%2Fsuite';
+  const builtin = 'https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=linkedin_oidc&redirect_to=https%3A%2F%2Fbaileyos-app.vercel.app%2Fsuite';
   assert.equal(suiteAuthorizeHref(good, config), good);
+  assert.equal(suiteAuthorizeHref(builtin, config), builtin);
   assert.equal(suiteAuthorizeHref('https://evil.example/auth/v1/authorize?provider=custom:app-oidc&redirect_to=https://baileyos-app.vercel.app/suite', config), null);
   assert.equal(suiteAuthorizeHref('https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=github&redirect_to=https://baileyos-app.vercel.app/suite', config), null);
   assert.equal(suiteAuthorizeHref('https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=custom:app-oidc&redirect_to=https://baileyos-app.vercel.app/workspace', config), null);
@@ -93,6 +101,7 @@ test('the suite entrance does not render a connected control while config is abs
   const src = readFileSync(new URL('../../components/SuiteEntrance.tsx', import.meta.url), 'utf8');
   assert.match(src, /SuiteContinue/);
   assert.match(src, /<a href=\{phase.href\}/);
+  assert.match(src, /suiteProvider\(\)/);
   assert.match(src, /signInWithOAuth\.bind\(client\.auth\)/);
   assert.match(src, /skipBrowserRedirect: true/);
   assert.match(src, /Do not choose Sign up/);
