@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'node:test';
 import { SuiteContinue } from '../../components/SuiteEntrance.tsx';
-import { SUITE_ISSUER, decideSuiteSubject, suiteAuthorizeHref, suiteConfig, suiteEnabled } from './verify.ts';
+import { SUITE_ISSUER, decideSuiteSubject, suiteAuthorizeHref, suiteConfig, suiteEnabled, suiteReturnTarget } from './verify.ts';
 
 const SUBJECT = '11111111-1111-4111-8111-111111111111';
 
@@ -50,6 +50,13 @@ test('the auth server must agree with the token subject', () => {
   assert.equal(decideSuiteSubject('not-a-jwt', { id: SUBJECT }).ok, false);
 });
 
+test('a code that lands on the map root is sent to /suite', () => {
+  assert.equal(suiteReturnTarget('https://baileyos-app.vercel.app/?code=abc'), '/suite?code=abc');
+  assert.equal(suiteReturnTarget('https://baileyos-app.vercel.app/suite?code=abc'), null);
+  assert.equal(suiteReturnTarget('https://baileyos-app.vercel.app/#access_token=abc&type=signup'), null);
+  assert.equal(suiteReturnTarget('https://baileyos-app.vercel.app/?code=abc#access_token=abc'), null);
+});
+
 test('only a 360 authorize link that returns to this map is kept', () => {
   const config = { url: 'https://shedpnosbkwkmwgqkefj.supabase.co', publishableKey: 'publishable' };
   const good = 'https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=custom%3Aapp-oidc&redirect_to=https%3A%2F%2Fbaileyos-app.vercel.app%2Fsuite';
@@ -65,7 +72,8 @@ test('the suite entrance does not render a connected control while config is abs
   assert.match(src, /<a href=\{phase.href\}/);
   assert.match(src, /signInWithOAuth\.bind\(client\.auth\)/);
   assert.match(src, /skipBrowserRedirect: true/);
-  assert.match(src, /does not grant steward/);
+  assert.match(src, /Do not choose Sign up/);
+  assert.match(src, /SuiteBadge/);
   assert.doesNotMatch(src, /Connected/);
   assert.match(src, /window\.location\.origin \+ '\/suite'/);
   assert.doesNotMatch(src, /window\.location\.(assign|href)/);

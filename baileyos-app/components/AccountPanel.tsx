@@ -82,9 +82,11 @@ function Notice({ notice }: { notice: AuthNotice | null }) {
 export function AccountPanel({
   client,
   onAccessToken,
+  deferProfile = false,
 }: {
   client: SupabaseClient | null;
   onAccessToken: (token: string | null) => void;
+  deferProfile?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>('signup');
   const [email, setEmail] = useState('');
@@ -98,6 +100,7 @@ export function AccountPanel({
   const [savedName, setSavedName] = useState<string | null>(null);
   const [dropUnconfirmed, setDropUnconfirmed] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [showDeferredProfile, setShowDeferredProfile] = useState(false);
   const hrefAtLoad = useState(() => (typeof window === 'undefined' ? '' : window.location.href))[0];
   const recoveryRef = useRef(hasRecoveryCredential(hrefAtLoad));
 
@@ -324,7 +327,14 @@ export function AccountPanel({
         </form>
       )}
 
-      {userId && !settingPassword && (
+      {userId && !settingPassword && deferProfile && !showDeferredProfile && (
+        <div className="mt-4">
+          <p className="text-sm text-gray-300">The email profile is separate. It is not the next step while 360° Brewing is signed in.</p>
+          <button type="button" onClick={() => setShowDeferredProfile(true)} className="mt-3 min-h-12 rounded-full border border-gray-600 px-4 font-semibold text-gray-200">Edit email profile</button>
+        </div>
+      )}
+
+      {userId && !settingPassword && (!deferProfile || showDeferredProfile) && (
         <form onSubmit={onSaveProfile} className="mt-4 grid gap-2">
           <p className="text-sm text-gray-300">{savedName ? `Saved profile loaded: ${savedName}. It is not shown on the map.` : 'Signed in. Save a display name. It is not shown on the map.'}</p>
           <label className="text-xs text-gray-400" htmlFor="display-name">Display name</label>

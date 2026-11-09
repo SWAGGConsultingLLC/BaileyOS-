@@ -2,10 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { SuiteBadge } from '@/components/SuiteEntrance';
+import { suiteStatusText } from '@/lib/steward/decide';
 import { suiteEnabled } from '@/lib/suite/verify';
 
 export default function SuiteReturn() {
   const [message, setMessage] = useState('Checking the 360° Brewing sign-in.');
+  const [status, setStatus] = useState<{ recorded: boolean; steward: boolean } | null>(null);
 
   useEffect(() => {
     const url = process.env.NEXT_PUBLIC_SUITE_SUPABASE_URL || '';
@@ -32,11 +35,9 @@ export default function SuiteReturn() {
         setMessage('360° Brewing did not confirm this sign-in. The map email account is unchanged.');
         return;
       }
-      if (body.steward === true) {
-        setMessage('Steward. This 360° Brewing sign-in is the map steward. An email account on the map is not.');
-        return;
-      }
-      setMessage('360° Brewing confirmed this sign-in. This sign-in is not the steward. The map email account is unchanged.');
+      const next = { recorded: body.recorded === true, steward: body.steward === true };
+      setStatus(next);
+      setMessage(suiteStatusText(next) || '360° Brewing did not confirm this sign-in.');
     }).catch(() => setMessage('360° Brewing did not confirm this sign-in. The map email account is unchanged.'));
   }, []);
 
@@ -44,7 +45,9 @@ export default function SuiteReturn() {
     <main className="mx-auto max-w-xl px-4 py-10">
       <p className="text-sm font-bold tracking-wide text-gray-400">360° BREWING</p>
       <h1 className="mt-2 text-3xl font-bold">Return from 360° Brewing</h1>
+      <SuiteBadge status={status} />
       <p className="mt-4 text-lg text-gray-200" role="status">{message}</p>
+      {!status && <p className="mt-3 text-sm text-gray-300">If a 360° Brewing screen opens, choose Sign in with LinkedIn or Sign in. Do not choose Sign up or Create account.</p>}
       <a className="mt-6 inline-flex min-h-12 items-center font-semibold text-cyan-300 underline" href="/">Back to the map</a>
     </main>
   );

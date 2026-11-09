@@ -9,18 +9,24 @@ export function isActiveSteward(subject: string, grant: StewardGrant | null): bo
   return grant.revokedAt === null || grant.revokedAt === '';
 }
 
-export type SuiteAuthority = { subject: string; steward: boolean };
+export type SuiteAuthority = { subject: string; steward: boolean; recorded: boolean };
+
+export function suiteStatusText(input: { recorded: boolean; steward: boolean } | null): string | null {
+  if (!input) return null;
+  if (!input.recorded) return '360° Brewing recognized this sign-in, but the map did not record it.';
+  if (input.steward) return 'Signed in with 360° Brewing. Steward.';
+  return 'Signed in with 360° Brewing. Not the steward.';
+}
 
 export async function completeSuiteLogin(subject: string, db: {
   remember: (subject: string) => Promise<void>;
   readGrant: (subject: string) => Promise<StewardGrant | null>;
 }): Promise<SuiteAuthority> {
-  let grant: StewardGrant | null = null;
   try {
     await db.remember(subject);
-    grant = await db.readGrant(subject);
+    const grant = await db.readGrant(subject);
+    return { subject, steward: isActiveSteward(subject, grant), recorded: true };
   } catch {
-    grant = null;
+    return { subject, steward: false, recorded: false };
   }
-  return { subject, steward: isActiveSteward(subject, grant) };
 }

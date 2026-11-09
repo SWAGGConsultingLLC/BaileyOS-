@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { completeSuiteLogin, isActiveSteward } from './decide.ts';
+import { completeSuiteLogin, isActiveSteward, suiteStatusText } from './decide.ts';
 
 const STEWARD = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
@@ -20,7 +20,7 @@ test('a verified sign-in stays ordinary unless the grant row is active', async (
     remember: async subject => { seen.push(subject); },
     readGrant: async () => null,
   });
-  assert.deepEqual(ordinary, { subject: OTHER, steward: false });
+  assert.deepEqual(ordinary, { subject: OTHER, steward: false, recorded: true });
   const steward = await completeSuiteLogin(STEWARD, {
     remember: async () => undefined,
     readGrant: async () => ({ subjectId: STEWARD, revokedAt: null }),
@@ -36,11 +36,16 @@ test('a verified sign-in stays ordinary unless the grant row is active', async (
     readGrant: async () => ({ subjectId: STEWARD, revokedAt: null }),
   });
   assert.equal(closed.steward, false);
+  assert.equal(closed.recorded, false);
+  assert.equal(suiteStatusText(closed), '360° Brewing recognized this sign-in, but the map did not record it.');
+  assert.equal(suiteStatusText({ recorded: true, steward: false }), 'Signed in with 360° Brewing. Not the steward.');
+  assert.equal(suiteStatusText({ recorded: true, steward: true }), 'Signed in with 360° Brewing. Steward.');
   assert.deepEqual(seen, [OTHER]);
 });
 
 test('the return page shows steward only from the server flag', () => {
   const src = readFileSync(new URL('../../app/suite/page.tsx', import.meta.url), 'utf8');
-  assert.match(src, /body\.steward === true/);
+  assert.match(src, /body\.recorded === true/);
+  assert.match(src, /SuiteBadge/);
   assert.doesNotMatch(src, /user_metadata|email ===/);
 });
