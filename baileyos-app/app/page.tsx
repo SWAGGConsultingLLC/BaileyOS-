@@ -91,9 +91,12 @@ export default function Home() {
       <AccountPanel client={sb} onAccessToken={onAccessToken} />
       <SuiteEntrance />
       {session && mine && (
-        <button onClick={() => linkCall(mine.linked ? 'DELETE' : 'POST')} className="mt-3 w-full rounded-full border border-goldx/60 py-3 font-semibold text-goldx">
-          {mine.linked ? 'Unlink my placement from my desk' : 'Link my placement to my desk (optional)'}
-        </button>
+        <div className="mt-3">
+          <button onClick={() => linkCall(mine.linked ? 'DELETE' : 'POST')} className="w-full rounded-full border border-goldx/60 py-3 font-semibold text-goldx">
+            {mine.linked ? 'Unlink my placement from my desk' : 'Link my placement to my desk (optional)'}
+          </button>
+          <p className="mt-2 text-xs text-gray-400">This stays on the map. It saves your latest pin to the email account signed in here. It does not open 360° Brewing.</p>
+        </div>
       )}
       {msg && <p className="mt-3 text-sm text-gray-300">{msg}</p>}
     </main>
