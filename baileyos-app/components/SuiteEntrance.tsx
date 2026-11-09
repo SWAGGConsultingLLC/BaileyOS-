@@ -37,7 +37,7 @@ export async function prepareSuiteHref(redirectTo: string): Promise<PrepareResul
     const client = createClient(config.url, config.publishableKey, {
       auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, flowType: 'pkce' },
     });
-    const startOAuth = client.auth.signInWithOAuth as (credentials: {
+    const startOAuth = client.auth.signInWithOAuth.bind(client.auth) as (credentials: {
       provider: string;
       options?: { redirectTo?: string; skipBrowserRedirect?: boolean };
     }) => Promise<{ data?: { url?: string | null }; error?: { message?: string } | null }>;
