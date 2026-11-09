@@ -1,3 +1,5 @@
+import { completeSuiteLogin } from '@/lib/steward/decide';
+import { readStewardGrant, rememberSuiteSubject } from '@/lib/steward/store';
 import { fetchSuiteUser } from '@/lib/suite/hosted';
 import { decideSuiteSubject, suiteConfig } from '@/lib/suite/verify';
 
@@ -16,5 +18,9 @@ export async function POST(req: Request) {
   if (!token) return Response.json({ error: 'Sign-in required.' }, { status: 401 });
   const decision = decideSuiteSubject(token, await fetchSuiteUser(token, config));
   if (!decision.ok) return Response.json({ error: decision.error }, { status: decision.status });
-  return Response.json({ subject: decision.subject });
+  const authority = await completeSuiteLogin(decision.subject, {
+    remember: rememberSuiteSubject,
+    readGrant: readStewardGrant,
+  });
+  return Response.json({ subject: authority.subject, steward: authority.steward });
 }
