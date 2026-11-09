@@ -2,7 +2,7 @@
   "name": "baileyos",
   "version": "0.1.0",
   "private": true,
-  "scripts": { "dev": "next dev", "build": "next build", "start": "next start", "typecheck": "tsc --noEmit", "test": "tsx --test lib/workspace/handle.test.ts" },
+  "scripts": { "dev": "next dev", "build": "next build", "start": "next start", "typecheck": "tsc --noEmit", "test": "tsx --test lib/steward/authorize.test.ts lib/workspace/handle.test.ts", "test:steward": "bash tests/steward/run.sh" },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "leaflet": "^1.9.4",
