@@ -4,11 +4,11 @@ Show up. Get placed. A privacy-first placement map centered on downtown Grand Ju
 
 ## Run
 1. `npm install`
-2. Create a Supabase project. Run `supabase/migrations/001_init.sql` in the SQL editor.
-3. Copy `.env.example` to `.env.local` and fill it in. Generate `PLACEMENT_SECRET` with `openssl rand -hex 32`.
+2. Create a Supabase project. Run `supabase/migrations/001_init.sql` in the SQL editor. For member profiles, also run `supabase/migrations/20261108142831_member_profiles.sql`. That second file is not applied to production by this repository.
+3. Copy `.env.example` to `.env.local` and fill it in. Generate `PLACEMENT_SECRET` with `openssl rand -hex 32`. Copy the publishable key from the Supabase dashboard. Do not commit either secret.
 4. `npm run dev`
 
-Login is optional. Without `NEXT_PUBLIC_SUPABASE_ANON_KEY`, the Log in button is hidden and placement still works.
+An account is optional. Without `NEXT_PUBLIC_SUPABASE_ANON_KEY`, the account form says sign-in is not configured and placement still works. See `AUTH.md` before calling member signup finished.
 
 ## Set the center
 `NEXT_PUBLIC_ORIGIN_LAT` / `NEXT_PUBLIC_ORIGIN_LON`. Default is 39.0639, -108.5506 (approx Main & 5th). To use the Grand Mesa instead, set 39.0433, -108.0617. Range, band size and sector size are `NEXT_PUBLIC_MAX_KM`, `NEXT_PUBLIC_BAND_KM`, `NEXT_PUBLIC_SECTOR_DEG`.
@@ -26,7 +26,8 @@ Login is optional. Without `NEXT_PUBLIC_SUPABASE_ANON_KEY`, the Log in button is
 - Cells are 5 km by 30°. Sparse cells can still single someone out; raise `NEXT_PUBLIC_BAND_KM` to 10 while data is thin.
 - The device token is client-generated, so someone can rotate it to place more than once. The rate limits slow that down. They don't stop it.
 - Rate limiting is in-memory. On serverless or several instances, replace `lib/rateLimit.ts` with Redis/Upstash.
-- Linking a placement to a desk account is explicit and reversible, but while linked, the account is associated with a 5 km cell.
+- Linking a placement to a desk account is explicit and reversible, but while linked, the account is associated with a 5 km cell. The link token comes from the placement response. The same email does not attach an old placement.
+- A member profile stores a display name and an optional short bio. Other people and anonymous visitors cannot read it. It does not grant a role.
 - Retention: `purge_old_placements(90)` deletes old rows and clears dangling links; the total stays. Schedule it with pg_cron (see the end of the migration) or call `POST /api/retention` with `Authorization: Bearer $CRON_SECRET` daily.
 - Secret rotation: changing `PLACEMENT_SECRET` changes every future dedupe key, so people can place once more in the current window. Rotate on a quiet boundary. Link tokens also change, so existing links can't be extended.
 

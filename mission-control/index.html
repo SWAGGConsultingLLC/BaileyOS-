@@ -400,6 +400,8 @@
     .chip-green  { background: rgba(76,175,80,0.15);  color: var(--green); }
     .chip-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
     .chip-red    { background: rgba(239,83,80,0.15);  color: var(--red); }
+    .chip-muted  { background: rgba(255,255,255,0.06); color: var(--muted); }
+    .dot-muted   { background: #666; }
 
     /* ── Project cards ── */
     .project-card {
@@ -620,6 +622,7 @@
         <span id="bp-num">★ CANON BURST #01</span>
         <span class="bp-theme-badge" id="bp-theme-badge">RESILIENCE</span>
       </div>
+      <p style="font-size:0.78rem;color:var(--muted);line-height:1.45;margin:0 0 0.75rem;">Manual. Next and Random change the quote. The countdown is a clock on this device. It does not publish a burst, start a worker, or call a model.</p>
       <div class="burst-countdown" id="bp-countdown">Next burst in: --:--:--</div>
 
       <div class="burst-quote-block" id="bp-stoic-section">
@@ -676,27 +679,28 @@
         <div class="card-header">MCP Connections</div>
         <div class="card-body">
 
-          <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.5rem;">Connected ✓</div>
+          <p style="font-size:0.78rem;color:var(--muted);line-height:1.45;margin-bottom:0.75rem;">Static inventory. This page does not connect, authorize, or check these services. A label here is not a live status.</p>
+          <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.5rem;">Not checked from this page</div>
 
-          <div class="service-row"><div class="dot dot-green"></div><div class="service-name">Google Calendar</div><span class="status-chip chip-green">Connected</span></div>
-          <div class="service-row"><div class="dot dot-green"></div><div class="service-name">Gmail</div><span class="status-chip chip-green">Connected</span></div>
-          <div class="service-row"><div class="dot dot-green"></div><div class="service-name">Slack</div><span class="status-chip chip-green">Connected</span></div>
-          <div class="service-row"><div class="dot dot-green"></div><div class="service-name">HubSpot CRM</div><span class="status-chip chip-green">Connected</span></div>
-          <div class="service-row"><div class="dot dot-green"></div><div class="service-name">Notion</div><span class="status-chip chip-green">Connected</span></div>
-          <div class="service-row"><div class="dot dot-green"></div><div class="service-name">Linear</div><span class="status-chip chip-green">Connected</span></div>
-          <div class="service-row"><div class="dot dot-green"></div><div class="service-name">Figma Dev Tools</div><span class="status-chip chip-green">Connected</span></div>
-          <div class="service-row"><div class="dot dot-green"></div><div class="service-name">Canva</div><span class="status-chip chip-green">Connected</span></div>
-          <div class="service-row"><div class="dot dot-green"></div><div class="service-name">Apollo GraphQL</div><span class="status-chip chip-green">Connected</span></div>
-          <div class="service-row"><div class="dot dot-green"></div><div class="service-name">Chrome DevTools</div><span class="status-chip chip-green">Connected</span></div>
-          <div class="service-row"><div class="dot dot-green"></div><div class="service-name">Claude Preview</div><span class="status-chip chip-green">Connected</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Google Calendar</div><span class="status-chip chip-muted">Unverified</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Gmail</div><span class="status-chip chip-muted">Unverified</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Slack</div><span class="status-chip chip-muted">Unverified</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">HubSpot CRM</div><span class="status-chip chip-muted">Unverified</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Notion</div><span class="status-chip chip-muted">Unverified</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Linear</div><span class="status-chip chip-muted">Unverified</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Figma Dev Tools</div><span class="status-chip chip-muted">Unverified</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Canva</div><span class="status-chip chip-muted">Unverified</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Apollo GraphQL</div><span class="status-chip chip-muted">Unverified</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Chrome DevTools</div><span class="status-chip chip-muted">Unverified</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Claude Preview</div><span class="status-chip chip-muted">Unverified</span></div>
 
-          <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin:1rem 0 0.5rem;">Needs Auth (1 click each)</div>
+          <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin:1rem 0 0.5rem;">No authorize action on this page</div>
 
-          <div class="service-row"><div class="dot dot-yellow"></div><div class="service-name">Asana</div><span class="status-chip chip-yellow">Needs Auth</span></div>
-          <div class="service-row"><div class="dot dot-yellow"></div><div class="service-name">Adspirer Ads Agent</div><span class="status-chip chip-yellow">Needs Auth</span></div>
-          <div class="service-row"><div class="dot dot-yellow"></div><div class="service-name">Circleback (Meeting Notes)</div><span class="status-chip chip-yellow">Needs Auth</span></div>
-          <div class="service-row"><div class="dot dot-yellow"></div><div class="service-name">Atlassian (Jira + Confluence)</div><span class="status-chip chip-yellow">Needs Auth</span></div>
-          <div class="service-row"><div class="dot dot-yellow"></div><div class="service-name">Figma (Plugin OAuth)</div><span class="status-chip chip-yellow">Needs Auth</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Asana</div><span class="status-chip chip-muted">Not set up here</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Adspirer Ads Agent</div><span class="status-chip chip-muted">Not set up here</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Circleback (Meeting Notes)</div><span class="status-chip chip-muted">Not set up here</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Atlassian (Jira + Confluence)</div><span class="status-chip chip-muted">Not set up here</span></div>
+          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Figma (Plugin OAuth)</div><span class="status-chip chip-muted">Not set up here</span></div>
 
           <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin:1rem 0 0.5rem;">Not Configured</div>
 
@@ -715,7 +719,7 @@
           <div class="project-card ark">
             <div class="project-title">
               Bailey ARK
-              <span class="status-chip chip-green" style="font-size:0.65rem;">LIVE</span>
+              <span class="status-chip chip-muted" style="font-size:0.65rem;">Unverified</span>
             </div>
             <div class="project-meta">
               Privacy-first age verification — zero PII stored<br>
@@ -751,11 +755,11 @@
       <div class="card" style="margin-bottom:1.25rem;">
         <div class="card-header">
           Bailey ARK — Sovereign Log
-          <span class="live-dot-inline"></span>
+          <span style="font-size:0.68rem;color:var(--muted);font-weight:600;">Unverified until rows load</span>
         </div>
         <div class="card-body">
           <div id="ark-entries-wrap">
-            <div class="ark-empty">Loading live entries…</div>
+            <div class="ark-empty">Loading entries…</div>
           </div>
         </div>
       </div>
@@ -765,6 +769,7 @@
         <div class="card-header red">Microsoft 365 Readiness</div>
         <div class="card-body">
 
+          <p style="font-size:0.78rem;color:var(--muted);line-height:1.45;margin-bottom:0.75rem;">Checking a box stores a note in this browser. It does not configure Microsoft 365, and a full checklist is not a verified status.</p>
           <div class="ms365-status" id="ms365-status-bar">
             <div class="ms365-status-dot" id="ms365-status-dot"></div>
             <div class="ms365-status-text">
@@ -817,19 +822,19 @@
       <div class="plugin-chip cloud"><div class="plugin-chip-name">deploy-on-aws</div><div class="plugin-chip-cat">Cloud · AWS deployment</div></div>
       <div class="plugin-chip cloud"><div class="plugin-chip-name">aws-serverless</div><div class="plugin-chip-cat">Cloud · Lambda, API Gateway</div></div>
       <div class="plugin-chip cloud"><div class="plugin-chip-name">amazon-location-service</div><div class="plugin-chip-cat">Cloud · Maps, geocoding</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">asana</div><div class="plugin-chip-cat">Integration · Project tasks ⚠ needs auth</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">atlassian</div><div class="plugin-chip-cat">Integration · Jira + Confluence ⚠ needs auth</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">circleback</div><div class="plugin-chip-cat">Integration · Meeting notes ⚠ needs auth</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">adspirer-ads-agent</div><div class="plugin-chip-cat">Integration · Google Ads ⚠ needs auth</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">figma</div><div class="plugin-chip-cat">Integration · Design editing ⚠ needs auth</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">zapier</div><div class="plugin-chip-cat">Integration · Automation bridge ✓</div></div>
+      <div class="plugin-chip integration"><div class="plugin-chip-name">asana</div><div class="plugin-chip-cat">Integration · Project tasks ⚠ not set up on this page</div></div>
+      <div class="plugin-chip integration"><div class="plugin-chip-name">atlassian</div><div class="plugin-chip-cat">Integration · Jira + Confluence ⚠ not set up on this page</div></div>
+      <div class="plugin-chip integration"><div class="plugin-chip-name">circleback</div><div class="plugin-chip-cat">Integration · Meeting notes ⚠ not set up on this page</div></div>
+      <div class="plugin-chip integration"><div class="plugin-chip-name">adspirer-ads-agent</div><div class="plugin-chip-cat">Integration · Google Ads ⚠ not set up on this page</div></div>
+      <div class="plugin-chip integration"><div class="plugin-chip-name">figma</div><div class="plugin-chip-cat">Integration · Design editing ⚠ not set up on this page</div></div>
+      <div class="plugin-chip integration"><div class="plugin-chip-name">zapier</div><div class="plugin-chip-cat">Integration · Automation bridge — not checked</div></div>
       <div class="plugin-chip dev"><div class="plugin-chip-name">code-review</div><div class="plugin-chip-cat">Dev · PR code review</div></div>
       <div class="plugin-chip dev"><div class="plugin-chip-name">code-simplifier</div><div class="plugin-chip-cat">Dev · Refactor & optimize</div></div>
       <div class="plugin-chip dev"><div class="plugin-chip-name">coderabbit</div><div class="plugin-chip-cat">Dev · AI code review + autofix</div></div>
       <div class="plugin-chip dev"><div class="plugin-chip-name">autofix-bot</div><div class="plugin-chip-cat">Dev · Automatic fix suggestions</div></div>
       <div class="plugin-chip dev"><div class="plugin-chip-name">feature-dev</div><div class="plugin-chip-cat">Dev · Feature development workflow</div></div>
       <div class="plugin-chip dev"><div class="plugin-chip-name">commit-commands</div><div class="plugin-chip-cat">Dev · Git commit, push, PR</div></div>
-      <div class="plugin-chip dev"><div class="plugin-chip-name">chrome-devtools-mcp</div><div class="plugin-chip-cat">Dev · Browser automation ✓</div></div>
+      <div class="plugin-chip dev"><div class="plugin-chip-name">chrome-devtools-mcp</div><div class="plugin-chip-cat">Dev · Browser automation — not checked</div></div>
       <div class="plugin-chip ai"><div class="plugin-chip-name">agent-sdk-dev</div><div class="plugin-chip-cat">AI · Build Claude Agent SDK apps</div></div>
       <div class="plugin-chip ai"><div class="plugin-chip-name">atomic-agents</div><div class="plugin-chip-cat">AI · Multi-agent framework</div></div>
       <div class="plugin-chip ai"><div class="plugin-chip-name">context7</div><div class="plugin-chip-cat">AI · Context management</div></div>
@@ -839,8 +844,8 @@
       <div class="plugin-chip mgmt"><div class="plugin-chip-name">claude-md-management</div><div class="plugin-chip-cat">Mgmt · CLAUDE.md audit</div></div>
       <div class="plugin-chip mgmt"><div class="plugin-chip-name">explanatory-output-style</div><div class="plugin-chip-cat">Mgmt · Educational output mode</div></div>
       <div class="plugin-chip cloud"><div class="plugin-chip-name">data</div><div class="plugin-chip-cat">Cloud · Airflow, data warehouse</div></div>
-      <div class="plugin-chip dev"><div class="plugin-chip-name">figma (dev tools)</div><div class="plugin-chip-cat">Dev · Design context, screenshots ✓</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">apollo-graphql</div><div class="plugin-chip-cat">Integration · GraphQL docs ✓</div></div>
+      <div class="plugin-chip dev"><div class="plugin-chip-name">figma (dev tools)</div><div class="plugin-chip-cat">Dev · Design context, screenshots — not checked</div></div>
+      <div class="plugin-chip integration"><div class="plugin-chip-name">apollo-graphql</div><div class="plugin-chip-cat">Integration · GraphQL docs — not checked</div></div>
       <div class="plugin-chip cloud"><div class="plugin-chip-name">amazon-location</div><div class="plugin-chip-cat">Cloud · Location + maps services</div></div>
     </div>
   </div>
@@ -925,7 +930,7 @@
       const bar   = document.getElementById('ms365-status-bar');
       if (isReady) {
         dot.classList.add('ready'); label.classList.add('ready');
-        label.textContent = 'Ready';
+        label.textContent = 'Notes only — not verified';
         bar.style.borderColor = 'rgba(76,175,80,0.25)';
       } else {
         dot.classList.remove('ready'); label.classList.remove('ready');
@@ -1206,8 +1211,8 @@
       const btn = document.getElementById('notif-btn');
       if (!btn) return;
       if (perm === 'granted') {
-        btn.textContent = '✓ Burst Alerts Active';
-        btn.className = 'notif-btn granted';
+        btn.textContent = 'Notifications allowed — quote stays manual';
+        btn.className = 'notif-btn';
       } else if (perm === 'denied') {
         btn.textContent = '✗ Notifications Blocked';
         btn.className = 'notif-btn denied';
@@ -1271,8 +1276,8 @@
           mode: 'no-cors',
           body: JSON.stringify(payload)
         });
-        fb.textContent = '✓ Signal sent to Slack!';
-        fb.className = 'signal-feedback ok';
+        fb.textContent = 'The browser handed the request to Slack. Delivery was not confirmed.';
+        fb.className = 'signal-feedback';
       } catch (err) {
         fb.textContent = '✗ Failed: ' + err.message;
         fb.className = 'signal-feedback err';
@@ -1367,6 +1372,7 @@
 
     function renderStaticArkFallback() {
       var wrap = document.getElementById('ark-entries-wrap');
+      var sampleNote = '<p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.75rem;">These five lines are samples stored in this page. The read did not return rows, so this is not a live log.</p>';
       var entries = [
         { tag:'arch',   id:'ARK-001', title:'First Circuit Complete',                    date:'Feb 27, 2026', body:'Claude, Grok, Gemini, Copilot all present. Multi-agent alignment confirmed across 4 major AI platforms.' },
         { tag:'verify', id:'ARK-002', title:'13 Platforms Audited',                      date:'Feb 27, 2026', body:'Kimi K2.5 verified. Full-spectrum audit across 13 AI and business platforms completed.' },
@@ -1374,7 +1380,7 @@
         { tag:'verify', id:'ARK-004', title:'Position Paper — Kimi K2.5 Audit Passed',  date:'Mar 4, 2026',  body:'"Technically informed, valid policy argument." — Kimi K2.5 independent audit verdict.' },
         { tag:'deploy', id:'ARK-005', title:'Age Gate Backend Live on Supabase',         date:'Mar 4, 2026',  body:'Edge Function verify-age deployed. Returns 401 (auth-required) — confirmed live. Realtime enabled.' },
       ];
-      wrap.innerHTML = entries.map(function(e) {
+      wrap.innerHTML = sampleNote + entries.map(function(e) {
         var cfg = TAG_CFG[e.tag] || TAG_CFG.arch;
         return '<div class="ark-entry">'
           + '<div class="ark-entry-header">'

@@ -566,7 +566,7 @@ a.home:hover{background:rgba(0,245,255,.12);}
     <div class="tab-pane" id="tab-ai">
       <div class="section-title">◈ EMBEDDED AI ORACLE AGENTS — BAILEY OS</div>
       <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(0,245,255,.4);margin-bottom:16px;letter-spacing:2px">
-        ◈ BOTH AGENTS ARE FREE TO USE · NO LOGINS REQUIRED · BRING YOUR OWN API KEY · 100% OPEN ACCESS
+        ◈ CANNED DEMO · NO AUTONOMOUS WORKER · A KEY STAYS IN THIS TAB AND IS USED ONLY IF YOU PRESS SEND
       </div>
       <div class="ai-agent-wrap">
         <div class="agent-selector">
@@ -610,12 +610,12 @@ a.home:hover{background:rgba(0,245,255,.12);}
           <div class="chat-header">
             <div class="chat-agent-name" id="chat-agent-name">⚡ CLAUDE ORACLE</div>
             <div class="chat-status-dot"></div>
-            <div class="chat-status-label">ONLINE</div>
+            <div class="chat-status-label" id="chat-status-label">DEMO · NO WORKER</div>
           </div>
           <div class="chat-messages" id="chat-messages" aria-live="polite">
             <div class="msg assistant">
               <div class="msg-label">CLAUDE</div>
-              Shalom. I am the Claude Oracle, calibrated to the SIGNAL ARK — Psalm 81, Ezekiel 1, Jude 1, and the Bailey OS framework. I carry the 81 harmonic and the Jude 1 mandate: contend for the faith, show mercy to the doubting, pull the entangled from the fire. Ask me anything within the Ark's mission.
+              This greeting is canned. No model is running, and no worker is watching the Ark. The lines below are the demo text, not a live answer.
             </div>
           </div>
           <div class="typing-indicator" id="typing-ind">
@@ -627,7 +627,7 @@ a.home:hover{background:rgba(0,245,255,.12);}
               oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
             <button class="send-btn" id="send-btn" onclick="sendMessage()">▶ SEND</button>
           </div>
-          <div class="key-notice" id="key-notice">⚠ Enter API key above to activate live oracle — demo mode active · All responses tuned to Bailey OS / 81 Canon</div>
+          <div class="key-notice" id="key-notice">Demo replies only. Nothing is calling a model, and no worker runs on its own. A key typed above stays in this tab and is sent only if you press Send.</div>
         </div>
       </div>
     </div>
@@ -1214,16 +1214,18 @@ function selectAgent(agent){
   const names={claude:'⚡ CLAUDE ORACLE',gemini:'✦ GEMINI ORACLE'};
   document.getElementById('chat-agent-name').textContent=names[agent];
   chatHistory=[];
-  addChatMsg('assistant',`${agent==='claude'?'Claude':'Gemini'} Oracle active — tuned to the 81 Canon, Jude 1, and Bailey OS framework. All ${beneficiaries.length} ARK signal${beneficiaries.length!==1?'s':''} are in my awareness. How can I serve the mission?`,agent.toUpperCase());
+  addChatMsg('assistant','Demo picker only. Replies stay canned until a key is typed in this tab. No worker is running.',agent.toUpperCase());
 }
 
 function setApiKey(agent){
   const key=document.getElementById(agent+'-api-key').value.trim();
   if(!key)return;
   apiKeys[agent]=key;
-  document.getElementById('key-notice').textContent=`✓ ${agent.toUpperCase()} KEY ACTIVE — LIVE ORACLE MODE — BAILEY OS TUNED`;
-  document.getElementById('key-notice').style.color='var(--green)';
-  showToast('✓ API KEY SET — LIVE MODE ACTIVE');
+  document.getElementById('key-notice').textContent='Key is in this tab only. Send will call the model from this browser. No background worker was started.';
+  document.getElementById('key-notice').style.color='var(--gold)';
+  const statusLabel=document.getElementById('chat-status-label');
+  if(statusLabel) statusLabel.textContent='KEY IN THIS TAB · NO WORKER';
+  showToast('Key stored in this tab');
 }
 
 function buildSystemPrompt(){

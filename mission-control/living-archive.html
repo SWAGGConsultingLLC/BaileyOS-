@@ -268,12 +268,13 @@
       <div class="sidebar-section">
         <div class="sidebar-label" style="margin-top:14px;">AGE GATE STATUS</div>
         <div class="age-gate-status">
-          <div class="ags-label">GATE READINESS</div>
-          <div class="ags-row"><span class="ags-key">TABLE</span><span class="ags-val g">✓ LIVE</span></div>
-          <div class="ags-row"><span class="ags-key">LOGGING</span><span class="ags-val g">✓ ACTIVE</span></div>
-          <div class="ags-row"><span class="ags-key">PII</span><span class="ags-val g">✓ ZERO</span></div>
-          <div class="ags-row"><span class="ags-key">SOURCE</span><span class="ags-val">BAILEY-OASIS</span></div>
-          <div class="ags-row"><span class="ags-key">REALTIME</span><span class="ags-val g" id="rt-status">◌ INIT</span></div>
+          <div class="ags-label">NOT A GATE</div>
+          <p style="font-size:10px;line-height:1.45;color:rgba(201,148,58,0.75);margin:6px 0 8px;">This page does not listen for bailey:agegate, window.BaileyAgeGate, or localStorage bailey_agegate. Those cannot arrive from another site. A database row is not an age check.</p>
+          <div class="ags-row"><span class="ags-key">LISTENER</span><span class="ags-val">NONE</span></div>
+          <div class="ags-row"><span class="ags-key">OASIS MSG</span><span class="ags-val">NOT RECEIVED</span></div>
+          <div class="ags-row"><span class="ags-key">TABLE</span><span class="ags-val">READ ATTEMPT</span></div>
+          <div class="ags-row"><span class="ags-key">PII</span><span class="ags-val">NOT PROVEN</span></div>
+          <div class="ags-row"><span class="ags-key">REALTIME</span><span class="ags-val" id="rt-status">◌ INIT</span></div>
         </div>
       </div>
 
@@ -372,9 +373,9 @@ let db=null;
 
 function setLiveDot(state){
   const el=document.getElementById('live-dot'), rt=document.getElementById('rt-status');
-  if(state==='live'){el.textContent='◉ LIVE';el.style.color='rgba(0,200,100,0.8)';if(rt){rt.textContent='◉ LIVE';rt.style.color='#0c8';}}
-  else if(state==='connect'){el.textContent='◌ CONNECTING…';el.style.color='rgba(201,148,58,0.5)';if(rt){rt.textContent='◌ INIT';rt.style.color='rgba(201,148,58,0.6)';}}
-  else{el.textContent='◌ OFFLINE';el.style.color='rgba(255,80,80,0.5)';if(rt){rt.textContent='✗ OFF';rt.style.color='#f55';}}
+  if(state==='live'){el.textContent='◉ FEED';el.style.color='rgba(0,200,100,0.8)';if(rt){rt.textContent='SOCKET OPEN';rt.style.color='rgba(201,148,58,0.85)';}}
+  else if(state==='connect'){el.textContent='◌ CONNECTING…';el.style.color='rgba(201,148,58,0.5)';if(rt){rt.textContent='SOCKET INIT';rt.style.color='rgba(201,148,58,0.6)';}}
+  else{el.textContent='◌ OFFLINE';el.style.color='rgba(255,80,80,0.5)';if(rt){rt.textContent='SOCKET OFF';rt.style.color='#f55';}}
 }
 
 function bootLive(){
