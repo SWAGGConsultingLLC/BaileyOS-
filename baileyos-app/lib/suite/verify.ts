@@ -37,6 +37,55 @@ export function suiteEnabled(env?: { suiteUrl?: string; suiteKey?: string }): bo
   return suiteConfig(env) !== null;
 }
 
+export type SuiteCallback =
+  | { kind: 'pending'; message: string }
+  | { kind: 'error'; message: string }
+  | { kind: 'ready'; message: string };
+
+function safeProviderText(value: string): string {
+  const cleaned = value.replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '').trim();
+  return cleaned.slice(0, 160);
+}
+
+/**
+ * Explains a /suite return without contacting Auth.
+ * A code with a missing verifier means the return browser is not the one that started the link.
+ */
+export function suiteCallbackMessage(input: {
+  search: string;
+  exchangeError?: string | null;
+  hasSession: boolean;
+}): SuiteCallback {
+  const query = new URLSearchParams(input.search.startsWith('?') ? input.search.slice(1) : input.search);
+  const providerError = query.get('error_description') || query.get('error');
+  if (providerError) {
+    return {
+      kind: 'error',
+      message: `360° Brewing did not finish the sign-in. ${safeProviderText(providerError)}`,
+    };
+  }
+  if (query.get('code') && input.exchangeError) {
+    const missing = /verifier|code challenge|pkce/i.test(input.exchangeError);
+    if (missing) {
+      return {
+        kind: 'error',
+        message: 'The return reached this page, but this browser does not have the sign-in check saved on the map. LinkedIn often opens its own browser. Open the map in Safari or Chrome, clear this site’s data if a previous try stuck, tap Continue, and stay in that same browser.',
+      };
+    }
+    return {
+      kind: 'error',
+      message: 'The return reached this page, but the sign-in could not be finished. Open the map in the phone’s main browser and tap Continue again.',
+    };
+  }
+  if (!input.hasSession) {
+    return {
+      kind: 'pending',
+      message: '360° Brewing has not confirmed a sign-in on this map yet. A sign-in kept on the 360 website does not count here. Tap Continue on the map and choose Sign in with LinkedIn or Sign in.',
+    };
+  }
+  return { kind: 'ready', message: '' };
+}
+
 /** A PKCE code that landed on the map root belongs on /suite. An email link uses the hash instead. */
 export function suiteReturnTarget(href: string): string | null {
   let url: URL;

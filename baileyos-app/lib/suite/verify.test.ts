@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'node:test';
 import { SuiteContinue } from '../../components/SuiteEntrance.tsx';
-import { SUITE_ISSUER, decideSuiteSubject, suiteAuthorizeHref, suiteConfig, suiteEnabled, suiteReturnTarget } from './verify.ts';
+import { SUITE_ISSUER, decideSuiteSubject, suiteAuthorizeHref, suiteCallbackMessage, suiteConfig, suiteEnabled, suiteReturnTarget } from './verify.ts';
 
 const SUBJECT = '11111111-1111-4111-8111-111111111111';
 
@@ -48,6 +48,29 @@ test('the auth server must agree with the token subject', () => {
   assert.equal(decideSuiteSubject(token({ ...good, role: 'service_role' }), { id: SUBJECT }).ok, false);
   assert.equal(decideSuiteSubject(token({ ...good, aud: 'anon' }), { id: SUBJECT }).ok, false);
   assert.equal(decideSuiteSubject('not-a-jwt', { id: SUBJECT }).ok, false);
+});
+
+test('a callback explains a missing verifier, a provider error, and a session that never reached this site', () => {
+  const missing = suiteCallbackMessage({
+    search: '?code=returned-code',
+    exchangeError: 'PKCE code verifier not found in storage. This can happen if the auth flow was initiated in a different browser or device.',
+    hasSession: false,
+  });
+  assert.equal(missing.kind, 'error');
+  assert.match(missing.message, /this browser does not have the sign-in check/);
+  assert.match(missing.message, /Safari or Chrome/);
+  const denied = suiteCallbackMessage({
+    search: '?error=access_denied&error_description=The+user+cancelled',
+    hasSession: false,
+  });
+  assert.equal(denied.kind, 'error');
+  assert.match(denied.message, /did not finish/);
+  assert.match(denied.message, /cancelled/);
+  const elsewhere = suiteCallbackMessage({ search: '', hasSession: false });
+  assert.equal(elsewhere.kind, 'pending');
+  assert.match(elsewhere.message, /360 website does not count/);
+  const ready = suiteCallbackMessage({ search: '', hasSession: true });
+  assert.equal(ready.kind, 'ready');
 });
 
 test('a code that lands on the map root is sent to /suite', () => {
