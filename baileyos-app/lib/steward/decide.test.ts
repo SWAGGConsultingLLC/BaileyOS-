@@ -46,6 +46,8 @@ test('a verified sign-in stays ordinary unless the grant row is active', async (
 test('the return page shows steward only from the server flag', () => {
   const src = readFileSync(new URL('../../app/suite/page.tsx', import.meta.url), 'utf8');
   assert.match(src, /body\.recorded === true/);
+  assert.match(src, /suiteCallbackMessage/);
+  assert.match(src, /role=\{failed \? 'alert' : 'status'\}/);
   assert.match(src, /SuiteBadge/);
   assert.doesNotMatch(src, /user_metadata|email ===/);
 });
