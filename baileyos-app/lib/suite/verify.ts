@@ -37,6 +37,24 @@ export function suiteEnabled(env?: { suiteUrl?: string; suiteKey?: string }): bo
   return suiteConfig(env) !== null;
 }
 
+/** Accept only an authorize URL on the configured 360 project. */
+export function suiteAuthorizeHref(candidate: string, config: SuiteConfig): string | null {
+  try {
+    const target = new URL(candidate);
+    const allowed = new URL(config.url);
+    if (target.origin !== allowed.origin) return null;
+    if (target.pathname !== '/auth/v1/authorize') return null;
+    if (target.searchParams.get('provider') !== SUITE_PROVIDER) return null;
+    const redirectTo = target.searchParams.get('redirect_to');
+    if (!redirectTo) return null;
+    const back = new URL(redirectTo);
+    if (back.pathname !== '/suite') return null;
+    return target.toString();
+  } catch {
+    return null;
+  }
+}
+
 /** Reads claims without checking the signature. Authorization still requires the Auth server result. */
 export function unverifiedClaims(token: string): Record<string, unknown> | null {
   const parts = token.split('.');

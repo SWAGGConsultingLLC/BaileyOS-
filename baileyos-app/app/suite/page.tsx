@@ -14,7 +14,9 @@ export default function SuiteReturn() {
       setMessage('360° Brewing sign-in is not turned on for this map.');
       return;
     }
-    const client = createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true } });
+    const client = createClient(url, key, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' },
+    });
     client.auth.getSession().then(async ({ data }) => {
       const token = data.session?.access_token;
       if (!token) {

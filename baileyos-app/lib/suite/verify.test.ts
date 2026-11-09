@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'node:test';
-import { SUITE_ISSUER, decideSuiteSubject, suiteConfig, suiteEnabled } from './verify.ts';
+import { SuiteContinue } from '../../components/SuiteEntrance.tsx';
+import { SUITE_ISSUER, decideSuiteSubject, suiteAuthorizeHref, suiteConfig, suiteEnabled } from './verify.ts';
 
 const SUBJECT = '11111111-1111-4111-8111-111111111111';
 
@@ -47,9 +50,35 @@ test('the auth server must agree with the token subject', () => {
   assert.equal(decideSuiteSubject('not-a-jwt', { id: SUBJECT }).ok, false);
 });
 
+test('only a 360 authorize link that returns to this map is kept', () => {
+  const config = { url: 'https://shedpnosbkwkmwgqkefj.supabase.co', publishableKey: 'publishable' };
+  const good = 'https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=custom%3Aapp-oidc&redirect_to=https%3A%2F%2Fbaileyos-app.vercel.app%2Fsuite';
+  assert.equal(suiteAuthorizeHref(good, config), good);
+  assert.equal(suiteAuthorizeHref('https://evil.example/auth/v1/authorize?provider=custom:app-oidc&redirect_to=https://baileyos-app.vercel.app/suite', config), null);
+  assert.equal(suiteAuthorizeHref('https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=github&redirect_to=https://baileyos-app.vercel.app/suite', config), null);
+  assert.equal(suiteAuthorizeHref('https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=custom:app-oidc&redirect_to=https://baileyos-app.vercel.app/workspace', config), null);
+});
+
 test('the suite entrance does not render a connected control while config is absent', () => {
   const src = readFileSync(new URL('../../components/SuiteEntrance.tsx', import.meta.url), 'utf8');
-  assert.match(src, /if \(!enabled\) return null/);
+  assert.match(src, /SuiteContinue/);
+  assert.match(src, /<a href=\{phase.href\}/);
+  assert.match(src, /skipBrowserRedirect: true/);
   assert.match(src, /does not grant steward/);
   assert.doesNotMatch(src, /Connected/);
+  assert.match(src, /window\.location\.origin \+ '\/suite'/);
+  assert.doesNotMatch(src, /window\.location\.(assign|href)/);
+});
+
+test('the continue control is a link only after the address is ready', () => {
+  const preparing = renderToStaticMarkup(createElement(SuiteContinue, { phase: { state: 'preparing' } }));
+  assert.match(preparing, /Preparing the 360° Brewing sign-in/);
+  assert.doesNotMatch(preparing, /<a /);
+  const href = 'https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=custom%3Aapp-oidc&redirect_to=https%3A%2F%2Fbaileyos-app.vercel.app%2Fsuite';
+  const ready = renderToStaticMarkup(createElement(SuiteContinue, { phase: { state: 'ready', href } }));
+  assert.match(ready, /<a href="https:\/\/shedpnosbkwkmwgqkefj\.supabase\.co\/auth\/v1\/authorize\?provider=custom%3Aapp-oidc/);
+  assert.match(ready, /Continue to 360° Brewing/);
+  const failed = renderToStaticMarkup(createElement(SuiteContinue, { phase: { state: 'error', message: 'Could not prepare the 360° Brewing sign-in.' } }));
+  assert.match(failed, /role="alert"/);
+  assert.doesNotMatch(failed, /<a /);
 });
