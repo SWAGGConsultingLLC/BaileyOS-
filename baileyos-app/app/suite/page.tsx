@@ -32,7 +32,11 @@ export default function SuiteReturn() {
         setMessage('360° Brewing did not confirm this sign-in. The map email account is unchanged.');
         return;
       }
-      setMessage('360° Brewing confirmed this sign-in. The map email account is unchanged, and this does not grant steward.');
+      if (body.steward === true) {
+        setMessage('Steward. This 360° Brewing sign-in is the map steward. An email account on the map is not.');
+        return;
+      }
+      setMessage('360° Brewing confirmed this sign-in. This sign-in is not the steward. The map email account is unchanged.');
     }).catch(() => setMessage('360° Brewing did not confirm this sign-in. The map email account is unchanged.'));
   }, []);
 
