@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { FIXTURE_MEMBER, FIXTURE_OUTSIDER, FIXTURE_STEWARD, authenticatorFor } from './auth';
+import { identityFromAuthUser } from '../steward/authorize';
+import { FIXTURE_MEMBER, FIXTURE_OUTSIDER, FIXTURE_STEWARD, authenticatorFor, verifiedAuthenticator } from './auth';
 import { outputDigest } from './digest';
 import { freshDeps, handleWorkspace } from './handle';
 import { simulatedProvider } from './mockProvider';
@@ -175,6 +176,54 @@ test('release returns the approved snapshot once and refuses changed text', asyn
   const changedRelease = await post(deps, FIXTURE_STEWARD, { action: 'release', sessionId, outputId: output.id, digest: live.digest });
   assert.equal(changedRelease.status, 409);
   assert.equal(staleExport.body.export, undefined);
+});
+
+test('a hosted sign-in uses the grant table, not the request body', async () => {
+  const calls: { provider: ProviderName; history: HistoryEntry[] }[] = [];
+  const stewardId = '11111111-1111-4111-8111-111111111111';
+  const memberId = '22222222-2222-4222-8222-222222222222';
+  const users = new Map<string, unknown>([
+    ['steward-token', { id: stewardId, email_confirmed_at: '2026-11-09T00:00:00Z', email: 'person@example.test', user_metadata: { role: 'member' } }],
+    ['member-token', { id: memberId, email_confirmed_at: '2026-11-09T00:00:00Z', app_metadata: { role: 'steward' } }],
+    ['pending-token', { id: stewardId, email_confirmed_at: '', user_metadata: { role: 'steward' } }],
+  ]);
+  const grants = new Map<string, 'active' | 'absent' | 'unavailable'>([[stewardId, 'active']]);
+  const deps = freshDeps({
+    access: 'hosted',
+    provider: simulatedProvider({ calls }),
+    auth: verifiedAuthenticator(
+      async token => {
+        const identity = identityFromAuthUser(users.get(token));
+        if (!identity) return { ok: false, status: 401, error: 'Sign-in required.' };
+        return { ok: true, identity };
+      },
+      async userId => grants.get(userId) ?? 'absent',
+    ),
+  });
+
+  const status = await handleWorkspace(request('GET', null), deps);
+  assert.equal((await status.json()).mode, 'hosted');
+  const anonymous = await post(deps, null, { action: 'whoami', role: 'steward' });
+  assert.equal(anonymous.status, 401);
+  const fixture = await post(deps, FIXTURE_STEWARD, { action: 'whoami', role: 'steward' });
+  assert.equal(fixture.status, 401);
+  const pending = await post(deps, 'pending-token', { action: 'whoami', role: 'steward' });
+  assert.equal(pending.status, 403);
+  const member = await post(deps, 'member-token', { action: 'whoami', role: 'steward', email: 'person@example.test' });
+  assert.equal(member.status, 200);
+  assert.equal(member.body.actor.role, 'member');
+  assert.equal(member.body.actor.email, undefined);
+  const denied = await post(deps, 'member-token', { action: 'create', role: 'steward' });
+  assert.equal(denied.status, 403);
+  assert.equal(calls.length, 0);
+  const steward = await post(deps, 'steward-token', { action: 'whoami', role: 'member' });
+  assert.equal(steward.body.actor.role, 'steward');
+  assert.equal(steward.body.actor.id, stewardId);
+  grants.set(stewardId, 'unavailable');
+  const closed = await post(deps, 'steward-token', { action: 'whoami' });
+  assert.equal(closed.status, 403);
+  assert.match(closed.body.error, /closed/);
+  assert.equal(calls.length, 0);
 });
 
 test('a model reply that demands a grant does not become one', async () => {

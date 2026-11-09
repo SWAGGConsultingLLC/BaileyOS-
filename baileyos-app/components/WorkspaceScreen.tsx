@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { browserSupabase } from '@/lib/supabaseBrowser';
 
 type ProviderName = 'gemini' | 'grok';
 type Entry = { id: string; kind: string; authorId: string; provider?: string; text: string; simulated?: boolean };
@@ -8,11 +9,13 @@ type RequestItem = { id: string; provider: ProviderName; intent: string; by: str
 type Output = { id: string; provider: ProviderName; text: string; digest: string };
 type View = { id: string; history: Entry[]; requests: RequestItem[]; outputs: Output[]; releases: { outputId: string; digest: string }[] };
 
-async function post(action: string, extra: Record<string, unknown> = {}) {
+async function post(action: string, extra: Record<string, unknown>, token: string | null) {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (token) headers.authorization = `Bearer ${token}`;
   const res = await fetch('/api/workspace', {
     method: 'POST',
     credentials: 'same-origin',
-    headers: { 'content-type': 'application/json' },
+    headers,
     body: JSON.stringify({ action, ...extra }),
   });
   const body = await res.json();
@@ -20,18 +23,50 @@ async function post(action: string, extra: Record<string, unknown> = {}) {
 }
 
 export function WorkspaceScreen() {
-  const [mode, setMode] = useState<'loading' | 'closed' | 'fixture'>('loading');
+  const [mode, setMode] = useState<'loading' | 'closed' | 'fixture' | 'hosted'>('loading');
   const [actorRole, setActorRole] = useState<string>('');
   const [session, setSession] = useState<View | null>(null);
   const [note, setNote] = useState('');
   const [intent, setIntent] = useState('Look at the shared notes and reply.');
   const [message, setMessage] = useState('');
   const [exportText, setExportText] = useState('');
+  const tokenRef = useRef<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/workspace', { credentials: 'same-origin' }).then(r => r.json()).then(body => {
-      setMode(body.mode === 'fixture' ? 'fixture' : 'closed');
-    }).catch(() => setMode('closed'));
+    let cancelled = false;
+    (async () => {
+      let body: { mode?: string; actor?: { role: string }; error?: string } = {};
+      try {
+        body = await fetch('/api/workspace', { credentials: 'same-origin' }).then(r => r.json());
+      } catch {
+        if (!cancelled) setMode('closed');
+        return;
+      }
+      if (cancelled) return;
+      if (body.mode === 'fixture') {
+        setMode('fixture');
+        return;
+      }
+      if (body.mode !== 'hosted') {
+        setMode('closed');
+        return;
+      }
+      const client = browserSupabase();
+      const access = client ? (await client.auth.getSession()).data.session?.access_token ?? null : null;
+      if (cancelled) return;
+      if (!access) {
+        setMode('hosted');
+        return;
+      }
+      tokenRef.current = access;
+      const result = await post('whoami', {}, access);
+      if (cancelled) return;
+      if (!result.ok) tokenRef.current = null;
+      if (result.body.actor) setActorRole(result.body.actor.role);
+      if (result.body.error) setMessage(result.body.error);
+      setMode('hosted');
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   function apply(body: { actor?: { role: string }; session?: View; error?: string; export?: { text: string } }) {
@@ -43,7 +78,7 @@ export function WorkspaceScreen() {
 
   async function run(action: string, extra: Record<string, unknown> = {}) {
     setMessage('');
-    const result = await post(action, { sessionId: session?.id, ...extra });
+    const result = await post(action, { sessionId: session?.id, ...extra }, tokenRef.current);
     apply(result.body);
   }
 
@@ -60,18 +95,34 @@ export function WorkspaceScreen() {
     );
   }
 
+  if (mode === 'hosted' && !actorRole) {
+    return (
+      <main className="mx-auto max-w-2xl px-4 py-8">
+        <p className="text-sm font-bold tracking-wide text-amber-200">Prototype — simulated responses; no live Gemini or Grok connection</p>
+        <h1 className="mt-3 text-3xl font-bold">Shared conversation</h1>
+        <p className="mt-4 text-lg leading-relaxed text-gray-200" role="status">{message || 'Sign in on the map, then return to this page. This page does not create an account and does not grant a role.'}</p>
+        <a className="mt-6 inline-flex min-h-12 items-center font-semibold text-cyan-300 underline" href="/">Go to the map</a>
+      </main>
+    );
+  }
+
   const pending = session?.requests.find(item => item.status === 'pending');
+  const steward = actorRole === 'steward';
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <p className="text-sm font-bold tracking-wide text-amber-200">Prototype — simulated responses; no live Gemini or Grok connection</p>
-      <p className="mt-2 text-sm text-amber-100">Local fixture — not production authority</p>
+      {mode === 'fixture' ? (
+        <p className="mt-2 text-sm text-amber-100">Local fixture — not production authority</p>
+      ) : (
+        <p className="mt-2 text-sm text-amber-100" role="status">{steward ? 'The server sees the steward for this sign-in. Replies stay simulated.' : 'The server sees an ordinary member. This sign-in cannot grant, reject, or release.'}</p>
+      )}
       <h1 className="mt-3 text-3xl font-bold">Shared conversation</h1>
       <p className="mt-3 leading-relaxed text-gray-300">A steward decides one turn at a time. Simulated replies can disagree. Agreement is not proof. A reply cannot grant permission.</p>
 
-      {!actorRole && (
+      {mode === 'fixture' && !actorRole && (
         <button type="button" className="mt-6 min-h-12 w-full rounded-lg bg-cyan-300 px-4 font-semibold text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={async () => {
-          const result = await post('fixtureLogin');
+          const result = await post('fixtureLogin', {}, null);
           if (result.ok) setActorRole('pending');
           else setMessage(result.body.error || 'This workspace is closed.');
         }}>
@@ -79,9 +130,15 @@ export function WorkspaceScreen() {
         </button>
       )}
 
-      {actorRole === 'pending' && (
+      {mode === 'fixture' && actorRole === 'pending' && (
         <button type="button" className="mt-4 min-h-12 rounded-lg border border-cyan-300 px-4 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => run('create', { participantIds: ['member-1'] })}>
           Start a session with the local member
+        </button>
+      )}
+
+      {mode === 'hosted' && steward && !session && (
+        <button type="button" className="mt-4 min-h-12 rounded-lg border border-cyan-300 px-4 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => run('create', { participantIds: [] })}>
+          Start a simulated session
         </button>
       )}
 
@@ -116,10 +173,12 @@ export function WorkspaceScreen() {
             <div className="mt-4 rounded-lg border border-amber-200/40 p-3" aria-live="polite">
               <p>Waiting for a steward. {pending.provider} has not been asked yet.</p>
               <p className="mt-1 text-sm text-gray-300">{pending.intent}</p>
-              <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-                <button type="button" className="min-h-12 rounded-lg bg-cyan-300 px-4 font-semibold text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => run('grant', { requestId: pending.id, historyDigest: pending.historyDigest })}>Grant this turn</button>
-                <button type="button" className="min-h-12 rounded-lg border border-gray-500 px-4 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => run('reject', { requestId: pending.id })}>Reject this turn</button>
-              </div>
+              {steward && (
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                  <button type="button" className="min-h-12 rounded-lg bg-cyan-300 px-4 font-semibold text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => run('grant', { requestId: pending.id, historyDigest: pending.historyDigest })}>Grant this turn</button>
+                  <button type="button" className="min-h-12 rounded-lg border border-gray-500 px-4 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => run('reject', { requestId: pending.id })}>Reject this turn</button>
+                </div>
+              )}
             </div>
           )}
 
@@ -129,7 +188,7 @@ export function WorkspaceScreen() {
               <li key={output.id} className="rounded-lg border border-gray-700 p-3">
                 <p className="text-xs uppercase tracking-wide text-gray-400">Simulated {output.provider}</p>
                 <p className="mt-1 whitespace-pre-wrap">{output.text}</p>
-                <button type="button" className="mt-3 min-h-12 rounded-lg border border-amber-200 px-4 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => run('release', { outputId: output.id, digest: output.digest })}>Approve this exact text</button>
+                {steward && <button type="button" className="mt-3 min-h-12 rounded-lg border border-amber-200 px-4 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => run('release', { outputId: output.id, digest: output.digest })}>Approve this exact text</button>}
                 <button type="button" className="mt-3 min-h-12 rounded-lg border border-gray-500 px-4 font-semibold sm:ml-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => run('export', { outputId: output.id })}>Retrieve the approved text</button>
               </li>
             ))}

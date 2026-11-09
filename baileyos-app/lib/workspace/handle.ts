@@ -1,11 +1,12 @@
 import { randomBytes } from 'crypto';
-import { FIXTURE_STEWARD, authenticatorFor, tokenFromRequest, type Authenticator } from './auth';
+import { FIXTURE_STEWARD, authenticatorFor, liveAccess, liveAuthenticator, tokenFromRequest, type Authenticator, type WorkspaceAccess } from './auth';
 import { historyDigest, outputDigest } from './digest';
 import { simulatedProvider } from './mockProvider';
 import type { Actor, HistoryEntry, ModelOutput, Provider, SharedSession, TurnRequest } from './types';
 
 export type WorkspaceDeps = {
   auth: Authenticator;
+  access?: WorkspaceAccess;
   sessions: Map<string, SharedSession>;
   provider: Provider;
   locks: Map<string, Promise<void>>;
@@ -16,7 +17,8 @@ const liveLocks = new Map<string, Promise<void>>();
 
 export function liveDeps(): WorkspaceDeps {
   return {
-    auth: authenticatorFor(),
+    auth: liveAuthenticator(),
+    access: liveAccess(),
     sessions: liveSessions,
     provider: simulatedProvider(),
     locks: liveLocks,
@@ -26,6 +28,7 @@ export function liveDeps(): WorkspaceDeps {
 export function freshDeps(over: Partial<WorkspaceDeps> = {}): WorkspaceDeps {
   return {
     auth: over.auth ?? authenticatorFor({ nodeEnv: 'test', sessionAuth: 'fixture' }),
+    access: over.access,
     sessions: over.sessions ?? new Map(),
     provider: over.provider ?? simulatedProvider(),
     locks: over.locks ?? new Map(),
@@ -82,6 +85,9 @@ export async function handleWorkspace(req: Request, deps: WorkspaceDeps = liveDe
   const token = tokenFromRequest(req);
   const url = new URL(req.url);
   if (req.method === 'GET' && !url.searchParams.get('sessionId')) {
+    if (deps.access === 'hosted' || deps.access === 'closed' || deps.access === 'fixture') {
+      return json({ mode: deps.access });
+    }
     const probed = await deps.auth(null);
     return json({ mode: probed.ok ? 'fixture' : probed.status === 401 ? 'fixture' : 'closed' });
   }
@@ -112,6 +118,8 @@ export async function handleWorkspace(req: Request, deps: WorkspaceDeps = liveDe
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return fail('Bad request.', 400); }
   const action = body.action;
+
+  if (action === 'whoami') return json({ actor: auth.actor });
 
   if (action === 'create') {
     if (auth.actor.role !== 'steward') return fail('Only a steward can open a session.', 403);
