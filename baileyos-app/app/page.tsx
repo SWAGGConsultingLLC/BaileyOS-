@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { browserSupabase } from '@/lib/supabaseBrowser';
 import { AccountPanel } from '@/components/AccountPanel';
 import { SuiteEntrance } from '@/components/SuiteEntrance';
+import { suiteReturnTarget } from '@/lib/suite/verify';
 import type { Cell } from '@/components/MapView';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false, loading: () => <div className="h-[340px]" /> });
@@ -27,11 +28,17 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [frameKey, setFrameKey] = useState(0);
   const [session, setSession] = useState<string | null>(null);
+  const [suiteSignedIn, setSuiteSignedIn] = useState(false);
   const onAccessToken = useCallback((token: string | null) => setSession(token), []);
   const sb = browserSupabase();
 
   const load = useCallback(async () => {
     try { const r = await fetch('/api/placements'); if (r.ok) { const j = await r.json(); setCells(j.cells); setTotal(j.total); } } catch {}
+  }, []);
+
+  useEffect(() => {
+    const target = suiteReturnTarget(window.location.href);
+    if (target) window.location.replace(target);
   }, []);
 
   useEffect(() => {
@@ -88,8 +95,8 @@ export default function Home() {
 
       <button onClick={share} disabled={busy} className="mt-5 w-full rounded-full bg-cyanx py-4 text-lg font-bold text-black disabled:opacity-60">Share my place</button>
       <p className="mt-2 text-xs text-gray-500">Sharing a place uses a device token, not an email. You can do it before you have an account.</p>
-      <AccountPanel client={sb} onAccessToken={onAccessToken} />
-      <SuiteEntrance />
+      <SuiteEntrance onSignedIn={setSuiteSignedIn} />
+      <AccountPanel client={sb} onAccessToken={onAccessToken} deferProfile={suiteSignedIn} />
       {session && mine && (
         <div className="mt-3">
           <button onClick={() => linkCall(mine.linked ? 'DELETE' : 'POST')} className="w-full rounded-full border border-goldx/60 py-3 font-semibold text-goldx">

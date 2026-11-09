@@ -37,6 +37,16 @@ export function suiteEnabled(env?: { suiteUrl?: string; suiteKey?: string }): bo
   return suiteConfig(env) !== null;
 }
 
+/** A PKCE code that landed on the map root belongs on /suite. An email link uses the hash instead. */
+export function suiteReturnTarget(href: string): string | null {
+  let url: URL;
+  try { url = new URL(href); } catch { return null; }
+  if (url.pathname === '/suite') return null;
+  if (!url.searchParams.get('code')) return null;
+  if (url.hash.includes('access_token')) return null;
+  return `/suite${url.search}`;
+}
+
 /** Accept only an authorize URL on the configured 360 project. */
 export function suiteAuthorizeHref(candidate: string, config: SuiteConfig): string | null {
   try {

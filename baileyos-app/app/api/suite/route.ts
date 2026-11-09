@@ -22,5 +22,5 @@ export async function POST(req: Request) {
     remember: rememberSuiteSubject,
     readGrant: readStewardGrant,
   });
-  return Response.json({ subject: authority.subject, steward: authority.steward });
+  return Response.json({ subject: authority.subject, steward: authority.steward, recorded: authority.recorded });
 }
