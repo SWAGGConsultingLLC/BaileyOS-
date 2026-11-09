@@ -63,6 +63,7 @@ test('the suite entrance does not render a connected control while config is abs
   const src = readFileSync(new URL('../../components/SuiteEntrance.tsx', import.meta.url), 'utf8');
   assert.match(src, /SuiteContinue/);
   assert.match(src, /<a href=\{phase.href\}/);
+  assert.match(src, /signInWithOAuth\.bind\(client\.auth\)/);
   assert.match(src, /skipBrowserRedirect: true/);
   assert.match(src, /does not grant steward/);
   assert.doesNotMatch(src, /Connected/);
