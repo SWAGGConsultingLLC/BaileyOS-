@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test lib/account.test.ts lib/placeRequest.test.ts",
+    "test": "tsx --test lib/account.test.ts lib/placeRequest.test.ts lib/suite/verify.test.ts",
     "test:rls": "bash tests/rls/run.sh"
   },
   "dependencies": {
