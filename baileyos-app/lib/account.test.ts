@@ -62,6 +62,13 @@ test('signup failure does not say the email is registered', () => {
   if (notice.kind === 'error') assert.doesNotMatch(notice.message, /already registered/i);
 });
 
+test('an email sign-in is labeled as not Steward', () => {
+  const text = noticeText({ kind: 'signed-in' });
+  assert.match(text, /Signed in with email/);
+  assert.match(text, /not Steward/);
+  assert.doesNotMatch(text, /You are the steward|is the map steward/);
+});
+
 test('confirmed sign-in requires a session and a confirmation timestamp', () => {
   assert.equal(interpretSignIn({ error: null, session: { access_token: 't' }, emailConfirmedAt: '2024-01-01T00:00:00Z' }).kind, 'signed-in');
   assert.equal(interpretSignIn({ error: null, session: { access_token: 't' }, emailConfirmedAt: null }).kind, 'unconfirmed');

@@ -204,9 +204,9 @@ export function noticeText(notice: AuthNotice): string {
     case 'resend-accepted':
       return 'The resend request was accepted. Check the inbox if this address still needs confirmation. This does not confirm that a new message was delivered.';
     case 'profile-saved':
-      return 'Private profile saved. It stays on this account and is not shown on the map.';
+      return 'Private profile saved on this email account. This account is not Steward.';
     case 'signed-in':
-      return 'Signed in. Your profile is private. Saving it does not attach a map placement.';
+      return 'Signed in with email. This account is not Steward. Saving a profile does not attach a map placement.';
     case 'unconfirmed':
       return 'This email is not confirmed yet. Open the confirmation message, then sign in. Placement on the map is separate.';
     case 'invalid':
