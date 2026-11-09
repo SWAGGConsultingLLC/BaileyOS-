@@ -336,7 +336,7 @@ export function AccountPanel({
 
       {userId && !settingPassword && (!deferProfile || showDeferredProfile) && (
         <form onSubmit={onSaveProfile} className="mt-4 grid gap-2">
-          <p className="text-sm text-gray-300">{savedName ? `Saved profile loaded: ${savedName}. It is not shown on the map.` : 'Signed in. Save a display name. It is not shown on the map.'}</p>
+          <p className="text-sm text-gray-300">{savedName ? `Saved email profile loaded: ${savedName}. This account is not Steward.` : 'Signed in with email. This account is not Steward. Save a display name if you want one. It is not shown on the map.'}</p>
           <label className="text-xs text-gray-400" htmlFor="display-name">Display name</label>
           <input id="display-name" value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={80} className="rounded-lg border border-gray-700 bg-transparent px-3 py-2" required />
           <label className="text-xs text-gray-400" htmlFor="bio">Short bio, optional</label>
