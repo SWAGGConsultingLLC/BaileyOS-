@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import React, { FormEvent, useEffect, useRef, useState } from 'react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import {
   authRedirectUrl,
@@ -22,6 +22,63 @@ import {
 type Mode = 'signup' | 'signin' | 'recover';
 const PENDING_NAME = 'baileyos_pending_display_name';
 
+export function PasswordField({
+  id,
+  label,
+  autoComplete,
+  value,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  label: string;
+  autoComplete: 'new-password' | 'current-password';
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div>
+      <label className="text-xs text-gray-400" htmlFor={id}>{label}</label>
+      <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+        <input
+          id={id}
+          type={shown ? 'text' : 'password'}
+          autoComplete={autoComplete}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          disabled={disabled}
+          required
+          className="min-h-12 w-full rounded-lg border border-gray-700 bg-transparent px-3 py-2"
+        />
+        <button
+          type="button"
+          aria-pressed={shown}
+          aria-controls={id}
+          onClick={() => setShown(current => !current)}
+          className="min-h-12 shrink-0 rounded-lg border border-gray-600 px-3 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        >
+          {shown ? 'Hide password' : 'Show password'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Notice({ notice }: { notice: AuthNotice | null }) {
+  if (!notice) return null;
+  const alert = notice.kind === 'error' || notice.kind === 'invalid';
+  return (
+    <p className="mt-3 text-sm text-gray-200" role={alert ? 'alert' : 'status'} aria-live={alert ? 'assertive' : 'polite'}>
+      {noticeText(notice)}
+    </p>
+  );
+}
+
 export function AccountPanel({
   client,
   onAccessToken,
@@ -40,6 +97,7 @@ export function AccountPanel({
   const [notice, setNotice] = useState<AuthNotice | null>(null);
   const [savedName, setSavedName] = useState<string | null>(null);
   const [dropUnconfirmed, setDropUnconfirmed] = useState(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const hrefAtLoad = useState(() => (typeof window === 'undefined' ? '' : window.location.href))[0];
   const recoveryRef = useRef(hasRecoveryCredential(hrefAtLoad));
 
@@ -118,7 +176,7 @@ export function AccountPanel({
 
   async function onSignUp(e: FormEvent) {
     e.preventDefault();
-    if (!client) return;
+    if (!client || busy) return;
     const name = validateDisplayName(displayName);
     const pass = validatePassword(password);
     if (!name.ok) { setNotice({ kind: 'error', message: name.error }); return; }
@@ -140,6 +198,7 @@ export function AccountPanel({
     if (result.kind === 'confirm-email' && data.session) setDropUnconfirmed(true);
     setNotice(result);
     if (result.kind === 'confirm-email') {
+      setAwaitingConfirmation(true);
       try { sessionStorage.setItem(PENDING_NAME, name.value); } catch { /* ignore */ }
       setDisplayName(name.value);
     }
@@ -147,7 +206,7 @@ export function AccountPanel({
 
   async function onSignIn(e: FormEvent) {
     e.preventDefault();
-    if (!client) return;
+    if (!client || busy) return;
     setBusy(true);
     const { data, error } = await client.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
@@ -158,7 +217,7 @@ export function AccountPanel({
   }
 
   async function onResend() {
-    if (!client || !email.trim()) return;
+    if (!client || busy || !email.trim()) return;
     setBusy(true);
     const { error } = await client.auth.resend({
       type: 'signup',
@@ -171,7 +230,7 @@ export function AccountPanel({
 
   async function onRecover(e: FormEvent) {
     e.preventDefault();
-    if (!client) return;
+    if (!client || busy) return;
     setBusy(true);
     const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: authRedirectUrl(window.location.origin),
@@ -181,7 +240,7 @@ export function AccountPanel({
   }
 
   async function onMagicLink() {
-    if (!client || !email.trim()) return;
+    if (!client || busy || !email.trim()) return;
     setBusy(true);
     const { error } = await client.auth.signInWithOtp({
       email: email.trim(),
@@ -196,7 +255,7 @@ export function AccountPanel({
 
   async function onNewPassword(e: FormEvent) {
     e.preventDefault();
-    if (!client) return;
+    if (!client || busy) return;
     const pass = validatePassword(password);
     if (!pass.ok) { setNotice({ kind: 'error', message: pass.error }); return; }
     setBusy(true);
@@ -213,7 +272,7 @@ export function AccountPanel({
 
   async function onSaveProfile(e: FormEvent) {
     e.preventDefault();
-    if (!client || !userId) return;
+    if (!client || !userId || busy) return;
     const name = validateDisplayName(displayName);
     const about = validateBio(bio);
     if (!name.ok) { setNotice({ kind: 'error', message: name.error }); return; }
@@ -227,7 +286,7 @@ export function AccountPanel({
     if (error) { setNotice({ kind: 'error', message: 'Could not save the profile.' }); return; }
     setSavedName(name.value);
     try { sessionStorage.removeItem(PENDING_NAME); } catch { /* ignore */ }
-    setNotice({ kind: 'signed-in' });
+    setNotice({ kind: 'profile-saved' });
   }
 
   async function onSignOut() {
@@ -252,28 +311,27 @@ export function AccountPanel({
   }
 
   return (
-    <section className="mt-6 rounded-2xl border border-gray-800 p-4" aria-labelledby="account-heading">
+    <section className="mt-6 rounded-2xl border border-gray-800 p-4" aria-labelledby="account-heading" aria-busy={busy}>
       <h2 id="account-heading" className="text-sm font-bold tracking-widest text-gray-400">ACCOUNT</h2>
       <p className="mt-2 text-sm text-gray-400">Optional. The map does not require a member. A profile is private to you and is not joined to a placement by email.</p>
 
-      {notice && <p className="mt-3 text-sm text-gray-200" role="status">{noticeText(notice)}</p>}
+      <Notice notice={notice} />
 
       {userId && settingPassword && (
         <form onSubmit={onNewPassword} className="mt-4 grid gap-2">
-          <label className="text-xs text-gray-400" htmlFor="new-password">New password</label>
-          <input id="new-password" type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} className="rounded-lg border border-gray-700 bg-transparent px-3 py-2" required />
-          <button disabled={busy} className="rounded-full bg-cyanx py-3 font-semibold text-black disabled:opacity-60">Save new password</button>
+          <PasswordField id="new-password" label="New password" autoComplete="new-password" value={password} onChange={setPassword} disabled={busy} />
+          <button disabled={busy} className="min-h-12 rounded-full bg-cyanx py-3 font-semibold text-black disabled:opacity-60">{busy ? 'Saving password…' : 'Save new password'}</button>
         </form>
       )}
 
       {userId && !settingPassword && (
         <form onSubmit={onSaveProfile} className="mt-4 grid gap-2">
-          <p className="text-sm text-gray-300">{savedName ? `Private profile: ${savedName}` : 'Signed in. Save a display name. It is not shown on the map.'}</p>
+          <p className="text-sm text-gray-300">{savedName ? `Saved profile loaded: ${savedName}. It is not shown on the map.` : 'Signed in. Save a display name. It is not shown on the map.'}</p>
           <label className="text-xs text-gray-400" htmlFor="display-name">Display name</label>
           <input id="display-name" value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={80} className="rounded-lg border border-gray-700 bg-transparent px-3 py-2" required />
           <label className="text-xs text-gray-400" htmlFor="bio">Short bio, optional</label>
           <textarea id="bio" value={bio} onChange={e => setBio(e.target.value)} maxLength={280} rows={3} className="rounded-lg border border-gray-700 bg-transparent px-3 py-2" />
-          <button disabled={busy} className="rounded-full bg-cyanx py-3 font-semibold text-black disabled:opacity-60">Save private profile</button>
+          <button disabled={busy} className="min-h-12 rounded-full bg-cyanx py-3 font-semibold text-black disabled:opacity-60">{busy ? 'Saving profile…' : 'Save private profile'}</button>
           <button type="button" onClick={onSignOut} disabled={busy} className="rounded-full border border-gray-600 py-3 font-semibold text-gray-200">Sign out</button>
         </form>
       )}
@@ -288,28 +346,38 @@ export function AccountPanel({
             ))}
           </div>
 
-          {mode === 'signup' && (
+          {mode === 'signup' && awaitingConfirmation && (
+            <section className="mt-4 rounded-xl border border-cyan-300/40 p-4" aria-labelledby="confirm-step-heading">
+              <p className="text-xs font-bold tracking-wide text-cyan-200">Step 2 of 3</p>
+              <h3 id="confirm-step-heading" className="mt-1 text-xl font-bold">Confirm this address</h3>
+              <p className="mt-2 break-all text-sm text-gray-200">{email}</p>
+              <div className="mt-4 flex flex-col gap-3">
+                <button type="button" onClick={onResend} disabled={busy} className="min-h-12 rounded-lg bg-cyan-300 px-4 font-semibold text-black disabled:opacity-60">{busy ? 'Sending…' : 'Resend confirmation'}</button>
+                <button type="button" onClick={() => { setAwaitingConfirmation(false); setNotice(null); }} className="min-h-12 rounded-lg border border-gray-500 px-4 font-semibold">Edit address</button>
+                <button type="button" onClick={() => { setMode('signin'); setAwaitingConfirmation(false); setNotice(null); }} className="min-h-12 rounded-lg border border-gray-500 px-4 font-semibold">Go to sign in</button>
+              </div>
+            </section>
+          )}
+
+          {mode === 'signup' && !awaitingConfirmation && (
             <form onSubmit={onSignUp} className="mt-3 grid gap-2">
               <label className="text-xs text-gray-400" htmlFor="signup-email">Email</label>
-              <input id="signup-email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} required className="rounded-lg border border-gray-700 bg-transparent px-3 py-2" />
-              <label className="text-xs text-gray-400" htmlFor="signup-password">Password</label>
-              <input id="signup-password" type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} required className="rounded-lg border border-gray-700 bg-transparent px-3 py-2" />
+              <input id="signup-email" type="email" autoComplete="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} required disabled={busy} className="min-h-12 rounded-lg border border-gray-700 bg-transparent px-3 py-2" />
+              <PasswordField id="signup-password" label="Password" autoComplete="new-password" value={password} onChange={setPassword} disabled={busy} />
               <label className="text-xs text-gray-400" htmlFor="signup-name">Display name</label>
-              <input id="signup-name" value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={80} required className="rounded-lg border border-gray-700 bg-transparent px-3 py-2" />
-              <button disabled={busy} className="rounded-full bg-cyanx py-3 font-semibold text-black disabled:opacity-60">Create account</button>
-              <p className="text-xs text-gray-500">You must open the confirmation email before signing in. This does not place you on the map.</p>
-              <button type="button" onClick={onResend} disabled={busy} className="text-left text-xs font-semibold text-cyanx">Resend confirmation email</button>
+              <input id="signup-name" value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={80} required disabled={busy} className="min-h-12 rounded-lg border border-gray-700 bg-transparent px-3 py-2" />
+              <button disabled={busy} className="min-h-12 rounded-full bg-cyanx py-3 font-semibold text-black disabled:opacity-60">{busy ? 'Creating account…' : 'Create account'}</button>
+              <p className="text-xs text-gray-500">Use Show password to check it before submitting. This does not place you on the map.</p>
             </form>
           )}
 
           {mode === 'signin' && (
             <form onSubmit={onSignIn} className="mt-3 grid gap-2">
               <label className="text-xs text-gray-400" htmlFor="signin-email">Email</label>
-              <input id="signin-email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} required className="rounded-lg border border-gray-700 bg-transparent px-3 py-2" />
-              <label className="text-xs text-gray-400" htmlFor="signin-password">Password</label>
-              <input id="signin-password" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required className="rounded-lg border border-gray-700 bg-transparent px-3 py-2" />
-              <button disabled={busy} className="rounded-full bg-cyanx py-3 font-semibold text-black disabled:opacity-60">Sign in</button>
-              <button type="button" onClick={onMagicLink} disabled={busy} className="text-left text-xs font-semibold text-cyanx">Email a sign-in link to an existing account</button>
+              <input id="signin-email" type="email" autoComplete="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} required disabled={busy} className="min-h-12 rounded-lg border border-gray-700 bg-transparent px-3 py-2" />
+              <PasswordField id="signin-password" label="Password" autoComplete="current-password" value={password} onChange={setPassword} disabled={busy} />
+              <button disabled={busy} className="min-h-12 rounded-full bg-cyanx py-3 font-semibold text-black disabled:opacity-60">{busy ? 'Signing in…' : 'Sign in'}</button>
+              <button type="button" onClick={onMagicLink} disabled={busy} className="min-h-12 text-left text-sm font-semibold text-cyanx">Email a sign-in link to an existing account</button>
             </form>
           )}
 

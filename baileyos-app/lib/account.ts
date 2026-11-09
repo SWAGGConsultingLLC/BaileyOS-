@@ -8,8 +8,8 @@ export type AuthErrorLike = { message?: string; code?: string; status?: number }
 
 export type AuthNotice =
   | { kind: 'confirm-email' }
-  | { kind: 'existing-account' }
-  | { kind: 'resend-sent' }
+  | { kind: 'resend-accepted' }
+  | { kind: 'profile-saved' }
   | { kind: 'signed-in' }
   | { kind: 'unconfirmed' }
   | { kind: 'invalid' }
@@ -116,17 +116,25 @@ export function interpretSignUp(result: {
 }): AuthNotice {
   if (result.error) return { kind: 'error', message: 'Could not create the account. If you already have one, sign in.' };
   if (result.session && emailIsConfirmed(result.emailConfirmedAt)) return { kind: 'signed-in' };
-  // Auth returns an empty identities list, and no error, when the address is already registered.
-  // That response does not send a confirmation message.
-  if (Array.isArray(result.identities) && result.identities.length === 0) return { kind: 'existing-account' };
+  // An empty identity list is the provider's generic success for an address it will not email.
+  // Treat it like any other confirmation step: do not say whether the address exists, and do not say a message was delivered.
   return { kind: 'confirm-email' };
 }
 
+const ENUMERATION = /already been registered|already registered|already confirmed|email address has already|user already exists/i;
+
+/** Resend success is not delivery. Existence errors stay generic. Rate limits stay specific. */
 export function interpretResend(result: { error: AuthErrorLike }): AuthNotice {
-  if (!result.error) return { kind: 'resend-sent' };
-  const code = result.error.code || '';
-  const message = (result.error.message || '').toLowerCase();
-  if (code === 'email_exists' || code === 'user_already_exists' || message.includes('already')) return { kind: 'existing-account' };
+  if (!result.error) return { kind: 'resend-accepted' };
+  const code = (result.error.code || '').toLowerCase();
+  const message = result.error.message || '';
+  const lower = message.toLowerCase();
+  if (code === 'email_exists' || code === 'user_already_exists' || ENUMERATION.test(message)) return { kind: 'resend-accepted' };
+  if (code.includes('rate_limit') || result.error.status === 429 || lower.includes('rate limit') || lower.includes('once every')) {
+    const detail = message && !/token|bearer|jwt/i.test(message) ? message : 'Confirmation messages are temporarily limited.';
+    return { kind: 'error', message: `Confirmation messages are limited. ${detail}` };
+  }
+  if (message && message.length <= 180 && !/token|bearer|jwt|password/i.test(message)) return { kind: 'error', message };
   return { kind: 'error', message: 'Could not resend the confirmation message.' };
 }
 
@@ -192,11 +200,11 @@ export function decideSessionExposure(input: {
 export function noticeText(notice: AuthNotice): string {
   switch (notice.kind) {
     case 'confirm-email':
-      return 'Check your email and open the confirmation link before signing in. An unconfirmed signup is not a signed-in member. The link does not place you on the map.';
-    case 'existing-account':
-      return 'This address already has an account, so no new confirmation message was sent. Sign in. If you need a new password, use Reset password.';
-    case 'resend-sent':
-      return 'If this address still needs confirmation, another message is on its way. An address that is already confirmed does not get another message. Sign in, or use Reset password.';
+      return 'Step 2 of 3. Check the inbox for this address, including spam and other folders. Open a confirmation message before signing in. If you already use this address, sign in or reset the password. This response does not by itself mean a new message was delivered.';
+    case 'resend-accepted':
+      return 'The resend request was accepted. Check the inbox if this address still needs confirmation. This does not confirm that a new message was delivered.';
+    case 'profile-saved':
+      return 'Private profile saved. It stays on this account and is not shown on the map.';
     case 'signed-in':
       return 'Signed in. Your profile is private. Saving it does not attach a map placement.';
     case 'unconfirmed':

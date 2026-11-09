@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'node:test';
+import { PasswordField } from '../components/AccountPanel.tsx';
 import {
   authRedirectUrl,
   callbackKind,
@@ -17,10 +20,11 @@ import {
   validatePassword,
 } from './account.ts';
 
-test('signup without a session asks for email confirmation', () => {
+test('signup without a session asks for email confirmation without claiming delivery', () => {
   const notice = interpretSignUp({ error: null, session: null });
   assert.equal(notice.kind, 'confirm-email');
-  assert.match(noticeText(notice), /not a signed-in member/);
+  assert.match(noticeText(notice), /does not by itself mean a new message was delivered/);
+  assert.doesNotMatch(noticeText(notice), /already has an account/);
 });
 
 test('signup that already has a session is signed in only when the email is confirmed', () => {
@@ -28,23 +32,28 @@ test('signup that already has a session is signed in only when the email is conf
   assert.equal(interpretSignUp({ error: null, session: { access_token: 't' }, emailConfirmedAt: null }).kind, 'confirm-email');
 });
 
-test('an existing address with no identities does not claim a confirmation message was sent', () => {
-  const notice = interpretSignUp({ error: null, session: null, identities: [] });
-  assert.equal(notice.kind, 'existing-account');
-  assert.match(noticeText(notice), /no new confirmation message was sent/);
-  assert.match(noticeText(notice), /Sign in/);
+test('an empty identity list uses the same confirmation step and does not reveal the address', () => {
+  const hidden = interpretSignUp({ error: null, session: null, identities: [] });
   const fresh = interpretSignUp({ error: null, session: null, identities: [{ provider: 'email' }] });
+  assert.equal(hidden.kind, 'confirm-email');
   assert.equal(fresh.kind, 'confirm-email');
+  assert.equal(noticeText(hidden), noticeText(fresh));
+  assert.doesNotMatch(noticeText(hidden), /already has an account|was delivered to/);
 });
 
-test('resend tells an already confirmed address to sign in', () => {
+test('resend reports a rate limit and does not treat generic success as delivery', () => {
   const sent = interpretResend({ error: null });
-  assert.equal(sent.kind, 'resend-sent');
-  assert.match(noticeText(sent), /already confirmed does not get another message/);
+  assert.equal(sent.kind, 'resend-accepted');
+  assert.match(noticeText(sent), /does not confirm that a new message was delivered/);
+  assert.doesNotMatch(noticeText(sent), /already has an account/);
   const exists = interpretResend({ error: { code: 'email_exists', message: 'A user with this email address has already been registered' } });
-  assert.equal(exists.kind, 'existing-account');
-  const other = interpretResend({ error: { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' } });
-  assert.equal(other.kind, 'error');
+  assert.equal(exists.kind, 'resend-accepted');
+  const limited = interpretResend({ error: { code: 'over_email_send_rate_limit', status: 429, message: 'email rate limit exceeded' } });
+  assert.equal(limited.kind, 'error');
+  if (limited.kind === 'error') {
+    assert.match(limited.message, /email rate limit exceeded/);
+    assert.match(limited.message, /limited/);
+  }
 });
 
 test('signup failure does not say the email is registered', () => {
@@ -146,6 +155,31 @@ test('the account panel uses the session decision instead of a bare recovery que
   assert.match(src, /hasRecoveryCredential\(/);
   assert.doesNotMatch(src, /callbackKind\(window\.location\.href\)/);
   assert.doesNotMatch(src, /onAccessToken\(session\.access_token\)/);
+  assert.match(src, /Show password/);
+  assert.match(src, /aria-pressed/);
+  assert.match(src, /autoComplete="new-password"/);
+  assert.match(src, /autoComplete="current-password"/);
+  assert.match(src, /Confirm this address/);
+  assert.match(src, /Go to sign in/);
+  assert.match(src, /Edit address/);
+  assert.doesNotMatch(src, /sessionStorage\.setItem\([^)]*password/i);
+  assert.doesNotMatch(src, /localStorage/);
+});
+
+test('the password field starts masked and can be shown without a second entry', () => {
+  const html = renderToStaticMarkup(createElement(PasswordField, {
+    id: 'signup-password',
+    label: 'Password',
+    autoComplete: 'new-password',
+    value: 'correct horse',
+    onChange: () => undefined,
+  }));
+  assert.match(html, /type="password"/);
+  assert.match(html, /auto[Cc]omplete="new-password"/);
+  assert.match(html, /aria-pressed="false"/);
+  assert.match(html, /Show password/);
+  assert.doesNotMatch(html, /type="text"/);
+  assert.match(html, /value="correct horse"/);
 });
 
 test('profile migration does not use security definer or user metadata', () => {
