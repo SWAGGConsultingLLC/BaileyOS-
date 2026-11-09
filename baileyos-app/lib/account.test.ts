@@ -7,6 +7,7 @@ import {
   decideSessionExposure,
   interpretMagicLink,
   interpretRecoverySend,
+  interpretResend,
   interpretSignIn,
   interpretSignUp,
   noticeText,
@@ -25,6 +26,25 @@ test('signup without a session asks for email confirmation', () => {
 test('signup that already has a session is signed in only when the email is confirmed', () => {
   assert.equal(interpretSignUp({ error: null, session: { access_token: 't' }, emailConfirmedAt: '2024-01-01T00:00:00Z' }).kind, 'signed-in');
   assert.equal(interpretSignUp({ error: null, session: { access_token: 't' }, emailConfirmedAt: null }).kind, 'confirm-email');
+});
+
+test('an existing address with no identities does not claim a confirmation message was sent', () => {
+  const notice = interpretSignUp({ error: null, session: null, identities: [] });
+  assert.equal(notice.kind, 'existing-account');
+  assert.match(noticeText(notice), /no new confirmation message was sent/);
+  assert.match(noticeText(notice), /Sign in/);
+  const fresh = interpretSignUp({ error: null, session: null, identities: [{ provider: 'email' }] });
+  assert.equal(fresh.kind, 'confirm-email');
+});
+
+test('resend tells an already confirmed address to sign in', () => {
+  const sent = interpretResend({ error: null });
+  assert.equal(sent.kind, 'resend-sent');
+  assert.match(noticeText(sent), /already confirmed does not get another message/);
+  const exists = interpretResend({ error: { code: 'email_exists', message: 'A user with this email address has already been registered' } });
+  assert.equal(exists.kind, 'existing-account');
+  const other = interpretResend({ error: { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' } });
+  assert.equal(other.kind, 'error');
 });
 
 test('signup failure does not say the email is registered', () => {

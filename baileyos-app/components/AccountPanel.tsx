@@ -9,6 +9,7 @@ import {
   interpretMagicLink,
   interpretRecoverySend,
   interpretSignIn,
+  interpretResend,
   interpretSignUp,
   noticeText,
   stripAuthParams,
@@ -130,7 +131,12 @@ export function AccountPanel({
     });
     setBusy(false);
     setPassword('');
-    const result = interpretSignUp({ error, session: data.session, emailConfirmedAt: data.user?.email_confirmed_at });
+    const result = interpretSignUp({
+      error,
+      session: data.session,
+      emailConfirmedAt: data.user?.email_confirmed_at,
+      identities: data.user?.identities,
+    });
     if (result.kind === 'confirm-email' && data.session) setDropUnconfirmed(true);
     setNotice(result);
     if (result.kind === 'confirm-email') {
@@ -160,9 +166,7 @@ export function AccountPanel({
       options: { emailRedirectTo: authRedirectUrl(window.location.origin) },
     });
     setBusy(false);
-    setNotice(error
-      ? { kind: 'error', message: 'Could not resend the confirmation message.' }
-      : { kind: 'confirm-email' });
+    setNotice(interpretResend({ error }));
   }
 
   async function onRecover(e: FormEvent) {

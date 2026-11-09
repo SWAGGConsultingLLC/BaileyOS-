@@ -8,6 +8,8 @@ export type AuthErrorLike = { message?: string; code?: string; status?: number }
 
 export type AuthNotice =
   | { kind: 'confirm-email' }
+  | { kind: 'existing-account' }
+  | { kind: 'resend-sent' }
   | { kind: 'signed-in' }
   | { kind: 'unconfirmed' }
   | { kind: 'invalid' }
@@ -106,10 +108,26 @@ export function sessionIsUsable(
   return true;
 }
 
-export function interpretSignUp(result: { error: AuthErrorLike; session: unknown | null; emailConfirmedAt?: string | null }): AuthNotice {
+export function interpretSignUp(result: {
+  error: AuthErrorLike;
+  session: unknown | null;
+  emailConfirmedAt?: string | null;
+  identities?: unknown[] | null;
+}): AuthNotice {
   if (result.error) return { kind: 'error', message: 'Could not create the account. If you already have one, sign in.' };
   if (result.session && emailIsConfirmed(result.emailConfirmedAt)) return { kind: 'signed-in' };
+  // Auth returns an empty identities list, and no error, when the address is already registered.
+  // That response does not send a confirmation message.
+  if (Array.isArray(result.identities) && result.identities.length === 0) return { kind: 'existing-account' };
   return { kind: 'confirm-email' };
+}
+
+export function interpretResend(result: { error: AuthErrorLike }): AuthNotice {
+  if (!result.error) return { kind: 'resend-sent' };
+  const code = result.error.code || '';
+  const message = (result.error.message || '').toLowerCase();
+  if (code === 'email_exists' || code === 'user_already_exists' || message.includes('already')) return { kind: 'existing-account' };
+  return { kind: 'error', message: 'Could not resend the confirmation message.' };
 }
 
 export function interpretSignIn(result: { error: AuthErrorLike; session: unknown | null; emailConfirmedAt?: string | null }): AuthNotice {
@@ -175,6 +193,10 @@ export function noticeText(notice: AuthNotice): string {
   switch (notice.kind) {
     case 'confirm-email':
       return 'Check your email and open the confirmation link before signing in. An unconfirmed signup is not a signed-in member. The link does not place you on the map.';
+    case 'existing-account':
+      return 'This address already has an account, so no new confirmation message was sent. Sign in. If you need a new password, use Reset password.';
+    case 'resend-sent':
+      return 'If this address still needs confirmation, another message is on its way. An address that is already confirmed does not get another message. Sign in, or use Reset password.';
     case 'signed-in':
       return 'Signed in. Your profile is private. Saving it does not attach a map placement.';
     case 'unconfirmed':
