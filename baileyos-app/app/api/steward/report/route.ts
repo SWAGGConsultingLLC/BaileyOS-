@@ -1,3 +1,5 @@
+import { QUESTION_PROMPT } from '@/lib/brew/question001';
+import { readStewardQuestion } from '@/lib/brew/store';
 import { stewardReportAccess } from '@/lib/steward/report';
 import { readStewardGrant, readSuiteCounts } from '@/lib/steward/store';
 import { fetchSuiteUser } from '@/lib/suite/hosted';
@@ -24,7 +26,17 @@ export async function GET(req: Request) {
   if (!access.ok) return Response.json({ error: access.error }, { status: access.status });
   try {
     const counts = await readSuiteCounts();
-    return Response.json({ members: counts.members, recentSignIns: counts.recentSignIns });
+    const question = await readStewardQuestion();
+    return Response.json({
+      members: counts.members,
+      recentSignIns: counts.recentSignIns,
+      question: {
+        prompt: QUESTION_PROMPT,
+        total: question.tally.total,
+        options: question.tally.options,
+        votes: question.votes,
+      },
+    });
   } catch {
     return Response.json({ error: 'The report could not be read.' }, { status: 500 });
   }

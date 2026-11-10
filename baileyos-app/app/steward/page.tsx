@@ -2,9 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import type { PublicTally, VoteOption } from '@/lib/brew/question001';
 import { suiteConfig } from '@/lib/suite/verify';
 
-type Report = { members: number; recentSignIns: number };
+type Report = {
+  members: number;
+  recentSignIns: number;
+  question: PublicTally & { prompt: string; votes: { at: string; option: VoteOption }[] };
+};
 
 export default function StewardReport() {
   const [message, setMessage] = useState('Checking access.');
@@ -31,11 +36,11 @@ export default function StewardReport() {
         setMessage('Steward only');
         return;
       }
-      if (!res.ok || typeof body.members !== 'number' || typeof body.recentSignIns !== 'number') {
+      if (!res.ok || typeof body.members !== 'number' || typeof body.recentSignIns !== 'number' || !body.question) {
         setMessage(res.status === 401 ? 'Sign in required.' : 'The report could not be read.');
         return;
       }
-      setReport({ members: body.members, recentSignIns: body.recentSignIns });
+      setReport({ members: body.members, recentSignIns: body.recentSignIns, question: body.question });
       setMessage('');
     }).catch(() => setMessage('Sign in required.'));
   }, []);
@@ -49,7 +54,20 @@ export default function StewardReport() {
         <div className="mt-6 space-y-3 text-gray-200">
           <p>Verified members: {report.members}</p>
           <p>Verified sign-ins in the last 7 days: {report.recentSignIns}</p>
-          <p>No consensus questions yet</p>
+          <h2 className="pt-4 text-lg font-semibold text-white">Question #001</h2>
+          <p>{report.question.prompt}</p>
+          <p>Verified votes: {report.question.total}</p>
+          <ul className="space-y-1">
+            {report.question.options.map(item => (
+              <li key={item.option}>{item.option}. {item.label}: {item.count} ({item.percent}%)</li>
+            ))}
+          </ul>
+          <h3 className="pt-2 font-semibold text-white">Votes over time</h3>
+          {report.question.votes.length === 0 ? <p>No votes yet.</p> : (
+            <ul className="space-y-1">
+              {report.question.votes.map(vote => <li key={`${vote.at}-${vote.option}`}>{vote.at} · {vote.option}</li>)}
+            </ul>
+          )}
         </div>
       )}
       <a className="mt-8 inline-flex min-h-12 items-center font-semibold text-cyan-300 underline" href="/">Back to the map</a>
