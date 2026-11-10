@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { BrewLogo } from '@/components/BrewLogo';
 import type { PublicTally, VoteOption } from '@/lib/brew/question001';
 
 type Row = { at: string; option: VoteOption; receipt: string };
@@ -24,7 +25,7 @@ export default function VoteVerification() {
 
   return (
     <main className="mx-auto max-w-xl px-4 py-10">
-      <p className="text-sm font-bold tracking-wide text-gray-400">360° BREWING</p>
+      <BrewLogo />
       <h1 className="mt-2 text-3xl font-bold">Question #001 vote log</h1>
       <p className="mt-4 text-gray-300">Each row is a time, an option, and a receipt. The receipt is a per-question hash. It does not show who voted.</p>
       {message && <p className="mt-4 text-amber-100">{message}</p>}
