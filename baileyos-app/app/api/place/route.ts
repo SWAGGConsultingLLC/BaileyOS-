@@ -3,6 +3,7 @@ import { allow } from '@/lib/rateLimit';
 import { preparePlacement } from '@/lib/placeRequest';
 import { admin } from '@/lib/supabaseAdmin';
 import { linkToken, safeEqual } from '@/lib/crypto';
+import { ownerPlacementBody } from '@/lib/crowd';
 import { checkInCard, shouldAttachCheckInProfile, type CheckInCard } from '@/lib/checkInProfile';
 import { fetchSuiteUser } from '@/lib/suite/hosted';
 import { decideSuiteSubject, suiteConfig } from '@/lib/suite/verify';
@@ -22,18 +23,25 @@ export async function POST(req: NextRequest) {
   if (!prepared.ok) return fail(prepared.error, prepared.status);
 
   const db = admin();
-  const { data, error } = await db.rpc('insert_placement', {
+  const { data, error } = await db.rpc('insert_placement_hex', {
     p_band: prepared.cell.band_km,
     p_sector: prepared.cell.sector,
     p_hour: prepared.hour,
     p_key: '\\x' + prepared.key,
+    p_h3: prepared.hex,
+    p_phone: '\\x' + prepared.phoneKey,
   });
   if (error) return fail('Could not record placement', 500);
 
   let placementId = data == null ? null : Number(data);
+  let hex = prepared.hex;
   if (placementId == null) {
     const found = await db.rpc('placement_id_for_key', { p_key: '\\x' + prepared.key });
     if (!found.error && found.data != null) placementId = Number(found.data);
+    if (placementId != null) {
+      const stored = await db.from('placements').select('h3').eq('id', placementId).maybeSingle();
+      if (typeof stored.data?.h3 === 'string') hex = stored.data.h3;
+    }
   }
   const showLinkedIn = body.show_linkedin === true;
   let shared = false;
@@ -53,14 +61,14 @@ export async function POST(req: NextRequest) {
     await db.from('placement_cards').delete().eq('placement_id', placementId);
   }
 
-  if (data == null) return NextResponse.json({ status: 'duplicate', ...prepared.cell, shared_profile: shared });
-  return NextResponse.json({
-    status: 'placed',
-    ...prepared.cell,
-    placement_id: data,
-    link_token: linkToken(Number(data)),
-    shared_profile: shared,
-  });
+  if (placementId == null) return fail('Could not record placement', 500);
+  return NextResponse.json(ownerPlacementBody({
+    status: data == null ? 'duplicate' : 'placed',
+    hex,
+    placementId,
+    linkToken: linkToken(placementId),
+    shared,
+  }));
 }
 
 async function profileFromSession(req: NextRequest): Promise<CheckInCard | null> {

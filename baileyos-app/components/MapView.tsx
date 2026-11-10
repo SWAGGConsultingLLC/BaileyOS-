@@ -3,47 +3,71 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CONFIG } from '@/lib/config';
-import { jitteredPoint } from '@/lib/geo';
+import type { CheckInCard } from '@/lib/checkInProfile';
+import { hexCenter, jitterInHex, type MapViewBox } from '@/lib/neighborhood';
 
-export type CheckInPin = { name: string; photo: string | null; profileUrl: string | null };
-export type Cell = { band_km: number; sector: number; card?: CheckInPin | null };
-type Props = { cells: Cell[]; mine: Cell | null; frameKey: number };
+export type NeighborhoodPin = { hex: string; phones: number; cards: CheckInCard[] };
+type MinePin = { h3: string };
+type Props = {
+  neighborhoods: NeighborhoodPin[];
+  mine: MinePin | null;
+  focusHex: string | null;
+  frameKey: number;
+  onBounds: (view: MapViewBox) => void;
+};
 
-export default function MapView({ cells, mine, frameKey }: Props) {
+export default function MapView({ neighborhoods, mine, focusHex, frameKey, onBounds }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const dots = useRef<L.LayerGroup | null>(null);
-  const range = useRef<L.Circle | null>(null);
+  const onBoundsRef = useRef(onBounds);
+  onBoundsRef.current = onBounds;
 
   useEffect(() => {
     if (!el.current || map.current) return;
-    const o: [number, number] = [CONFIG.origin.lat, CONFIG.origin.lon];
-    const m = L.map(el.current, { zoomControl: false, attributionControl: true }).setView(o, 9);
+    const m = L.map(el.current, { zoomControl: false, attributionControl: true }).setView([CONFIG.origin.lat, CONFIG.origin.lon], 12);
     L.control.zoom({ position: 'topright' }).addTo(m);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19, className: 'osm-dark',
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(m);
-    range.current = L.circle(o, { radius: CONFIG.maxKm * 1000, color: '#22d3ee', weight: 1, opacity: 0.35, fillOpacity: 0.02, interactive: false }).addTo(m);
     dots.current = L.layerGroup().addTo(m);
-    m.fitBounds(range.current.getBounds());
+    const publish = () => {
+      const bounds = m.getBounds();
+      onBoundsRef.current({
+        west: bounds.getWest(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        north: bounds.getNorth(),
+      });
+    };
+    m.on('moveend', publish);
     map.current = m;
+    publish();
     return () => { m.remove(); map.current = null; };
   }, []);
 
-  // Every render re-seeds the jitter, so a dot never has a stable position.
   useEffect(() => {
-    const g = dots.current; if (!g) return;
-    g.clearLayers();
-    cells.forEach(c => {
-      const point = jitteredPoint(c.band_km, c.sector);
-      if (c.card?.name) namedPin(point, c.card).addTo(g);
-      else L.circleMarker(point, { radius: 3, color: '#22d3ee', weight: 0, fillColor: '#22d3ee', fillOpacity: 0.7, interactive: false }).addTo(g);
-    });
-    if (mine) L.circleMarker(jitteredPoint(mine.band_km, mine.sector), { radius: 9, color: '#ffffff', weight: 2, fillColor: '#3b82f6', fillOpacity: 0.95 }).addTo(g);
-  }, [cells, mine]);
+    if (!map.current || !focusHex) return;
+    try { map.current.setView(hexCenter(focusHex), 12); } catch { /* ignore a stored hex the library cannot draw */ }
+  }, [focusHex, frameKey]);
 
-  useEffect(() => { if (frameKey > 0 && map.current && range.current) map.current.fitBounds(range.current.getBounds()); }, [frameKey]);
+  useEffect(() => {
+    const g = dots.current;
+    if (!g) return;
+    g.clearLayers();
+    for (const area of neighborhoods) {
+      try {
+        L.circleMarker(jitterInHex(area.hex), { radius: 4, color: '#22d3ee', weight: 0, fillColor: '#22d3ee', fillOpacity: 0.8, interactive: false }).addTo(g);
+        for (const card of area.cards) namedPin(jitterInHex(area.hex), card).addTo(g);
+      } catch { /* a bad hex is skipped */ }
+    }
+    if (mine?.h3) {
+      try {
+        L.circleMarker(jitterInHex(mine.h3), { radius: 9, color: '#ffffff', weight: 2, fillColor: '#3b82f6', fillOpacity: 0.95 }).addTo(g);
+      } catch { /* the viewer's own hex could not be drawn */ }
+    }
+  }, [neighborhoods, mine, frameKey]);
 
   return <div ref={el} className="h-[340px] w-full" />;
 }
@@ -52,7 +76,7 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] ?? char));
 }
 
-function namedPin(point: [number, number], card: { name: string; photo: string | null; profileUrl: string | null }): L.Marker {
+function namedPin(point: [number, number], card: CheckInCard): L.Marker {
   const name = escapeHtml(card.name);
   const photo = card.photo && card.photo.startsWith('https://')
     ? `<img alt="" src="${escapeHtml(card.photo)}" style="width:28px;height:28px;border-radius:999px;object-fit:cover" />`

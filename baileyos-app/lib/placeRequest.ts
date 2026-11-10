@@ -1,6 +1,7 @@
 import { CONFIG } from './config';
-import { hmacHex } from './crypto';
+import { hmacHex, phoneMarker } from './crypto';
 import { polar, quantize } from './geo';
+import { neighborhoodHex } from './neighborhood';
 
 const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
@@ -8,7 +9,9 @@ export type PlaceFailure = { ok: false; error: string; status: number };
 export type PlaceReady = {
   ok: true;
   cell: { band_km: number; sector: number };
+  hex: string;
   key: string;
+  phoneKey: string;
   hour: string;
 };
 
@@ -36,12 +39,13 @@ export function preparePlacement(args: {
   if (accuracy_m > CONFIG.maxAccuracyM || accuracy_m < 0) return { ok: false, error: 'Location not precise enough', status: 400 };
 
   const { d, b } = polar(lat, lon);
-  if (d > CONFIG.maxKm) return { ok: false, error: `Out of range (more than ${CONFIG.maxKm} km from center)`, status: 400 };
   const cell = quantize(d, b);
+  const hex = neighborhoodHex(lat, lon);
 
   const windowMs = Number(process.env.DEDUPE_WINDOW_HOURS || 24) * 3600_000;
   const windowStart = Math.floor(args.now / windowMs) * windowMs;
   const key = hmacHex(`${device_token}:${windowStart}`);
+  const phoneKey = phoneMarker(device_token);
   const hour = new Date(Math.floor(args.now / 3600_000) * 3600_000).toISOString();
-  return { ok: true, cell, key, hour };
+  return { ok: true, cell, hex, key, phoneKey, hour };
 }
