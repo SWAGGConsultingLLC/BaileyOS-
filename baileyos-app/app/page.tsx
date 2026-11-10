@@ -3,8 +3,10 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
 import { browserSupabase } from '@/lib/supabaseBrowser';
 import { AccountPanel } from '@/components/AccountPanel';
+import { BrewLogo } from '@/components/BrewLogo';
 import { SuiteEntrance } from '@/components/SuiteEntrance';
 import { SuiteIdentity } from '@/components/SuiteIdentity';
+import { QUESTION_PROMPT } from '@/lib/brew/question001';
 import { suiteReturnTarget } from '@/lib/suite/verify';
 import type { Cell } from '@/components/MapView';
 
@@ -81,17 +83,17 @@ export default function Home() {
 
   return (
     <main className="mx-auto max-w-xl px-4 py-8">
-      <div className="text-sm font-bold tracking-[0.35em] text-cyanx">BAILEYOS</div>
+      <p className="text-sm font-semibold text-gray-300">SWAGG Consulting</p>
+      <div className="mt-2 text-sm font-bold tracking-[0.35em] text-cyanx">BAILEYOS</div>
       <h1 className="mt-3 text-4xl font-extrabold text-white">Show up. Get placed.</h1>
-      <p className="mt-2 text-gray-400">Share where you are. An account is optional and does not place you on the map. The books stay in the works.</p>
+      <p className="mt-2 text-gray-400">BaileyOS is a community map by SWAGG Consulting. People can share roughly where they are, and they can join 360° Brewing questions. An account is optional and does not place you on the map.</p>
       <SuiteIdentity onStatus={onSuiteStatus} />
-      {!suiteSignedIn && (
-        <>
-          <p className="mt-3 text-sm text-goldx">•?81⊞81·ΔS◇0 | 81ABSCS81</p>
-          <p className="text-sm text-goldx">The bearing stays 81ABSCS81. Rewriting the holder does not transfer the firm.</p>
-          <p className="text-xs text-goldx/80">(to SWAGG Consulting LLC)</p>
-        </>
-      )}
+      <section className="mt-5 rounded-2xl border border-gray-800 p-4" aria-labelledby="question-001-heading">
+        <BrewLogo size={64} />
+        <h2 id="question-001-heading" className="mt-3 text-lg font-semibold text-white">Question #001</h2>
+        <p className="mt-2 text-gray-300">{QUESTION_PROMPT}</p>
+        <a className="mt-4 inline-flex min-h-12 items-center rounded-lg bg-white px-4 font-semibold text-black" href="/brew/q/001">Answer Question #001</a>
+      </section>
 
       <div className="mt-5 overflow-hidden rounded-2xl border-2 border-goldx/70"><MapView cells={cells} mine={mine} frameKey={frameKey} /></div>
 
@@ -99,11 +101,11 @@ export default function Home() {
         <button onClick={() => setFrameKey(k => k + 1)} className="text-xs font-bold tracking-widest text-cyanx">FRAME THE MESA</button>
         <span className="text-xs tracking-widest text-gray-500">PLACED {total}</span>
       </div>
-      <div className="mt-1 text-2xl font-bold text-white">{mine ? `Placed: ${mine.band_km}–${mine.band_km + 5} km` : 'No pin yet'}</div>
-      <p className="mt-1 text-gray-400">The pin is your place. Nothing is assigned until you share it.</p>
+      <div className="mt-1 text-2xl font-bold text-white">{mine ? `Your area: ${mine.band_km}–${mine.band_km + 5} km from the map center` : 'No area shared yet'}</div>
+      <p className="mt-1 text-gray-400">Nothing is saved until you tap Share my place. The browser asks for your location only then.</p>
 
       <button onClick={share} disabled={busy} className="mt-5 w-full rounded-full bg-cyanx py-4 text-lg font-bold text-black disabled:opacity-60">Share my place</button>
-      <p className="mt-2 text-xs text-gray-500">Sharing a place uses a device token, not an email. You can do it before you have an account.</p>
+      <p className="mt-2 text-xs text-gray-500">What is saved is a rough area: a 5 km band and a direction from the map center, not your exact coordinates. It uses a device token, not an email, and it is not tied to an account unless you later choose to link it.</p>
       <SuiteEntrance onSignedIn={setSuiteSignedIn} />
       <AccountPanel client={sb} onAccessToken={onAccessToken} deferProfile={suiteSignedIn} />
       {session && mine && (
