@@ -10,40 +10,46 @@ import { suiteConfig } from '@/lib/suite/verify';
 
 type Mine = { option: VoteOption | null; label: string | null };
 
+const LINKEDIN_VOTE = 'Voting needs a LinkedIn sign-in. These choices sign you in with LinkedIn and bring you back to this question.';
+
 export default function QuestionVote() {
   const [tally, setTally] = useState<PublicTally | null>(null);
   const [mine, setMine] = useState<Mine | null>(null);
-  const [signedOut, setSignedOut] = useState(true);
+  const [needsLinkedIn, setNeedsLinkedIn] = useState(true);
   const [href, setHref] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    let cancel = false;
     fetch('/api/brew/q/001/results', { cache: 'no-store' }).then(res => res.json()).then(body => {
-      if (typeof body.total === 'number' && Array.isArray(body.options)) setTally(body);
+      if (!cancel && typeof body.total === 'number' && Array.isArray(body.options)) setTally(body);
+    }).catch(() => undefined);
+    prepareSuiteHref(window.location.origin + '/suite').then(ready => {
+      if (!cancel && 'href' in ready) setHref(ready.href);
     }).catch(() => undefined);
     const config = suiteConfig();
-    if (!config) return;
+    if (!config) return () => { cancel = true; };
     const client = createClient(config.url, config.publishableKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: 'pkce' },
     });
     client.auth.getSession().then(async ({ data }) => {
       const token = data.session?.access_token;
       if (!token) {
-        setSignedOut(true);
-        const ready = await prepareSuiteHref(window.location.origin + '/suite');
-        if ('href' in ready) setHref(ready.href);
+        if (!cancel) setNeedsLinkedIn(true);
         return;
       }
-      setSignedOut(false);
-      const res = await fetch('/api/brew/q/001/vote', { headers: { authorization: `Bearer ${token}` } });
+      const res = await fetch('/api/brew/q/001/vote', { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' });
+      if (cancel) return;
       if (!res.ok) {
-        setNotice('A verified LinkedIn sign-in is required before a vote is recorded.');
+        setNeedsLinkedIn(true);
         return;
       }
       const body = await res.json();
+      setNeedsLinkedIn(false);
       setMine({ option: body.option ?? null, label: body.label ?? null });
-    }).catch(() => setSignedOut(true));
+    }).catch(() => { if (!cancel) setNeedsLinkedIn(true); });
+    return () => { cancel = true; };
   }, []);
 
   async function choose(option: VoteOption) {
@@ -57,6 +63,8 @@ export default function QuestionVote() {
     const token = data.session?.access_token;
     if (!token) {
       setBusy(false);
+      setNeedsLinkedIn(true);
+      setNotice(LINKEDIN_VOTE);
       return;
     }
     const res = await fetch('/api/brew/q/001/vote', {
@@ -66,6 +74,11 @@ export default function QuestionVote() {
     });
     const body = await res.json().catch(() => ({}));
     setBusy(false);
+    if (res.status === 401) {
+      setNeedsLinkedIn(true);
+      setNotice(LINKEDIN_VOTE);
+      return;
+    }
     if (!res.ok || !body.option) {
       setNotice('The vote could not be recorded.');
       return;
@@ -81,12 +94,18 @@ export default function QuestionVote() {
       <h1 className="mt-2 text-3xl font-bold">Question #001</h1>
       <p className="mt-4 text-lg text-gray-200">{QUESTION_PROMPT}</p>
       {mine?.option && (
-        <p className="mt-4 text-amber-100" role="status">Your vote is recorded. {mine.label ?? voteLabel(mine.option)}</p>
+        <p className="mt-4 text-lg font-semibold text-amber-50" role="status">Your vote is recorded. {mine.label ?? voteLabel(mine.option)}</p>
+      )}
+      {!mine?.option && (needsLinkedIn || notice) && (
+        <div className="mt-6 rounded-xl border-2 border-amber-200 bg-amber-950 px-4 py-4 text-lg font-semibold text-amber-50" role={notice ? 'alert' : 'status'}>
+          {needsLinkedIn && <p>{LINKEDIN_VOTE}</p>}
+          {notice && notice !== LINKEDIN_VOTE && <p className={needsLinkedIn ? 'mt-2' : ''}>{notice}</p>}
+        </div>
       )}
       {!mine?.option && (
         <div className="mt-6 space-y-3">
-          {VOTE_OPTIONS.map(item => signedOut ? (
-            <a key={item.option} href={href ?? undefined} onClick={() => sessionStorage.setItem(BREW_RETURN_KEY, QUESTION_VOTE_PATH)} className="flex min-h-12 items-center rounded-lg bg-white px-4 font-semibold text-black">
+          {VOTE_OPTIONS.map(item => needsLinkedIn ? (
+            <a key={item.option} href={href ?? undefined} onClick={() => sessionStorage.setItem(BREW_RETURN_KEY, QUESTION_VOTE_PATH)} className={`flex min-h-12 items-center rounded-lg bg-white px-4 font-semibold text-black ${href ? '' : 'pointer-events-none opacity-60'}`}>
               {item.option}. {item.label}
             </a>
           ) : (
@@ -94,10 +113,8 @@ export default function QuestionVote() {
               {item.option}. {item.label}
             </button>
           ))}
-          {signedOut && <p className="text-sm text-gray-300">The first tap signs in with LinkedIn and returns to this question.</p>}
         </div>
       )}
-      {notice && <p className="mt-4 text-amber-100" role="alert">{notice}</p>}
       {tally && (
         <section className="mt-8">
           <h2 className="text-sm font-bold tracking-widest text-gray-400">RESULTS</h2>

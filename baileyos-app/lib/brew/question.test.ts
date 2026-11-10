@@ -73,6 +73,21 @@ test('brew pages link back to the map and the vote log is not cached', () => {
   assert.match(results, /no-store/);
 });
 
+test('email and signed-out visitors are sent to LinkedIn before a vote', () => {
+  const page = readFileSync(new URL('../../app/brew/q/001/vote/page.tsx', import.meta.url), 'utf8');
+  const messageAt = page.indexOf('{LINKEDIN_VOTE}');
+  const choicesAt = page.indexOf('VOTE_OPTIONS.map');
+  assert.match(page, /Voting needs a LinkedIn sign-in/);
+  assert.ok(messageAt > 0 && choicesAt > messageAt);
+  assert.match(page, /needsLinkedIn \? \(/);
+  assert.match(page, /QUESTION_VOTE_PATH/);
+  assert.match(page, /role=\{notice \? 'alert' : 'status'\}/);
+  assert.match(page, /text-lg font-semibold/);
+  const route = readFileSync(new URL('../../app/api/brew/q/001/vote/route.ts', import.meta.url), 'utf8');
+  assert.match(route, /subjectIsVerified/);
+  assert.doesNotMatch(route, /user_metadata|email ===/);
+});
+
 test('the vote route and the vote table reject changes', () => {
   const route = readFileSync(new URL('../../app/api/brew/q/001/vote/route.ts', import.meta.url), 'utf8');
   const store = readFileSync(new URL('./store.ts', import.meta.url), 'utf8');
