@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'node:test';
-import { SuiteContinue } from '../../components/SuiteEntrance.tsx';
+import { SuiteContinue, suiteContinueLabel } from '../../components/SuiteEntrance.tsx';
 import { SUITE_ISSUER, decideSuiteSubject, suiteAuthorizeHref, suiteCallbackMessage, suiteConfig, suiteEnabled, suiteReturnTarget } from './verify.ts';
 
 const SUBJECT = '11111111-1111-4111-8111-111111111111';
@@ -110,6 +110,23 @@ test('the suite entrance does not render a connected control while config is abs
   assert.doesNotMatch(src, /Connected/);
   assert.match(src, /window\.location\.origin \+ '\/suite'/);
   assert.doesNotMatch(src, /window\.location\.(assign|href)/);
+});
+
+test('a signed-in steward opens the report instead of starting LinkedIn again', () => {
+  assert.equal(suiteContinueLabel('/steward'), 'Open the Steward Consensus Report');
+  assert.equal(suiteContinueLabel('/brewing'), 'Open 360° Brewing');
+  const markup = renderToStaticMarkup(createElement(SuiteContinue, {
+    phase: { state: 'ready', href: '/steward' },
+    status: { recorded: true, steward: true },
+  }));
+  assert.match(markup, /Open the Steward Consensus Report/);
+  assert.doesNotMatch(markup, /authorize/);
+  const member = renderToStaticMarkup(createElement(SuiteContinue, {
+    phase: { state: 'ready', href: '/brewing' },
+    status: { recorded: true, steward: false },
+  }));
+  assert.match(member, /Open 360° Brewing/);
+  assert.doesNotMatch(member, /authorize/);
 });
 
 test('the continue control is a link only after the address is ready', () => {

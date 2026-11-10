@@ -7,7 +7,7 @@ begin
   select string_agg(column_name, ',' order by column_name) into cols
     from information_schema.columns
    where table_schema = 'public' and table_name = 'profiles';
-  if cols <> 'bio,created_at,display_name,updated_at,user_id' then
+  if cols <> 'bio,created_at,display_name,show_name,show_photo,updated_at,user_id' then
     raise exception 'unexpected profiles columns: %', cols;
   end if;
   select count(*) into n from information_schema.role_table_grants

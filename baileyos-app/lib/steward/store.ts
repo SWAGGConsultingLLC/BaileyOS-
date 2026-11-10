@@ -33,6 +33,19 @@ export async function rememberSuiteSubject(subject: string, providerSub: string)
   if (error) throw new Error('remember failed');
 }
 
+export async function readSuiteCounts(now = new Date()): Promise<{ members: number; recentSignIns: number }> {
+  const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const client = admin();
+  const members = await client.from('verified_suite_subjects').select('subject_id', { count: 'exact', head: true });
+  if (members.error) throw new Error('count failed');
+  const recent = await client
+    .from('verified_suite_subjects')
+    .select('subject_id', { count: 'exact', head: true })
+    .gte('last_seen_at', since);
+  if (recent.error) throw new Error('count failed');
+  return { members: members.count ?? 0, recentSignIns: recent.count ?? 0 };
+}
+
 export async function readStewardGrant(subject: string): Promise<StewardGrant | null> {
   const { data, error } = await admin()
     .from('steward_grants')
