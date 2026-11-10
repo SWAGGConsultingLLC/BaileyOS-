@@ -1,6 +1,7 @@
 export const QUESTION_ID = '001';
 export const QUESTION_PATH = '/brew/q/001';
 export const QUESTION_VOTE_PATH = '/brew/q/001/vote';
+export const CHECKIN_RETURN = '/?checkin=1';
 export const MISSION_PATH = '/brew/mission';
 export const BREW_RETURN_KEY = 'baileyos_brew_return';
 export const QUESTION_TITLE = '360° Brewing | Question #001';
@@ -27,7 +28,8 @@ export function voteLabel(option: VoteOption): string {
 }
 
 export function brewReturnPath(value: string | null): string | null {
-  return value === QUESTION_VOTE_PATH ? value : null;
+  if (value === QUESTION_VOTE_PATH || value === CHECKIN_RETURN) return value;
+  return null;
 }
 
 export type PublicOption = { option: VoteOption; label: string; count: number; percent: number };

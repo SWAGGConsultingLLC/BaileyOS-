@@ -21,6 +21,7 @@ test('question text is the approved wording', () => {
   assert.equal(voteOption('A'), 'A');
   assert.equal(voteOption('D'), null);
   assert.equal(brewReturnPath('/brew/q/001/vote'), '/brew/q/001/vote');
+  assert.equal(brewReturnPath('/?checkin=1'), '/?checkin=1');
   assert.equal(brewReturnPath('/suite'), null);
 });
 
