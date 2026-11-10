@@ -6,7 +6,7 @@ import { AccountPanel } from '@/components/AccountPanel';
 import { BrewLogo } from '@/components/BrewLogo';
 import { SuiteEntrance } from '@/components/SuiteEntrance';
 import { SuiteIdentity } from '@/components/SuiteIdentity';
-import { BREW_RETURN_KEY, CHECKIN_RETURN, QUESTION_PROMPT } from '@/lib/brew/question001';
+import { BREW_RETURN_KEY, CHECKIN_RETURN, MAP_RETURN, QUESTION_PROMPT } from '@/lib/brew/question001';
 import { linkedInReturnInProgress, prepareSuiteHref } from '@/components/SuiteEntrance';
 import { suiteReturnTarget } from '@/lib/suite/verify';
 import { legacyNeighborhoodHex, type MapViewBox } from '@/lib/neighborhood';
@@ -171,12 +171,17 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-8">
+    <main className="mx-auto max-w-xl">
+      <div className="sticky top-0 z-30 border-b border-gray-800 bg-black px-4 py-3">
+        {suiteSignedIn ? <SuiteIdentity onStatus={onSuiteStatus} /> : (
+          <a href={checkinHref ?? undefined} onClick={() => sessionStorage.setItem(BREW_RETURN_KEY, MAP_RETURN)} className={`flex min-h-12 w-full items-center justify-center rounded-lg bg-white px-4 text-center text-base font-semibold text-black ${checkinHref ? '' : 'pointer-events-none opacity-60'}`}>Sign in with 360° Brewing</a>
+        )}
+      </div>
+      <div className="px-4 pb-8 pt-4">
       <p className="text-sm font-semibold text-gray-300">SWAGG Consulting</p>
       <div className="mt-2 text-sm font-bold tracking-[0.35em] text-cyanx">BAILEYOS</div>
       <h1 className="mt-3 text-4xl font-extrabold text-white">Show up. Get placed.</h1>
       <p className="mt-2 text-gray-400">BaileyOS is a community map by SWAGG Consulting. People can share roughly where they are, and they can join 360° Brewing questions. An account is optional and does not place you on the map.</p>
-      <SuiteIdentity onStatus={onSuiteStatus} />
       <section className="mt-5 rounded-2xl border border-gray-800 p-4" aria-labelledby="question-001-heading">
         <BrewLogo size={64} />
         <h2 id="question-001-heading" className="mt-3 text-lg font-semibold text-white">Question #001</h2>
@@ -223,6 +228,7 @@ export default function Home() {
         </div>
       )}
       {msg && <p className="mt-3 text-sm text-gray-300">{msg}</p>}
+      </div>
     </main>
   );
 }
