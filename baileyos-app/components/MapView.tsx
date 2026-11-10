@@ -5,7 +5,8 @@ import 'leaflet/dist/leaflet.css';
 import { CONFIG } from '@/lib/config';
 import { jitteredPoint } from '@/lib/geo';
 
-export type Cell = { band_km: number; sector: number };
+export type CheckInPin = { name: string; photo: string | null; profileUrl: string | null };
+export type Cell = { band_km: number; sector: number; card?: CheckInPin | null };
 type Props = { cells: Cell[]; mine: Cell | null; frameKey: number };
 
 export default function MapView({ cells, mine, frameKey }: Props) {
@@ -34,11 +35,34 @@ export default function MapView({ cells, mine, frameKey }: Props) {
   useEffect(() => {
     const g = dots.current; if (!g) return;
     g.clearLayers();
-    cells.forEach(c => L.circleMarker(jitteredPoint(c.band_km, c.sector), { radius: 3, color: '#22d3ee', weight: 0, fillColor: '#22d3ee', fillOpacity: 0.7, interactive: false }).addTo(g));
+    cells.forEach(c => {
+      const point = jitteredPoint(c.band_km, c.sector);
+      if (c.card?.name) namedPin(point, c.card).addTo(g);
+      else L.circleMarker(point, { radius: 3, color: '#22d3ee', weight: 0, fillColor: '#22d3ee', fillOpacity: 0.7, interactive: false }).addTo(g);
+    });
     if (mine) L.circleMarker(jitteredPoint(mine.band_km, mine.sector), { radius: 9, color: '#ffffff', weight: 2, fillColor: '#3b82f6', fillOpacity: 0.95 }).addTo(g);
   }, [cells, mine]);
 
   useEffect(() => { if (frameKey > 0 && map.current && range.current) map.current.fitBounds(range.current.getBounds()); }, [frameKey]);
 
   return <div ref={el} className="h-[340px] w-full" />;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] ?? char));
+}
+
+function namedPin(point: [number, number], card: { name: string; photo: string | null; profileUrl: string | null }): L.Marker {
+  const name = escapeHtml(card.name);
+  const photo = card.photo && card.photo.startsWith('https://')
+    ? `<img alt="" src="${escapeHtml(card.photo)}" style="width:28px;height:28px;border-radius:999px;object-fit:cover" />`
+    : '';
+  const label = `${photo}<span style="font:600 12px sans-serif;color:#111">${name}</span>`;
+  const html = card.profileUrl && card.profileUrl.startsWith('https://')
+    ? `<a href="${escapeHtml(card.profileUrl)}" style="display:flex;gap:6px;align-items:center;background:#fff;border-radius:999px;padding:2px 8px 2px 2px;text-decoration:none">${label}</a>`
+    : `<div style="display:flex;gap:6px;align-items:center;background:#fff;border-radius:999px;padding:2px 8px 2px 2px">${label}</div>`;
+  return L.marker(point, {
+    interactive: Boolean(card.profileUrl),
+    icon: L.divIcon({ className: '', html, iconSize: [140, 32], iconAnchor: [16, 16] }),
+  });
 }

@@ -12,7 +12,7 @@ import type { Cell } from '@/components/MapView';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false, loading: () => <div className="h-[340px]" /> });
 
-type Mine = Cell & { placement_id: number; link_token: string; linked?: boolean };
+type Mine = Cell & { placement_id: number; link_token: string; linked?: boolean; show_linkedin?: boolean };
 const MINE_KEY = 'baileyos_mine_v1', TOKEN_KEY = 'baileyos_device_v1';
 
 function deviceToken(): string {
@@ -32,9 +32,12 @@ export default function Home() {
   const [frameKey, setFrameKey] = useState(0);
   const [session, setSession] = useState<string | null>(null);
   const [suiteSignedIn, setSuiteSignedIn] = useState(false);
+  const [showLinkedIn, setShowLinkedIn] = useState(false);
   const onAccessToken = useCallback((token: string | null) => setSession(token), []);
   const onSuiteStatus = useCallback((status: { recorded: boolean } | null) => {
-    setSuiteSignedIn(status?.recorded === true);
+    const signedIn = status?.recorded === true;
+    setSuiteSignedIn(signedIn);
+    if (!signedIn) setShowLinkedIn(false);
   }, []);
   const sb = browserSupabase();
 
@@ -59,18 +62,49 @@ export default function Home() {
     setBusy(true); setMsg('Finding your place…');
     navigator.geolocation.getCurrentPosition(async pos => {
       try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const showProfile = suiteSignedIn && showLinkedIn;
+        if (showProfile) {
+          const configUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+          const configKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+          if (configUrl && configKey) {
+            const { createClient } = await import('@supabase/supabase-js');
+            const client = createClient(configUrl, configKey, { auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, flowType: 'pkce' } });
+            const { data } = await client.auth.getSession();
+            if (data.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`;
+          }
+        }
         const r = await fetch('/api/place', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy_m: pos.coords.accuracy, device_token: deviceToken(), timestamp: Date.now() })
+          method: 'POST', headers,
+          body: JSON.stringify({ lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy_m: pos.coords.accuracy, device_token: deviceToken(), timestamp: Date.now(), show_linkedin: showProfile })
         });
         const j = await r.json();
         if (!r.ok) setMsg(j.error || 'Could not place you.');
-        else if (j.status === 'duplicate') setMsg('You are already placed for today.');
-        else { saveMine({ band_km: j.band_km, sector: j.sector, placement_id: j.placement_id, link_token: j.link_token }); setMsg('Placed.'); await load(); }
+        else if (j.status === 'duplicate') {
+          if (mine) saveMine({ ...mine, show_linkedin: j.shared_profile === true });
+          setShowLinkedIn(j.shared_profile === true);
+          setMsg(j.shared_profile ? 'Your name and photo are on this check-in.' : 'You are already placed for today.');
+          await load();
+        }
+        else { saveMine({ band_km: j.band_km, sector: j.sector, placement_id: j.placement_id, link_token: j.link_token, show_linkedin: j.shared_profile === true }); setMsg('Placed.'); await load(); }
       } catch { setMsg('Network error. Nothing was recorded.'); }
       setBusy(false);
     }, err => { setBusy(false); setMsg(err.code === 1 ? 'Location permission denied. Nothing was recorded.' : 'Could not get a position.'); },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+  }
+
+  async function removeLinkedIn() {
+    if (!mine) return;
+    const r = await fetch('/api/place', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ placement_id: mine.placement_id, link_token: mine.link_token }),
+    });
+    if (!r.ok) { setMsg('Could not remove the name and photo.'); return; }
+    saveMine({ ...mine, show_linkedin: false });
+    setShowLinkedIn(false);
+    setMsg('Your name and photo were removed. The check-in stays on the map without them.');
+    await load();
   }
 
   async function linkCall(method: 'POST' | 'DELETE') {
@@ -105,6 +139,15 @@ export default function Home() {
       <p className="mt-1 text-gray-400">Nothing is saved until you tap Share my place. The browser asks for your location only then.</p>
 
       <button onClick={share} disabled={busy} className="mt-5 w-full rounded-full bg-cyanx py-4 text-lg font-bold text-black disabled:opacity-60">Share my place</button>
+      {suiteSignedIn && (
+        <label className="mt-3 flex min-h-11 items-start gap-2 text-sm text-gray-200">
+          <input type="checkbox" checked={showLinkedIn} onChange={event => setShowLinkedIn(event.target.checked)} />
+          <span>Show my LinkedIn profile with my check-in. This stays off until you turn it on. It adds the name and photo from your LinkedIn sign-in. A profile link is added only when LinkedIn provides one.</span>
+        </label>
+      )}
+      {suiteSignedIn && mine?.show_linkedin && (
+        <button type="button" onClick={removeLinkedIn} className="mt-2 min-h-11 font-semibold text-gray-300 underline">Remove my name and photo</button>
+      )}
       <p className="mt-2 text-xs text-gray-500">What is saved is a rough area: a 5 km band and a direction from the map center, not your exact coordinates. It uses a device token, not an email, and it is not tied to an account unless you later choose to link it.</p>
       <SuiteEntrance onSignedIn={setSuiteSignedIn} />
       <AccountPanel client={sb} onAccessToken={onAccessToken} deferProfile={suiteSignedIn} />
