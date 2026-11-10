@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 test('the public map header does not show the steward mark and links to Question #001', () => {
-  const src = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  const src = readFileSync(new URL('../components/MapHome.tsx', import.meta.url), 'utf8');
   assert.equal(src.includes('81ABSCS81'), false);
   assert.equal(src.includes('⊞'), false);
   assert.equal(src.includes('The bearing stays'), false);

@@ -42,7 +42,7 @@ test('the choice is off unless the person turns it on', () => {
   assert.equal(shouldAttachCheckInProfile({ showLinkedIn: true, verified: true, card: null }), false);
   assert.equal(shouldAttachCheckInProfile({ showLinkedIn: true, verified: true, card }), true);
   assert.deepEqual(publicCheckInCard(card), card);
-  const page = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../components/MapHome.tsx', import.meta.url), 'utf8');
   assert.match(page, /useState\(false\)/);
   assert.match(page, /Show my LinkedIn profile with my check-in/);
 });
