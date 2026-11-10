@@ -228,6 +228,9 @@ export default function Home() {
         </div>
       )}
       {msg && <p className="mt-3 text-sm text-gray-300">{msg}</p>}
+      <footer className="mt-10 border-t border-gray-800 py-6 text-center text-sm leading-6 text-gray-500">
+        <p>BaileyOS is a <a className="inline-flex min-h-11 items-center px-1 font-semibold text-gray-300 underline" href="https://www.swaggconsulting.com" target="_blank" rel="noopener noreferrer">SWAGG Consulting</a> project.</p>
+      </footer>
       </div>
     </main>
   );

@@ -23,6 +23,13 @@ test('the public map header does not show the steward mark and links to Question
   assert.match(src, /sticky top-0/);
   assert.match(src, /suiteSignedIn \? <SuiteIdentity/);
   assert.match(src, /MAP_RETURN/);
+  const map = src.indexOf('<MapView');
+  const footer = src.indexOf('BaileyOS is a');
+  assert.ok(map > 0 && footer > map);
+  assert.match(src, /href="https:\/\/www\.swaggconsulting\.com"/);
+  assert.match(src, /target="_blank"/);
+  assert.match(src, /rel="noopener noreferrer"/);
+  assert.equal(src.includes('fixed bottom'), false);
   assert.match(src, /cache: 'no-store'/);
   const placements = readFileSync(new URL('../app/api/placements/route.ts', import.meta.url), 'utf8');
   assert.match(placements, /no-store/);
