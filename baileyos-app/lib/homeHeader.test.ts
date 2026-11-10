@@ -14,4 +14,9 @@ test('the public map header does not show the steward mark and links to Question
   assert.match(src, /Continue without signing in/);
   assert.match(src, /CHECKIN_RETURN/);
   assert.match(src, /useState\(false\)/);
+  assert.match(src, /Your place is already counted/);
+  assert.match(src, /cache: 'no-store'/);
+  const placements = readFileSync(new URL('../app/api/placements/route.ts', import.meta.url), 'utf8');
+  assert.match(placements, /no-store/);
+  assert.equal(placements.includes('s-maxage'), false);
 });

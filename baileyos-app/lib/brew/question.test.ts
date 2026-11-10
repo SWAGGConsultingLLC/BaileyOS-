@@ -54,6 +54,25 @@ test('the share page names the image and the open graph title', () => {
   assert.equal(png.readUInt32BE(20), 627);
 });
 
+test('brew pages link back to the map and the vote log is not cached', () => {
+  const link = readFileSync(new URL('../../components/BackToMap.tsx', import.meta.url), 'utf8');
+  assert.match(link, /Back to map/);
+  assert.match(link, /https:\/\/baileyos-app\.vercel\.app\//);
+  const pages = ['mission/page.tsx', 'q/001/page.tsx', 'q/001/vote/page.tsx', 'q/001/verify/page.tsx'];
+  for (const page of pages) {
+    const src = readFileSync(new URL(`../../app/brew/${page}`, import.meta.url), 'utf8');
+    assert.match(src, /BackToMap/);
+  }
+  const log = readFileSync(new URL('../../app/brew/q/001/verify/page.tsx', import.meta.url), 'utf8');
+  assert.match(log, /Back to the question/);
+  assert.match(log, /force-dynamic/);
+  assert.match(log, /readVerification/);
+  const route = readFileSync(new URL('../../app/api/brew/q/001/verify/route.ts', import.meta.url), 'utf8');
+  const results = readFileSync(new URL('../../app/api/brew/q/001/results/route.ts', import.meta.url), 'utf8');
+  assert.match(route, /no-store/);
+  assert.match(results, /no-store/);
+});
+
 test('the vote route and the vote table reject changes', () => {
   const route = readFileSync(new URL('../../app/api/brew/q/001/vote/route.ts', import.meta.url), 'utf8');
   const store = readFileSync(new URL('./store.ts', import.meta.url), 'utf8');

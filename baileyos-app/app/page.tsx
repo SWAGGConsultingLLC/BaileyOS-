@@ -45,7 +45,7 @@ export default function Home() {
   const sb = browserSupabase();
 
   const load = useCallback(async () => {
-    try { const r = await fetch('/api/placements'); if (r.ok) { const j = await r.json(); setCells(j.cells); setTotal(j.total); } } catch {}
+    try { const r = await fetch('/api/placements', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); setCells(j.cells); setTotal(j.total); } } catch {}
   }, []);
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export default function Home() {
         else if (j.status === 'duplicate') {
           if (mine) saveMine({ ...mine, show_linkedin: j.shared_profile === true });
           setShowLinkedIn(j.shared_profile === true);
-          setMsg(j.shared_profile ? 'Your name and photo are on this check-in.' : 'You are already placed for today.');
+          setMsg(j.shared_profile ? 'Your place is already counted. Your name and photo are on this check-in.' : 'Your place is already counted');
           await load();
         }
         else { saveMine({ band_km: j.band_km, sector: j.sector, placement_id: j.placement_id, link_token: j.link_token, show_linkedin: j.shared_profile === true }); setMsg('Placed.'); await load(); }
