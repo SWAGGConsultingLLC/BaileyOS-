@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { getResolution } from 'h3-js';
 import { destination } from './geo.ts';
+import { ownerPlacementBody } from './crowd.ts';
 import { preparePlacement } from './placeRequest.ts';
 
 process.env.PLACEMENT_SECRET = '0123456789abcdef0123456789abcdef';
@@ -30,14 +32,38 @@ test('the same device and window produces the same dedupe key', () => {
   assert.equal(a.ok && b.ok && a.key === b.key, true);
 });
 
-test('map request rejects a missing body, a far point, a stale clock, and a vague fix', () => {
-  assert.equal(preparePlacement({ body: {}, now, ip: 'x', allow: allowAll }).ok, false);
-  const far = preparePlacement({
-    body: body({ lat: 0, lon: 0, timestamp: now }),
+test('a check-in in Washington DC is a neighborhood, and the exact point is not returned', () => {
+  const dc = preparePlacement({
+    body: body({ lat: 38.9072, lon: -77.0369, timestamp: now }),
     now, ip: 'x', allow: allowAll,
   });
-  assert.equal(far.ok, false);
-  if (!far.ok) assert.match(far.error, /Out of range/);
+  assert.equal(dc.ok, true);
+  if (!dc.ok) return;
+  assert.equal(getResolution(dc.hex), 7);
+  assert.equal(dc.phoneKey.length, 64);
+  assert.notEqual(dc.phoneKey, dc.key);
+  const later = preparePlacement({
+    body: body({ lat: 38.91, lon: -77.04, timestamp: now + 25 * 60 * 60 * 1000 }),
+    now: now + 25 * 60 * 60 * 1000, ip: 'x', allow: allowAll,
+  });
+  assert.equal(later.ok && later.phoneKey === dc.phoneKey, true);
+  assert.equal(later.ok && later.key !== dc.key, true);
+  const owner = ownerPlacementBody({
+    status: 'placed', hex: dc.hex, placementId: 4, linkToken: 'abc', shared: false,
+  });
+  const text = JSON.stringify(owner);
+  assert.equal(text.includes('38.9072'), false);
+  assert.equal(text.includes(dc.phoneKey), false);
+  assert.equal(text.includes('phone'), false);
+});
+
+test('map request rejects a missing body, an impossible point, a stale clock, and a vague fix', () => {
+  assert.equal(preparePlacement({ body: {}, now, ip: 'x', allow: allowAll }).ok, false);
+  const impossible = preparePlacement({
+    body: body({ lat: 120, lon: 0, timestamp: now }),
+    now, ip: 'x', allow: allowAll,
+  });
+  assert.equal(impossible.ok, false);
   const skew = preparePlacement({ body: body({ timestamp: now - 60 * 60 * 1000 }), now, ip: 'x', allow: allowAll });
   assert.equal(skew.ok, false);
   if (!skew.ok) assert.equal(skew.error, 'Clock skew too large');

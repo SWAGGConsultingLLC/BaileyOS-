@@ -9,12 +9,22 @@ import { SuiteIdentity } from '@/components/SuiteIdentity';
 import { BREW_RETURN_KEY, CHECKIN_RETURN, QUESTION_PROMPT } from '@/lib/brew/question001';
 import { prepareSuiteHref } from '@/components/SuiteEntrance';
 import { suiteReturnTarget } from '@/lib/suite/verify';
-import type { Cell } from '@/components/MapView';
+import { legacyNeighborhoodHex, type MapViewBox } from '@/lib/neighborhood';
+import type { NeighborhoodPin } from '@/components/MapView';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false, loading: () => <div className="h-[340px]" /> });
 
-type Mine = Cell & { placement_id: number; link_token: string; linked?: boolean; show_linkedin?: boolean };
+type Mine = { h3: string; placement_id: number; link_token: string; linked?: boolean; show_linkedin?: boolean };
 const MINE_KEY = 'baileyos_mine_v1', TOKEN_KEY = 'baileyos_device_v1';
+
+function storedMine(value: unknown): Mine | null {
+  if (!value || typeof value !== 'object') return null;
+  const row = value as { h3?: unknown; band_km?: unknown; sector?: unknown; placement_id?: unknown; link_token?: unknown; linked?: unknown; show_linkedin?: unknown };
+  let h3 = typeof row.h3 === 'string' ? row.h3 : '';
+  if (!h3 && typeof row.band_km === 'number' && typeof row.sector === 'number') h3 = legacyNeighborhoodHex(row.band_km, row.sector);
+  if (!h3 || typeof row.placement_id !== 'number' || typeof row.link_token !== 'string') return null;
+  return { h3, placement_id: row.placement_id, link_token: row.link_token, linked: row.linked === true, show_linkedin: row.show_linkedin === true };
+}
 
 function deviceToken(): string {
   try {
@@ -25,8 +35,11 @@ function deviceToken(): string {
 }
 
 export default function Home() {
-  const [cells, setCells] = useState<Cell[]>([]);
-  const [total, setTotal] = useState(0);
+  const [neighborhoods, setNeighborhoods] = useState<NeighborhoodPin[]>([]);
+  const [phones, setPhones] = useState<number | null>(0);
+  const [zoomIn, setZoomIn] = useState(false);
+  const [focusHex, setFocusHex] = useState<string | null>(null);
+  const boundsRef = useRef<MapViewBox | null>(null);
   const [mine, setMine] = useState<Mine | null>(null);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
@@ -44,9 +57,23 @@ export default function Home() {
   }, []);
   const sb = browserSupabase();
 
-  const load = useCallback(async () => {
-    try { const r = await fetch('/api/placements', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); setCells(j.cells); setTotal(j.total); } } catch {}
+  const load = useCallback(async (box?: MapViewBox) => {
+    const view = box ?? boundsRef.current;
+    if (!view) return;
+    boundsRef.current = view;
+    const q = new URLSearchParams({
+      west: view.west.toFixed(2), south: view.south.toFixed(2), east: view.east.toFixed(2), north: view.north.toFixed(2),
+    });
+    try {
+      const r = await fetch(`/api/placements?${q}`, { cache: 'no-store' });
+      if (!r.ok) return;
+      const j = await r.json();
+      setNeighborhoods(Array.isArray(j.neighborhoods) ? j.neighborhoods : []);
+      setPhones(typeof j.phones === 'number' ? j.phones : null);
+      setZoomIn(j.zoom_in === true);
+    } catch { /* the map keeps the last neighborhoods it could read */ }
   }, []);
+  const onBounds = useCallback((box: MapViewBox) => { void load(box); }, [load]);
 
   useEffect(() => {
     const target = suiteReturnTarget(window.location.href);
@@ -74,7 +101,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    try { const s = localStorage.getItem(MINE_KEY); if (s) setMine(JSON.parse(s)); } catch {}
+    try {
+      const saved = storedMine(JSON.parse(localStorage.getItem(MINE_KEY) || 'null'));
+      if (saved) { setMine(saved); setFocusHex(saved.h3); }
+    } catch { /* a stored pin that cannot be read stays off the map */ }
     load(); const i = setInterval(load, 30000); return () => clearInterval(i);
   }, [load]);
 
@@ -103,13 +133,15 @@ export default function Home() {
         });
         const j = await r.json();
         if (!r.ok) setMsg(j.error || 'Could not place you.');
-        else if (j.status === 'duplicate') {
-          if (mine) saveMine({ ...mine, show_linkedin: j.shared_profile === true });
+        else if (typeof j.h3 === 'string' && typeof j.placement_id === 'number' && typeof j.link_token === 'string') {
+          saveMine({ h3: j.h3, placement_id: j.placement_id, link_token: j.link_token, show_linkedin: j.shared_profile === true, linked: mine?.linked });
+          setFocusHex(j.h3);
           setShowLinkedIn(j.shared_profile === true);
-          setMsg(j.shared_profile ? 'Your place is already counted. Your name and photo are on this check-in.' : 'Your place is already counted');
+          setMsg(j.status === 'duplicate'
+            ? (j.shared_profile ? 'Your place is already counted. Your name and photo are on this check-in.' : 'Your place is already counted')
+            : 'Placed.');
           await load();
-        }
-        else { saveMine({ band_km: j.band_km, sector: j.sector, placement_id: j.placement_id, link_token: j.link_token, show_linkedin: j.shared_profile === true }); setMsg('Placed.'); await load(); }
+        } else setMsg('Could not place you.');
       } catch { setMsg('Network error. Nothing was recorded.'); }
       setBusy(false);
     }, err => { setBusy(false); setMsg(err.code === 1 ? 'Location permission denied. Nothing was recorded.' : 'Could not get a position.'); },
@@ -152,13 +184,13 @@ export default function Home() {
         <a className="mt-4 inline-flex min-h-12 items-center rounded-lg bg-white px-4 font-semibold text-black" href="/brew/q/001">Answer Question #001</a>
       </section>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border-2 border-goldx/70"><MapView cells={cells} mine={mine} frameKey={frameKey} /></div>
+      <div className="mt-5 overflow-hidden rounded-2xl border-2 border-goldx/70"><MapView neighborhoods={neighborhoods} mine={mine} focusHex={focusHex} frameKey={frameKey} onBounds={onBounds} /></div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <button onClick={() => setFrameKey(k => k + 1)} className="text-xs font-bold tracking-widest text-cyanx">FRAME THE MESA</button>
-        <span className="text-xs tracking-widest text-gray-500">PLACED {total}</span>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <button onClick={() => setFrameKey(k => k + 1)} className="text-xs font-bold tracking-widest text-cyanx">Frame my area</button>
+        <span className="text-right text-xs tracking-widest text-gray-500">{zoomIn ? 'Zoom in to count phones' : `Phones on this map: ${phones ?? 0}`}</span>
       </div>
-      <div className="mt-1 text-2xl font-bold text-white">{mine ? `Your area: ${mine.band_km}–${mine.band_km + 5} km from the map center` : 'No area shared yet'}</div>
+      <div className="mt-1 text-2xl font-bold text-white">{mine ? 'Your area is one neighborhood, about 2.5 km across.' : 'No area shared yet'}</div>
       <p className="mt-1 text-gray-400">Nothing is saved until you tap Share my place. The browser asks for your location only then.</p>
 
       {suiteSignedIn ? (
@@ -179,7 +211,7 @@ export default function Home() {
       {suiteSignedIn && mine?.show_linkedin && (
         <button type="button" onClick={removeLinkedIn} className="mt-2 min-h-11 font-semibold text-gray-300 underline">Remove my name and photo</button>
       )}
-      <p className="mt-2 text-xs text-gray-500">What is saved is a rough area: a 5 km band and a direction from the map center, not your exact coordinates. It uses a device token, not an email, and it is not tied to an account unless you later choose to link it.</p>
+      <p className="mt-2 text-xs text-gray-500">A neighborhood appears after 3 different phones check in there in the last 7 days. The same phone counts once. Exact coordinates are not saved. A name and photo appear only when that person turns them on and the neighborhood meets that crowd.</p>
       <SuiteEntrance onSignedIn={setSuiteSignedIn} />
       <AccountPanel client={sb} onAccessToken={onAccessToken} deferProfile={suiteSignedIn} />
       {session && mine && (

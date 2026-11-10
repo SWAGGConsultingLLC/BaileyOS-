@@ -6,6 +6,8 @@ function secret(): string {
   return s;
 }
 export const hmacHex = (msg: string) => createHmac('sha256', secret()).update(msg).digest('hex');
+/** Stable per phone. The time window is not part of this marker, and it never leaves the server. */
+export const phoneMarker = (deviceToken: string) => hmacHex('phone:' + deviceToken);
 export const linkToken = (id: number) => hmacHex('link:' + id).slice(0, 32);
 export function safeEqual(a: string, b: string) {
   const x = Buffer.from(a), y = Buffer.from(b);
