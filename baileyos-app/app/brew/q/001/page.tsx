@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { BackToMap } from '@/components/BackToMap';
 import { BrewLogo } from '@/components/BrewLogo';
 import { MISSION_PATH, QUESTION_DESCRIPTION, QUESTION_IMAGE, QUESTION_PROMPT, QUESTION_TITLE } from '@/lib/brew/question001';
 
@@ -28,6 +29,7 @@ export default function QuestionPreview() {
       <p className="mt-4 text-gray-300">{QUESTION_PROMPT}</p>
       <a className="mt-8 inline-flex min-h-12 items-center rounded-lg bg-white px-4 font-semibold text-black" href={MISSION_PATH}>Read the mission</a>
       <p className="mt-6 text-sm text-gray-400"><a className="underline" href="/brew/q/001/verify">Outside reviewers can check the vote log.</a></p>
+      <BackToMap />
     </main>
   );
 }

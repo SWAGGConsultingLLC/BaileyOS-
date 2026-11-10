@@ -1,43 +1,30 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { BackToMap } from '@/components/BackToMap';
 import { BrewLogo } from '@/components/BrewLogo';
-import type { PublicTally, VoteOption } from '@/lib/brew/question001';
+import { VoteLog } from '@/components/VoteLog';
+import { readVerification } from '@/lib/brew/store';
 
-type Row = { at: string; option: VoteOption; receipt: string };
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-export default function VoteVerification() {
-  const [tally, setTally] = useState<PublicTally | null>(null);
-  const [votes, setVotes] = useState<Row[]>([]);
-  const [message, setMessage] = useState('Loading the vote log.');
-
-  useEffect(() => {
-    fetch('/api/brew/q/001/verify').then(res => res.json()).then(body => {
-      if (!body?.tally || !Array.isArray(body.votes)) {
-        setMessage('The vote log could not be read.');
-        return;
-      }
-      setTally(body.tally);
-      setVotes(body.votes);
-      setMessage('');
-    }).catch(() => setMessage('The vote log could not be read.'));
-  }, []);
+export default async function VoteVerification() {
+  let log: Awaited<ReturnType<typeof readVerification>> | null = null;
+  try {
+    log = await readVerification();
+  } catch {
+    log = null;
+  }
 
   return (
     <main className="mx-auto max-w-xl px-4 py-10">
       <BrewLogo />
       <h1 className="mt-2 text-3xl font-bold">Question #001 vote log</h1>
       <p className="mt-4 text-gray-300">Each row is a time, an option, and a receipt. The receipt is a per-question hash. It does not show who voted.</p>
-      {message && <p className="mt-4 text-amber-100">{message}</p>}
-      {tally && <p className="mt-4 text-gray-200">Verified votes: {tally.total}</p>}
-      {tally && (
-        <ul className="mt-2 space-y-1 text-gray-300">
-          {tally.options.map(item => <li key={item.option}>{item.option}: {item.count}</li>)}
-        </ul>
-      )}
-      <ul className="mt-6 space-y-3 text-sm text-gray-300">
-        {votes.map(row => <li key={row.receipt}>{row.at} · {row.option} · {row.receipt}</li>)}
-      </ul>
+      {log ? <VoteLog initial={log} /> : <p className="mt-4 text-amber-100">The vote log could not be read.</p>}
+      <div className="mt-8 flex flex-col">
+        <a className="inline-flex min-h-12 items-center font-semibold text-cyan-300 underline" href="/brew/q/001">Back to the question</a>
+        <BackToMap />
+      </div>
     </main>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { BackToMap } from '@/components/BackToMap';
 import { BrewLogo } from '@/components/BrewLogo';
 import { prepareSuiteHref } from '@/components/SuiteEntrance';
 import { BREW_RETURN_KEY, QUESTION_PROMPT, QUESTION_VOTE_PATH, VOTE_OPTIONS, voteLabel, type PublicTally, type VoteOption } from '@/lib/brew/question001';
@@ -18,7 +19,7 @@ export default function QuestionVote() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    fetch('/api/brew/q/001/results').then(res => res.json()).then(body => {
+    fetch('/api/brew/q/001/results', { cache: 'no-store' }).then(res => res.json()).then(body => {
       if (typeof body.total === 'number' && Array.isArray(body.options)) setTally(body);
     }).catch(() => undefined);
     const config = suiteConfig();
@@ -70,7 +71,7 @@ export default function QuestionVote() {
       return;
     }
     setMine({ option: body.option, label: body.label });
-    const results = await fetch('/api/brew/q/001/results').then(item => item.json()).catch(() => null);
+    const results = await fetch('/api/brew/q/001/results', { cache: 'no-store' }).then(item => item.json()).catch(() => null);
     if (results && typeof results.total === 'number') setTally(results);
   }
 
@@ -109,6 +110,7 @@ export default function QuestionVote() {
         </section>
       )}
       <a className="mt-8 inline-flex min-h-12 items-center font-semibold text-cyan-300 underline" href="/brew/q/001">Back to the question</a>
+      <div><BackToMap /></div>
     </main>
   );
 }

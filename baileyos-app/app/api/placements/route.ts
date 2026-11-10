@@ -32,6 +32,6 @@ export async function GET() {
   });
   return NextResponse.json(
     { total: Number(count.data.total), cells },
-    { headers: { 'Cache-Control': 'public, s-maxage=15, stale-while-revalidate=30' } }
+    { headers: { 'Cache-Control': 'no-store' } }
   );
 }
