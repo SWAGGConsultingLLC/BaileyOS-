@@ -7,7 +7,7 @@ import { BrewLogo } from '@/components/BrewLogo';
 import { SuiteEntrance } from '@/components/SuiteEntrance';
 import { SuiteIdentity } from '@/components/SuiteIdentity';
 import { BREW_RETURN_KEY, CHECKIN_RETURN, QUESTION_PROMPT } from '@/lib/brew/question001';
-import { prepareSuiteHref } from '@/components/SuiteEntrance';
+import { linkedInReturnInProgress, prepareSuiteHref } from '@/components/SuiteEntrance';
 import { suiteReturnTarget } from '@/lib/suite/verify';
 import { legacyNeighborhoodHex, type MapViewBox } from '@/lib/neighborhood';
 import type { NeighborhoodPin } from '@/components/MapView';
@@ -81,7 +81,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (suiteSignedIn) return;
+    if (suiteSignedIn || linkedInReturnInProgress(window.location.href)) return;
     let cancel = false;
     prepareSuiteHref(window.location.origin + '/suite').then(result => {
       if (!cancel && 'href' in result) setCheckinHref(result.href);

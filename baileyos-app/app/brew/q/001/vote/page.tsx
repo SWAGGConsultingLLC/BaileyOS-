@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { BackToMap } from '@/components/BackToMap';
 import { BrewLogo } from '@/components/BrewLogo';
-import { prepareSuiteHref } from '@/components/SuiteEntrance';
+import { linkedInReturnInProgress, prepareSuiteHref } from '@/components/SuiteEntrance';
 import { BREW_RETURN_KEY, QUESTION_PROMPT, QUESTION_VOTE_PATH, VOTE_OPTIONS, voteLabel, type PublicTally, type VoteOption } from '@/lib/brew/question001';
 import { suiteConfig } from '@/lib/suite/verify';
 
@@ -25,9 +25,11 @@ export default function QuestionVote() {
     fetch('/api/brew/q/001/results', { cache: 'no-store' }).then(res => res.json()).then(body => {
       if (!cancel && typeof body.total === 'number' && Array.isArray(body.options)) setTally(body);
     }).catch(() => undefined);
-    prepareSuiteHref(window.location.origin + '/suite').then(ready => {
-      if (!cancel && 'href' in ready) setHref(ready.href);
-    }).catch(() => undefined);
+    if (!linkedInReturnInProgress(window.location.href)) {
+      prepareSuiteHref(window.location.origin + '/suite').then(ready => {
+        if (!cancel && 'href' in ready) setHref(ready.href);
+      }).catch(() => undefined);
+    }
     const config = suiteConfig();
     if (!config) return () => { cancel = true; };
     const client = createClient(config.url, config.publishableKey, {

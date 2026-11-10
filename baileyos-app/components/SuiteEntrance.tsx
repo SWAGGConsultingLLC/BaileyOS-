@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { BrewLogo } from '@/components/BrewLogo';
 import { suiteStatusText } from '@/lib/steward/decide';
+import { BREW_RETURN_KEY, MAP_RETURN } from '@/lib/brew/question001';
 import { SUITE_LINKEDIN_PROVIDER, SUITE_SCOPES, suiteAuthorizeHref, suiteConfig, suiteEnabled } from '@/lib/suite/verify';
 
 export type SuiteContinuePhase =
@@ -38,7 +39,7 @@ export function SuiteContinue({ phase, status = null }: { phase: SuiteContinuePh
       {phase.state === 'preparing' && <p className="mt-4 text-sm text-gray-200" role="status">Preparing the 360° Brewing sign-in…</p>}
       {phase.state === 'error' && <p className="mt-4 text-sm text-amber-100" role="alert">{phase.message}</p>}
       {phase.state === 'ready' && (
-        <a href={phase.href} className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-white px-4 text-center font-semibold text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300">
+        <a href={phase.href} onClick={() => { if (phase.href.startsWith('https://')) sessionStorage.setItem(BREW_RETURN_KEY, MAP_RETURN); }} className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-white px-4 text-center font-semibold text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300">
           {suiteContinueLabel(phase.href)}
         </a>
       )}
@@ -49,8 +50,35 @@ export function SuiteContinue({ phase, status = null }: { phase: SuiteContinuePh
 
 type PrepareResult = { href: string } | { error: string };
 
-/** Builds the authorize address and stores the return check before the tap. */
-export async function prepareSuiteHref(redirectTo: string): Promise<PrepareResult> {
+const preparedHrefs = new Map<string, Promise<PrepareResult>>();
+
+/** A LinkedIn return is in the address. Preparing another sign-in would replace its saved check. */
+export function linkedInReturnInProgress(href: string): boolean {
+  try {
+    const url = new URL(href);
+    if (url.hash.includes('access_token')) return false;
+    return url.searchParams.has('code');
+  } catch {
+    return false;
+  }
+}
+
+/** One saved sign-in check per return address. A second call reuses it instead of replacing the check. */
+export function beginSuiteHref(redirectTo: string, start: (redirectTo: string) => Promise<PrepareResult>): Promise<PrepareResult> {
+  if (typeof window !== 'undefined' && linkedInReturnInProgress(window.location.href)) {
+    return Promise.resolve({ error: 'A LinkedIn sign-in return is already open.' });
+  }
+  const existing = preparedHrefs.get(redirectTo);
+  if (existing) return existing;
+  const promise = start(redirectTo).then(result => {
+    if ('error' in result) preparedHrefs.delete(redirectTo);
+    return result;
+  });
+  preparedHrefs.set(redirectTo, promise);
+  return promise;
+}
+
+async function createSuiteAuthorizeHref(redirectTo: string): Promise<PrepareResult> {
   const config = suiteConfig();
   if (!config) return { error: '360° Brewing sign-in is not turned on for this map.' };
   try {
@@ -71,6 +99,11 @@ export async function prepareSuiteHref(redirectTo: string): Promise<PrepareResul
   } catch {
     return { error: 'Could not prepare the 360° Brewing sign-in.' };
   }
+}
+
+/** Builds the authorize address and stores the return check before the tap. */
+export function prepareSuiteHref(redirectTo: string): Promise<PrepareResult> {
+  return beginSuiteHref(redirectTo, createSuiteAuthorizeHref);
 }
 
 /**
@@ -109,7 +142,7 @@ export function SuiteEntrance({
   }, [onSignedIn]);
 
   useEffect(() => {
-    if (!suiteEnabled()) return;
+    if (!suiteEnabled() || linkedInReturnInProgress(window.location.href)) return;
     if (status?.recorded) {
       setPhase({ state: 'ready', href: status.steward ? '/steward' : '/brewing' });
       return;
