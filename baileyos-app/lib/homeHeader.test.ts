@@ -17,6 +17,12 @@ test('the public map header does not show the steward mark and links to Question
   assert.match(src, /Your place is already counted/);
   assert.match(src, /3 different phones/);
   assert.match(src, /Phones on this map/);
+  const signIn = src.indexOf('Sign in with 360° Brewing');
+  const headline = src.indexOf('Show up. Get placed.');
+  assert.ok(signIn > 0 && headline > signIn);
+  assert.match(src, /sticky top-0/);
+  assert.match(src, /suiteSignedIn \? <SuiteIdentity/);
+  assert.match(src, /MAP_RETURN/);
   assert.match(src, /cache: 'no-store'/);
   const placements = readFileSync(new URL('../app/api/placements/route.ts', import.meta.url), 'utf8');
   assert.match(placements, /no-store/);
