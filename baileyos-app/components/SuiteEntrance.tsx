@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { suiteStatusText } from '@/lib/steward/decide';
-import { SUITE_PROVIDER, suiteAuthorizeHref, suiteConfig, suiteEnabled } from '@/lib/suite/verify';
+import { SUITE_LINKEDIN_PROVIDER, SUITE_SCOPES, suiteAuthorizeHref, suiteConfig, suiteEnabled } from '@/lib/suite/verify';
 
 export type SuiteContinuePhase =
   | { state: 'hidden' }
@@ -23,7 +23,7 @@ export function SuiteContinue({ phase, status = null }: { phase: SuiteContinuePh
     <section className="mt-6 rounded-2xl border border-gray-800 p-4" aria-labelledby="suite-heading">
       <h2 id="suite-heading" className="text-sm font-bold tracking-widest text-gray-400">360° BREWING</h2>
       <SuiteBadge status={status} />
-      <p className="mt-2 text-sm text-gray-300">Continue to 360° Brewing to sign in. On the next screen choose Sign in with LinkedIn or Sign in. Do not choose Sign up. The link leaves this map and returns to this site. The yellow desk link below stays on this map.</p>
+      <p className="mt-2 text-sm text-gray-300">Continue to 360° Brewing to sign in with LinkedIn. The link leaves this map and returns here. Do not choose Sign up. The email account on this page stays separate.</p>
       {phase.state === 'preparing' && <p className="mt-4 text-sm text-gray-200" role="status">Preparing the 360° Brewing sign-in…</p>}
       {phase.state === 'error' && <p className="mt-4 text-sm text-amber-100" role="alert">{phase.message}</p>}
       {phase.state === 'ready' && (
@@ -46,12 +46,12 @@ export async function prepareSuiteHref(redirectTo: string): Promise<PrepareResul
       auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, flowType: 'pkce' },
     });
     const startOAuth = client.auth.signInWithOAuth.bind(client.auth) as (credentials: {
-      provider: string;
-      options?: { redirectTo?: string; skipBrowserRedirect?: boolean };
+      provider: 'linkedin_oidc';
+      options?: { redirectTo?: string; scopes?: string; skipBrowserRedirect?: boolean };
     }) => Promise<{ data?: { url?: string | null }; error?: { message?: string } | null }>;
     const result = await startOAuth({
-      provider: SUITE_PROVIDER,
-      options: { redirectTo, skipBrowserRedirect: true },
+      provider: SUITE_LINKEDIN_PROVIDER,
+      options: { redirectTo, scopes: SUITE_SCOPES, skipBrowserRedirect: true },
     });
     const href = result.data?.url ? suiteAuthorizeHref(result.data.url, config) : null;
     if (result.error || !href) return { error: 'Could not prepare the 360° Brewing sign-in.' };

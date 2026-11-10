@@ -23,31 +23,36 @@ const good = {
   user_metadata: { role: 'steward' },
 };
 
-test('suite sign-in stays off without the 360 project key', () => {
+const linkedInUser = {
+  id: SUBJECT,
+  email: 'person@example.test',
+  user_metadata: { role: 'steward' },
+  app_metadata: { role: 'admin' },
+  identities: [{ provider: 'linkedin_oidc', identity_data: { sub: 'linkedin-sub-1', email: 'person@example.test' } }],
+};
+
+test('suite sign-in uses the map project and ignores the Data Nest project', () => {
   assert.equal(suiteEnabled({ suiteUrl: '', suiteKey: '' }), false);
-  assert.equal(suiteEnabled({ suiteUrl: 'https://rxckxwdvhjszzuqsvxdk.supabase.co', suiteKey: 'publishable' }), false);
+  assert.equal(suiteConfig({ suiteUrl: 'https://rxckxwdvhjszzuqsvxdk.supabase.co/', suiteKey: 'publishable' })?.url, 'https://rxckxwdvhjszzuqsvxdk.supabase.co');
+  assert.equal(suiteEnabled({ suiteUrl: 'https://shedpnosbkwkmwgqkefj.supabase.co', suiteKey: 'publishable' }), false);
   assert.equal(suiteEnabled({ suiteUrl: 'https://evil.example/auth', suiteKey: 'publishable' }), false);
-  assert.equal(suiteConfig({ suiteUrl: 'https://shedpnosbkwkmwgqkefj.supabase.co/', suiteKey: 'publishable' })?.url, 'https://shedpnosbkwkmwgqkefj.supabase.co');
 });
 
-test('a verified 360 user id is accepted and metadata is not a role', () => {
-  const decision = decideSuiteSubject(token(good), {
-    id: SUBJECT,
-    email: 'person@example.test',
-    user_metadata: { role: 'steward' },
-    app_metadata: { role: 'admin' },
-  });
-  assert.deepEqual(decision, { ok: true, subject: SUBJECT });
+test('a LinkedIn identity is accepted and metadata is not a role', () => {
+  const decision = decideSuiteSubject(token(good), linkedInUser);
+  assert.deepEqual(decision, { ok: true, subject: SUBJECT, providerSub: 'linkedin-sub-1' });
   assert.equal('email' in decision, false);
 });
 
 test('the auth server must agree with the token subject', () => {
   assert.equal(decideSuiteSubject(token(good), null).ok, false);
-  assert.equal(decideSuiteSubject(token(good), { id: '22222222-2222-4222-8222-222222222222' }).ok, false);
-  assert.equal(decideSuiteSubject(token({ ...good, iss: 'https://rxckxwdvhjszzuqsvxdk.supabase.co/auth/v1' }), { id: SUBJECT }).ok, false);
-  assert.equal(decideSuiteSubject(token({ ...good, role: 'service_role' }), { id: SUBJECT }).ok, false);
-  assert.equal(decideSuiteSubject(token({ ...good, aud: 'anon' }), { id: SUBJECT }).ok, false);
-  assert.equal(decideSuiteSubject('not-a-jwt', { id: SUBJECT }).ok, false);
+  assert.equal(decideSuiteSubject(token(good), { ...linkedInUser, id: '22222222-2222-4222-8222-222222222222' }).ok, false);
+  assert.equal(decideSuiteSubject(token({ ...good, iss: 'https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1' }), linkedInUser).ok, false);
+  assert.equal(decideSuiteSubject(token({ ...good, role: 'service_role' }), linkedInUser).ok, false);
+  assert.equal(decideSuiteSubject(token({ ...good, aud: 'anon' }), linkedInUser).ok, false);
+  assert.equal(decideSuiteSubject(token(good), { id: SUBJECT, identities: [{ provider: 'email', identity_data: { sub: SUBJECT } }] }).ok, false);
+  assert.equal(decideSuiteSubject(token(good), { id: SUBJECT, identities: [{ provider: 'linkedin_oidc', identity_data: { email: 'person@example.test' } }] }).ok, false);
+  assert.equal(decideSuiteSubject('not-a-jwt', linkedInUser).ok, false);
 });
 
 test('a callback explains a missing verifier, a provider error, and a session that never reached this site', () => {
@@ -80,19 +85,24 @@ test('a code that lands on the map root is sent to /suite', () => {
   assert.equal(suiteReturnTarget('https://baileyos-app.vercel.app/?code=abc#access_token=abc'), null);
 });
 
-test('only a 360 authorize link that returns to this map is kept', () => {
-  const config = { url: 'https://shedpnosbkwkmwgqkefj.supabase.co', publishableKey: 'publishable' };
-  const good = 'https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=custom%3Aapp-oidc&redirect_to=https%3A%2F%2Fbaileyos-app.vercel.app%2Fsuite';
+test('only a map LinkedIn authorize link that returns to /suite is kept', () => {
+  const config = { url: 'https://rxckxwdvhjszzuqsvxdk.supabase.co', publishableKey: 'publishable' };
+  const good = 'https://rxckxwdvhjszzuqsvxdk.supabase.co/auth/v1/authorize?provider=linkedin_oidc&scopes=openid+profile+email&redirect_to=https%3A%2F%2Fbaileyos-app.vercel.app%2Fsuite';
   assert.equal(suiteAuthorizeHref(good, config), good);
-  assert.equal(suiteAuthorizeHref('https://evil.example/auth/v1/authorize?provider=custom:app-oidc&redirect_to=https://baileyos-app.vercel.app/suite', config), null);
-  assert.equal(suiteAuthorizeHref('https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=github&redirect_to=https://baileyos-app.vercel.app/suite', config), null);
-  assert.equal(suiteAuthorizeHref('https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=custom:app-oidc&redirect_to=https://baileyos-app.vercel.app/workspace', config), null);
+  assert.equal(suiteAuthorizeHref('https://rxckxwdvhjszzuqsvxdk.supabase.co/auth/v1/authorize?provider=custom:app-oidc&redirect_to=https://baileyos-app.vercel.app/suite', config), null);
+  assert.equal(suiteAuthorizeHref('https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=linkedin_oidc&redirect_to=https://baileyos-app.vercel.app/suite', config), null);
+  assert.equal(suiteAuthorizeHref('https://rxckxwdvhjszzuqsvxdk.supabase.co/auth/v1/authorize?provider=github&redirect_to=https://baileyos-app.vercel.app/suite', config), null);
+  assert.equal(suiteAuthorizeHref('https://rxckxwdvhjszzuqsvxdk.supabase.co/auth/v1/authorize?provider=linkedin_oidc&redirect_to=https://baileyos-app.vercel.app/workspace', config), null);
 });
 
 test('the suite entrance does not render a connected control while config is absent', () => {
   const src = readFileSync(new URL('../../components/SuiteEntrance.tsx', import.meta.url), 'utf8');
   assert.match(src, /SuiteContinue/);
   assert.match(src, /<a href=\{phase.href\}/);
+  assert.match(src, /provider: SUITE_LINKEDIN_PROVIDER/);
+  assert.match(src, /scopes: SUITE_SCOPES/);
+  assert.match(readFileSync(new URL('./verify.ts', import.meta.url), 'utf8'), /openid profile email/);
+  assert.doesNotMatch(src, /custom:app-oidc/);
   assert.match(src, /signInWithOAuth\.bind\(client\.auth\)/);
   assert.match(src, /skipBrowserRedirect: true/);
   assert.match(src, /Do not choose Sign up/);
@@ -106,9 +116,9 @@ test('the continue control is a link only after the address is ready', () => {
   const preparing = renderToStaticMarkup(createElement(SuiteContinue, { phase: { state: 'preparing' } }));
   assert.match(preparing, /Preparing the 360° Brewing sign-in/);
   assert.doesNotMatch(preparing, /<a /);
-  const href = 'https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=custom%3Aapp-oidc&redirect_to=https%3A%2F%2Fbaileyos-app.vercel.app%2Fsuite';
+  const href = 'https://rxckxwdvhjszzuqsvxdk.supabase.co/auth/v1/authorize?provider=linkedin_oidc&redirect_to=https%3A%2F%2Fbaileyos-app.vercel.app%2Fsuite';
   const ready = renderToStaticMarkup(createElement(SuiteContinue, { phase: { state: 'ready', href } }));
-  assert.match(ready, /<a href="https:\/\/shedpnosbkwkmwgqkefj\.supabase\.co\/auth\/v1\/authorize\?provider=custom%3Aapp-oidc/);
+  assert.match(ready, /<a href="https:\/\/rxckxwdvhjszzuqsvxdk\.supabase\.co\/auth\/v1\/authorize\?provider=linkedin_oidc/);
   assert.match(ready, /Continue to 360° Brewing/);
   const failed = renderToStaticMarkup(createElement(SuiteContinue, { phase: { state: 'error', message: 'Could not prepare the 360° Brewing sign-in.' } }));
   assert.match(failed, /role="alert"/);

@@ -18,12 +18,12 @@ export function suiteStatusText(input: { recorded: boolean; steward: boolean } |
   return 'Signed in with 360° Brewing. Not the steward.';
 }
 
-export async function completeSuiteLogin(subject: string, db: {
-  remember: (subject: string) => Promise<void>;
+export async function completeSuiteLogin(subject: string, providerSub: string, db: {
+  remember: (subject: string, providerSub: string) => Promise<void>;
   readGrant: (subject: string) => Promise<StewardGrant | null>;
 }): Promise<SuiteAuthority> {
   try {
-    await db.remember(subject);
+    await db.remember(subject, providerSub);
     const grant = await db.readGrant(subject);
     return { subject, steward: isActiveSteward(subject, grant), recorded: true };
   } catch {
