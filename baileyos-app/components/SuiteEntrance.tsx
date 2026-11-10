@@ -40,6 +40,7 @@ export function SuiteContinue({ phase, status = null }: { phase: SuiteContinuePh
           {suiteContinueLabel(phase.href)}
         </a>
       )}
+      {signedIn && <a className="mt-3 inline-flex min-h-12 items-center font-semibold text-cyan-300 underline" href="/brew/q/001">Question #001</a>}
     </section>
   );
 }

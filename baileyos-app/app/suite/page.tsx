@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { SuiteBadge } from '@/components/SuiteEntrance';
 import { suiteStatusText } from '@/lib/steward/decide';
+import { BREW_RETURN_KEY, brewReturnPath } from '@/lib/brew/question001';
 import { suiteCallbackMessage, suiteEnabled } from '@/lib/suite/verify';
 
 export default function SuiteReturn() {
@@ -52,6 +53,12 @@ export default function SuiteReturn() {
         return;
       }
       const next = { recorded: body.recorded === true, steward: body.steward === true };
+      const back = next.recorded ? brewReturnPath(sessionStorage.getItem(BREW_RETURN_KEY)) : null;
+      if (back) {
+        sessionStorage.removeItem(BREW_RETURN_KEY);
+        window.location.replace(back);
+        return;
+      }
       setStatus(next);
       setFailed(!next.recorded);
       setMessage(suiteStatusText(next) || '360° Brewing did not confirm this sign-in.');

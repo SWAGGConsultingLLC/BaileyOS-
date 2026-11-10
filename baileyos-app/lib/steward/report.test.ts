@@ -17,7 +17,8 @@ test('the steward report allows only an active grant for this subject', () => {
 test('the report page does not invent questions or counts', () => {
   const page = readFileSync(new URL('../../app/steward/page.tsx', import.meta.url), 'utf8');
   const route = readFileSync(new URL('../../app/api/steward/report/route.ts', import.meta.url), 'utf8');
-  assert.match(page, /No consensus questions yet/);
+  assert.match(page, /Question #001/);
+  assert.doesNotMatch(page, /No consensus questions yet/);
   assert.match(page, /Steward only/);
   assert.match(route, /stewardReportAccess/);
   assert.doesNotMatch(page, /user_metadata|email ===|provider_sub/);
