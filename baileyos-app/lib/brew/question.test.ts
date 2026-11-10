@@ -8,7 +8,8 @@ const SUBJECT = '11111111-1111-4111-8111-111111111111';
 
 test('question text is the approved wording', () => {
   assert.equal(QUESTION_TITLE, '360° Brewing | Question #001');
-  assert.equal(QUESTION_DESCRIPTION, 'One verified person, one vote. Results counted in the open.');
+  assert.equal(QUESTION_DESCRIPTION, 'One verified person, one vote. Results counted in the open. Sign in with LinkedIn and add your voice to Question #001.');
+  assert.ok(QUESTION_DESCRIPTION.length >= 100);
   assert.equal(MISSION_TITLE, '360° Brewing: Our Mission');
   assert.match(MISSION_BODY, /We're reconnecting people from LinkedIn/);
   assert.match(QUESTION_PROMPT, /outside auditors/);
@@ -46,7 +47,7 @@ test('the share page names the image and the open graph title', () => {
   assert.match(page, /QUESTION_TITLE/);
   assert.match(page, /QUESTION_DESCRIPTION/);
   assert.match(page, /QUESTION_IMAGE/);
-  assert.equal(QUESTION_IMAGE, 'https://baileyos-app.vercel.app/brew/question-001.png');
+  assert.equal(QUESTION_IMAGE, 'https://baileyos-app.vercel.app/brew/question-001.png?v=2');
   const png = readFileSync(new URL('../../public/brew/question-001.png', import.meta.url));
   assert.equal(png.readUInt32BE(16), 1200);
   assert.equal(png.readUInt32BE(20), 627);
