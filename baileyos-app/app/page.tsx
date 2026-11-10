@@ -1,12 +1,13 @@
 'use client';
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserSupabase } from '@/lib/supabaseBrowser';
 import { AccountPanel } from '@/components/AccountPanel';
 import { BrewLogo } from '@/components/BrewLogo';
 import { SuiteEntrance } from '@/components/SuiteEntrance';
 import { SuiteIdentity } from '@/components/SuiteIdentity';
-import { QUESTION_PROMPT } from '@/lib/brew/question001';
+import { BREW_RETURN_KEY, CHECKIN_RETURN, QUESTION_PROMPT } from '@/lib/brew/question001';
+import { prepareSuiteHref } from '@/components/SuiteEntrance';
 import { suiteReturnTarget } from '@/lib/suite/verify';
 import type { Cell } from '@/components/MapView';
 
@@ -33,6 +34,8 @@ export default function Home() {
   const [session, setSession] = useState<string | null>(null);
   const [suiteSignedIn, setSuiteSignedIn] = useState(false);
   const [showLinkedIn, setShowLinkedIn] = useState(false);
+  const [checkinHref, setCheckinHref] = useState<string | null>(null);
+  const resumed = useRef(false);
   const onAccessToken = useCallback((token: string | null) => setSession(token), []);
   const onSuiteStatus = useCallback((status: { recorded: boolean } | null) => {
     const signedIn = status?.recorded === true;
@@ -48,6 +51,26 @@ export default function Home() {
   useEffect(() => {
     const target = suiteReturnTarget(window.location.href);
     if (target) window.location.replace(target);
+  }, []);
+
+  useEffect(() => {
+    if (suiteSignedIn) return;
+    let cancel = false;
+    prepareSuiteHref(window.location.origin + '/suite').then(result => {
+      if (!cancel && 'href' in result) setCheckinHref(result.href);
+    }).catch(() => undefined);
+    return () => { cancel = true; };
+  }, [suiteSignedIn]);
+
+  useEffect(() => {
+    if (resumed.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkin') !== '1') return;
+    resumed.current = true;
+    params.delete('checkin');
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash}`;
+    window.history.replaceState(null, '', next);
+    share();
   }, []);
 
   useEffect(() => {
@@ -138,7 +161,15 @@ export default function Home() {
       <div className="mt-1 text-2xl font-bold text-white">{mine ? `Your area: ${mine.band_km}–${mine.band_km + 5} km from the map center` : 'No area shared yet'}</div>
       <p className="mt-1 text-gray-400">Nothing is saved until you tap Share my place. The browser asks for your location only then.</p>
 
-      <button onClick={share} disabled={busy} className="mt-5 w-full rounded-full bg-cyanx py-4 text-lg font-bold text-black disabled:opacity-60">Share my place</button>
+      {suiteSignedIn ? (
+        <button onClick={share} disabled={busy} className="mt-5 w-full rounded-full bg-cyanx py-4 text-lg font-bold text-black disabled:opacity-60">Share my place</button>
+      ) : (
+        <>
+          <a href={checkinHref ?? undefined} onClick={() => sessionStorage.setItem(BREW_RETURN_KEY, CHECKIN_RETURN)} className={`mt-5 flex min-h-12 w-full items-center justify-center rounded-full bg-cyanx py-4 text-lg font-bold text-black ${checkinHref ? '' : 'pointer-events-none opacity-60'}`}>Share my place</a>
+          <p className="mt-2 text-center text-sm text-gray-300">This signs you in with LinkedIn, then asks for your location.</p>
+          <button type="button" onClick={share} disabled={busy} className="mt-1 min-h-11 w-full text-sm text-gray-400 underline">Continue without signing in</button>
+        </>
+      )}
       {suiteSignedIn && (
         <label className="mt-3 flex min-h-11 items-start gap-2 text-sm text-gray-200">
           <input type="checkbox" checked={showLinkedIn} onChange={event => setShowLinkedIn(event.target.checked)} />

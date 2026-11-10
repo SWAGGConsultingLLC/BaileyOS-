@@ -11,4 +11,7 @@ test('the public map header does not show the steward mark and links to Question
   assert.match(src, /Answer Question #001/);
   assert.match(src, /href="\/brew\/q\/001"/);
   assert.match(src, /Nothing is saved until you tap Share my place/);
+  assert.match(src, /Continue without signing in/);
+  assert.match(src, /CHECKIN_RETURN/);
+  assert.match(src, /useState\(false\)/);
 });
