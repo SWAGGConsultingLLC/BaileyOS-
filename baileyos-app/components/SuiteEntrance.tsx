@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { BrewLogo } from '@/components/BrewLogo';
 import { suiteStatusText } from '@/lib/steward/decide';
 import { SUITE_LINKEDIN_PROVIDER, SUITE_SCOPES, suiteAuthorizeHref, suiteConfig, suiteEnabled } from '@/lib/suite/verify';
 
@@ -28,7 +29,8 @@ export function SuiteContinue({ phase, status = null }: { phase: SuiteContinuePh
   const signedIn = status?.recorded === true;
   return (
     <section className="mt-6 rounded-2xl border border-gray-800 p-4" aria-labelledby="suite-heading">
-      <h2 id="suite-heading" className="text-sm font-bold tracking-widest text-gray-400">360° BREWING</h2>
+      <BrewLogo size={64} />
+      <h2 id="suite-heading" className="mt-3 text-sm font-bold tracking-widest text-gray-400">360° BREWING</h2>
       <SuiteBadge status={status} />
       <p className="mt-2 text-sm text-gray-300">{signedIn
         ? 'You are signed in to 360° Brewing on this map.'

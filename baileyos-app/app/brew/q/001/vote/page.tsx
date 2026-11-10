@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { BrewLogo } from '@/components/BrewLogo';
 import { prepareSuiteHref } from '@/components/SuiteEntrance';
 import { BREW_RETURN_KEY, QUESTION_PROMPT, QUESTION_VOTE_PATH, VOTE_OPTIONS, voteLabel, type PublicTally, type VoteOption } from '@/lib/brew/question001';
 import { suiteConfig } from '@/lib/suite/verify';
@@ -75,7 +76,7 @@ export default function QuestionVote() {
 
   return (
     <main className="mx-auto max-w-xl px-4 py-10">
-      <p className="text-sm font-bold tracking-wide text-gray-400">360° BREWING</p>
+      <BrewLogo />
       <h1 className="mt-2 text-3xl font-bold">Question #001</h1>
       <p className="mt-4 text-lg text-gray-200">{QUESTION_PROMPT}</p>
       {mine?.option && (

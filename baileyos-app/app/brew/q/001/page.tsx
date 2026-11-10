@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { BrewLogo } from '@/components/BrewLogo';
 import { MISSION_PATH, QUESTION_DESCRIPTION, QUESTION_IMAGE, QUESTION_PROMPT, QUESTION_TITLE } from '@/lib/brew/question001';
 
 export const metadata: Metadata = {
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
 export default function QuestionPreview() {
   return (
     <main className="mx-auto max-w-xl px-4 py-10">
-      <p className="text-sm font-bold tracking-wide text-gray-400">360° BREWING</p>
+      <BrewLogo />
       <h1 className="mt-2 text-3xl font-bold">{QUESTION_TITLE}</h1>
       <p className="mt-4 text-lg text-gray-200">{QUESTION_DESCRIPTION}</p>
       <p className="mt-4 text-gray-300">{QUESTION_PROMPT}</p>
