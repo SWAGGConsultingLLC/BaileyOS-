@@ -16,22 +16,22 @@ test('only the exact active subject is steward', () => {
 
 test('a verified sign-in stays ordinary unless the grant row is active', async () => {
   const seen: string[] = [];
-  const ordinary = await completeSuiteLogin(OTHER, {
-    remember: async subject => { seen.push(subject); },
+  const ordinary = await completeSuiteLogin(OTHER, 'linkedin-sub-2', {
+    remember: async (subject, providerSub) => { seen.push(`${subject}:${providerSub}`); },
     readGrant: async () => null,
   });
   assert.deepEqual(ordinary, { subject: OTHER, steward: false, recorded: true });
-  const steward = await completeSuiteLogin(STEWARD, {
+  const steward = await completeSuiteLogin(STEWARD, 'linkedin-sub-1', {
     remember: async () => undefined,
     readGrant: async () => ({ subjectId: STEWARD, revokedAt: null }),
   });
   assert.equal(steward.steward, true);
-  const revoked = await completeSuiteLogin(STEWARD, {
+  const revoked = await completeSuiteLogin(STEWARD, 'linkedin-sub-1', {
     remember: async () => undefined,
     readGrant: async () => ({ subjectId: STEWARD, revokedAt: '2026-11-09T00:00:00Z' }),
   });
   assert.equal(revoked.steward, false);
-  const closed = await completeSuiteLogin(STEWARD, {
+  const closed = await completeSuiteLogin(STEWARD, 'linkedin-sub-1', {
     remember: async () => { throw new Error('table missing'); },
     readGrant: async () => ({ subjectId: STEWARD, revokedAt: null }),
   });
@@ -40,7 +40,7 @@ test('a verified sign-in stays ordinary unless the grant row is active', async (
   assert.equal(suiteStatusText(closed), '360° Brewing recognized this sign-in, but the map did not record it.');
   assert.equal(suiteStatusText({ recorded: true, steward: false }), 'Signed in with 360° Brewing. Not the steward.');
   assert.equal(suiteStatusText({ recorded: true, steward: true }), 'Signed in with 360° Brewing. Steward.');
-  assert.deepEqual(seen, [OTHER]);
+  assert.deepEqual(seen, [`${OTHER}:linkedin-sub-2`]);
 });
 
 test('the return page shows steward only from the server flag', () => {

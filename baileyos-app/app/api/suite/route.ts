@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   if (!token) return Response.json({ error: 'Sign-in required.' }, { status: 401 });
   const decision = decideSuiteSubject(token, await fetchSuiteUser(token, config));
   if (!decision.ok) return Response.json({ error: decision.error }, { status: decision.status });
-  const authority = await completeSuiteLogin(decision.subject, {
+  const authority = await completeSuiteLogin(decision.subject, decision.providerSub, {
     remember: rememberSuiteSubject,
     readGrant: readStewardGrant,
   });

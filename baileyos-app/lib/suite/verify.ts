@@ -1,14 +1,22 @@
-/** 360° Brewing Auth issuer. Verified from that project's public discovery document. */
-export const SUITE_ISSUER = 'https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1';
+/** Map project. LinkedIn (OIDC) sessions for 360° Brewing are issued here. */
+export const SUITE_ISSUER = 'https://rxckxwdvhjszzuqsvxdk.supabase.co/auth/v1';
+/** Built-in provider. It does not send a PKCE proof to LinkedIn. */
+export const SUITE_LINKEDIN_PROVIDER = 'linkedin_oidc';
+/** Data Nest custom provider. It stays in code and is not used by the button. */
 export const SUITE_PROVIDER = 'custom:app-oidc';
+export const SUITE_SCOPES = 'openid profile email';
 
 const USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PROVIDER_SUB = /^[A-Za-z0-9._-]{1,255}$/;
 
 export type SuiteConfig = { url: string; publishableKey: string };
-export type VerifiedSuiteUser = { id?: unknown };
+export type VerifiedSuiteUser = {
+  id?: unknown;
+  identities?: { provider?: unknown; identity_data?: unknown }[] | null;
+};
 
 export type SuiteDecision =
-  | { ok: true; subject: string }
+  | { ok: true; subject: string; providerSub: string }
   | { ok: false; status: 401; error: string };
 
 function issuerFor(url: string): string | null {
@@ -21,13 +29,13 @@ function issuerFor(url: string): string | null {
   }
 }
 
-/** Off unless the public suite URL is exactly the 360 project and a publishable key is present. */
+/** On when the map project URL and its publishable key are present. The Data Nest project is not accepted. */
 export function suiteConfig(env: {
   suiteUrl?: string;
   suiteKey?: string;
 } = {}): SuiteConfig | null {
-  const url = (env.suiteUrl ?? process.env.NEXT_PUBLIC_SUITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
-  const publishableKey = (env.suiteKey ?? process.env.NEXT_PUBLIC_SUITE_PUBLISHABLE_KEY ?? '').trim();
+  const url = (env.suiteUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
+  const publishableKey = (env.suiteKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
   if (!url || !publishableKey) return null;
   if (issuerFor(url) !== SUITE_ISSUER) return null;
   return { url, publishableKey };
@@ -96,14 +104,14 @@ export function suiteReturnTarget(href: string): string | null {
   return `/suite${url.search}`;
 }
 
-/** Accept only an authorize URL on the configured 360 project. */
+/** Accept only a LinkedIn (OIDC) authorize URL on the map project that returns to /suite. */
 export function suiteAuthorizeHref(candidate: string, config: SuiteConfig): string | null {
   try {
     const target = new URL(candidate);
     const allowed = new URL(config.url);
     if (target.origin !== allowed.origin) return null;
     if (target.pathname !== '/auth/v1/authorize') return null;
-    if (target.searchParams.get('provider') !== SUITE_PROVIDER) return null;
+    if (target.searchParams.get('provider') !== SUITE_LINKEDIN_PROVIDER) return null;
     const redirectTo = target.searchParams.get('redirect_to');
     if (!redirectTo) return null;
     const back = new URL(redirectTo);
@@ -127,9 +135,20 @@ export function unverifiedClaims(token: string): Record<string, unknown> | null 
   }
 }
 
+function linkedInSub(user: VerifiedSuiteUser): string | null {
+  const identities = Array.isArray(user.identities) ? user.identities : [];
+  const linked = identities.filter(item => item?.provider === SUITE_LINKEDIN_PROVIDER);
+  if (linked.length !== 1) return null;
+  const data = linked[0].identity_data;
+  if (!data || typeof data !== 'object') return null;
+  const sub = (data as { sub?: unknown }).sub;
+  return typeof sub === 'string' && PROVIDER_SUB.test(sub) ? sub : null;
+}
+
 /**
- * The subject is the id returned by the 360 Auth server.
- * Email, user_metadata, and app_metadata are ignored. This id is not a map-database auth.uid().
+ * The subject is the map auth user id returned by this project's Auth server.
+ * The provider subject is that server's LinkedIn identity sub.
+ * Email, user_metadata, and app_metadata are ignored.
  */
 export function decideSuiteSubject(token: string, verifiedUser: VerifiedSuiteUser | null): SuiteDecision {
   const claims = unverifiedClaims(token);
@@ -139,5 +158,7 @@ export function decideSuiteSubject(token: string, verifiedUser: VerifiedSuiteUse
   if (!verifiedUser || typeof verifiedUser.id !== 'string' || !USER_ID.test(verifiedUser.id) || claims.sub !== verifiedUser.id) {
     return { ok: false, status: 401, error: 'Sign-in required.' };
   }
-  return { ok: true, subject: verifiedUser.id };
+  const providerSub = linkedInSub(verifiedUser);
+  if (!providerSub) return { ok: false, status: 401, error: 'Sign-in required.' };
+  return { ok: true, subject: verifiedUser.id, providerSub };
 }

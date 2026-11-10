@@ -88,3 +88,22 @@ begin
   raise exception 'service role inserted a grant';
 exception when insufficient_privilege then null;
 end $$;
+
+insert into public.verified_suite_subjects (subject_id, provider, provider_sub)
+  values ('11111111-1111-4111-8111-111111111111', 'linkedin_oidc', 'linkedin-sub-1');
+
+do $$
+begin
+  insert into public.verified_suite_subjects (subject_id, provider)
+    values ('33333333-3333-4333-8333-333333333333', 'linkedin_oidc');
+  raise exception 'a provider without a subject was stored';
+exception when check_violation then null;
+end $$;
+
+do $$
+begin
+  insert into public.verified_suite_subjects (subject_id, provider, provider_sub)
+    values ('33333333-3333-4333-8333-333333333333', 'linkedin_oidc', 'linkedin-sub-1');
+  raise exception 'the same LinkedIn subject was stored twice';
+exception when unique_violation then null;
+end $$;

@@ -30,6 +30,7 @@ trap cleanup EXIT
 "${PSQL[@]}" -d postgres -c "create database ${DB}"
 "${PSQL[@]}" -d "$DB" -f tests/steward-authority/prelude.sql
 "${PSQL[@]}" -d "$DB" -f supabase/migrations/20261109025712_steward_authority.sql
+"${PSQL[@]}" -d "$DB" -f supabase/migrations/20261110003000_linkedin_subject.sql
 if "${PSQL[@]}" -d "$DB" -f supabase/migrations/20261109025712_steward_authority.sql >/dev/null 2>&1; then
   echo "Steward authority tests failed: a second apply was allowed."
   exit 1
