@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'node:test';
-import { SuiteContinue, suiteContinueLabel } from '../../components/SuiteEntrance.tsx';
+import { SuiteContinue, beginSuiteHref, linkedInReturnInProgress, suiteContinueLabel } from '../../components/SuiteEntrance.tsx';
 import { SUITE_ISSUER, decideSuiteSubject, suiteAuthorizeHref, suiteCallbackMessage, suiteConfig, suiteEnabled, suiteReturnTarget } from './verify.ts';
 
 const SUBJECT = '11111111-1111-4111-8111-111111111111';
@@ -55,7 +55,7 @@ test('the auth server must agree with the token subject', () => {
   assert.equal(decideSuiteSubject('not-a-jwt', linkedInUser).ok, false);
 });
 
-test('a callback explains a missing verifier, a provider error, and a session that never reached this site', () => {
+test('a callback explains a missing verifier, a provider error, and a session that never reached this site', async () => {
   const missing = suiteCallbackMessage({
     search: '?code=returned-code',
     exchangeError: 'PKCE code verifier not found in storage. This can happen if the auth flow was initiated in a different browser or device.',
@@ -64,6 +64,27 @@ test('a callback explains a missing verifier, a provider error, and a session th
   assert.equal(missing.kind, 'error');
   assert.match(missing.message, /this browser does not have the sign-in check/);
   assert.match(missing.message, /Safari or Chrome/);
+  const mismatch = suiteCallbackMessage({
+    search: '?code=returned-code',
+    exchangeError: 'code challenge does not match previously saved code verifier',
+    hasSession: false,
+  });
+  assert.equal(mismatch.kind, 'error');
+  assert.match(mismatch.message, /started more than once/);
+  assert.equal(linkedInReturnInProgress('https://baileyos-app.vercel.app/suite?code=abc'), true);
+  assert.equal(linkedInReturnInProgress('https://baileyos-app.vercel.app/?code=abc'), true);
+  assert.equal(linkedInReturnInProgress('https://baileyos-app.vercel.app/#access_token=abc'), false);
+  let calls = 0;
+  const redirectTo = 'https://baileyos-app.vercel.app/suite#once';
+  const start = async () => {
+    calls += 1;
+    return { href: 'https://rxckxwdvhjszzuqsvxdk.supabase.co/auth/v1/authorize?provider=linkedin_oidc' };
+  };
+  const first = beginSuiteHref(redirectTo, start);
+  const second = beginSuiteHref(redirectTo, start);
+  assert.equal(first, second);
+  assert.equal(calls, 1);
+  assert.equal((await first).href, (await second).href);
   const denied = suiteCallbackMessage({
     search: '?error=access_denied&error_description=The+user+cancelled',
     hasSession: false,
@@ -109,7 +130,8 @@ test('the suite entrance does not render a connected control while config is abs
   assert.match(src, /SuiteBadge/);
   assert.doesNotMatch(src, /Connected/);
   assert.match(src, /window\.location\.origin \+ '\/suite'/);
-  assert.doesNotMatch(src, /window\.location\.(assign|href)/);
+  assert.doesNotMatch(src, /window\.location\.assign/);
+  assert.doesNotMatch(src, /window\.location\.href\s*=/);
 });
 
 test('a signed-in steward opens the report instead of starting LinkedIn again', () => {

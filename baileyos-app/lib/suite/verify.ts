@@ -73,7 +73,14 @@ export function suiteCallbackMessage(input: {
     };
   }
   if (query.get('code') && input.exchangeError) {
-    const missing = /verifier|code challenge|pkce/i.test(input.exchangeError);
+    const mismatch = /does not match|bad_code_verifier|code challenge/i.test(input.exchangeError);
+    const missing = /not found|verifier not/i.test(input.exchangeError);
+    if (mismatch) {
+      return {
+        kind: 'error',
+        message: 'The sign-in was started more than once, so the return could not be finished. Go back to the map and tap the LinkedIn button once.',
+      };
+    }
     if (missing) {
       return {
         kind: 'error',
@@ -82,7 +89,7 @@ export function suiteCallbackMessage(input: {
     }
     return {
       kind: 'error',
-      message: 'The return reached this page, but the sign-in could not be finished. Open the map in the phone’s main browser and tap Continue again.',
+      message: 'The return reached this page, but the sign-in could not be finished. Go back to the map and tap the LinkedIn button once.',
     };
   }
   if (!input.hasSession) {
