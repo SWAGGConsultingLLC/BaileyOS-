@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { browserSupabase } from '@/lib/supabaseBrowser';
 import { AccountPanel } from '@/components/AccountPanel';
 import { SuiteEntrance } from '@/components/SuiteEntrance';
+import { SuiteIdentity } from '@/components/SuiteIdentity';
 import { suiteReturnTarget } from '@/lib/suite/verify';
 import type { Cell } from '@/components/MapView';
 
@@ -30,6 +31,9 @@ export default function Home() {
   const [session, setSession] = useState<string | null>(null);
   const [suiteSignedIn, setSuiteSignedIn] = useState(false);
   const onAccessToken = useCallback((token: string | null) => setSession(token), []);
+  const onSuiteStatus = useCallback((status: { recorded: boolean } | null) => {
+    setSuiteSignedIn(status?.recorded === true);
+  }, []);
   const sb = browserSupabase();
 
   const load = useCallback(async () => {
@@ -80,9 +84,14 @@ export default function Home() {
       <div className="text-sm font-bold tracking-[0.35em] text-cyanx">BAILEYOS</div>
       <h1 className="mt-3 text-4xl font-extrabold text-white">Show up. Get placed.</h1>
       <p className="mt-2 text-gray-400">Share where you are. An account is optional and does not place you on the map. The books stay in the works.</p>
-      <p className="mt-3 text-sm text-goldx">•?81⊞81·ΔS◇0 | 81ABSCS81</p>
-      <p className="text-sm text-goldx">The bearing stays 81ABSCS81. Rewriting the holder does not transfer the firm.</p>
-      <p className="text-xs text-goldx/80">(to SWAGG Consulting LLC)</p>
+      <SuiteIdentity onStatus={onSuiteStatus} />
+      {!suiteSignedIn && (
+        <>
+          <p className="mt-3 text-sm text-goldx">•?81⊞81·ΔS◇0 | 81ABSCS81</p>
+          <p className="text-sm text-goldx">The bearing stays 81ABSCS81. Rewriting the holder does not transfer the firm.</p>
+          <p className="text-xs text-goldx/80">(to SWAGG Consulting LLC)</p>
+        </>
+      )}
 
       <div className="mt-5 overflow-hidden rounded-2xl border-2 border-goldx/70"><MapView cells={cells} mine={mine} frameKey={frameKey} /></div>
 

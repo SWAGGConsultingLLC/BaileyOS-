@@ -17,18 +17,27 @@ export function SuiteBadge({ status }: { status: { recorded: boolean; steward: b
   return <p className="mt-2 text-sm font-semibold text-amber-100" role="status">{text}</p>;
 }
 
+export function suiteContinueLabel(href: string): string {
+  if (href === '/steward') return 'Open the Steward Consensus Report';
+  if (href === '/brewing') return 'Open 360° Brewing';
+  return 'Continue to 360° Brewing';
+}
+
 export function SuiteContinue({ phase, status = null }: { phase: SuiteContinuePhase; status?: { recorded: boolean; steward: boolean } | null }) {
   if (phase.state === 'hidden' && !status) return null;
+  const signedIn = status?.recorded === true;
   return (
     <section className="mt-6 rounded-2xl border border-gray-800 p-4" aria-labelledby="suite-heading">
       <h2 id="suite-heading" className="text-sm font-bold tracking-widest text-gray-400">360° BREWING</h2>
       <SuiteBadge status={status} />
-      <p className="mt-2 text-sm text-gray-300">Continue to 360° Brewing to sign in with LinkedIn. The link leaves this map and returns here. Do not choose Sign up. The email account on this page stays separate.</p>
+      <p className="mt-2 text-sm text-gray-300">{signedIn
+        ? 'You are signed in to 360° Brewing on this map.'
+        : 'Continue to 360° Brewing to sign in with LinkedIn. The link leaves this map and returns here. Do not choose Sign up. The email account on this page stays separate.'}</p>
       {phase.state === 'preparing' && <p className="mt-4 text-sm text-gray-200" role="status">Preparing the 360° Brewing sign-in…</p>}
       {phase.state === 'error' && <p className="mt-4 text-sm text-amber-100" role="alert">{phase.message}</p>}
       {phase.state === 'ready' && (
         <a href={phase.href} className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-white px-4 text-center font-semibold text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300">
-          Continue to 360° Brewing
+          {suiteContinueLabel(phase.href)}
         </a>
       )}
     </section>
@@ -98,6 +107,10 @@ export function SuiteEntrance({
 
   useEffect(() => {
     if (!suiteEnabled()) return;
+    if (status?.recorded) {
+      setPhase({ state: 'ready', href: status.steward ? '/steward' : '/brewing' });
+      return;
+    }
     let cancel = false;
     setPhase({ state: 'preparing' });
     const redirectTo = window.location.origin + '/suite';
@@ -109,7 +122,7 @@ export function SuiteEntrance({
       if (!cancel) setPhase({ state: 'error', message: 'Could not prepare the 360° Brewing sign-in.' });
     });
     return () => { cancel = true; };
-  }, [prepare]);
+  }, [prepare, status]);
 
   return <SuiteContinue phase={phase} status={status} />;
 }

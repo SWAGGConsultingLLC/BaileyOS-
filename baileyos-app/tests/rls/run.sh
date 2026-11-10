@@ -32,5 +32,6 @@ trap cleanup EXIT
 "${PSQL[@]}" -d "$DB" -f tests/rls/prelude.sql
 "${PSQL[@]}" -d "$DB" -f supabase/migrations/001_init.sql
 "${PSQL[@]}" -d "$DB" -f supabase/migrations/20261108142831_member_profiles.sql
+"${PSQL[@]}" -d "$DB" -f supabase/migrations/20261110021500_profile_visibility.sql
 "${PSQL[@]}" -d "$DB" -f tests/rls/checks.sql
 echo "RLS tests passed on local database ${DB} (roles anon, authenticated, service_role)."

@@ -68,6 +68,11 @@ export default function SuiteReturn() {
       <h1 className="mt-2 text-3xl font-bold">Return from 360° Brewing</h1>
       <SuiteBadge status={status} />
       <p className={`mt-4 text-lg ${failed ? 'text-amber-100' : 'text-gray-200'}`} role={failed ? 'alert' : 'status'}>{message}</p>
+      {status?.recorded && (
+        <a className="mt-4 inline-flex min-h-12 items-center font-semibold text-white underline" href={status.steward ? '/steward' : '/brewing'}>
+          {status.steward ? 'Open the Steward Consensus Report' : 'Open 360° Brewing'}
+        </a>
+      )}
       {!status && !failed && <p className="mt-3 text-sm text-gray-300">LinkedIn asks you to sign in to 360° Brewing. This page stays here and shows the result.</p>}
       <a className="mt-6 inline-flex min-h-12 items-center font-semibold text-cyan-300 underline" href="/">Back to the map</a>
     </main>
