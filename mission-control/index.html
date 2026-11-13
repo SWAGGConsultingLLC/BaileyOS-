@@ -5,6 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Mission Control | SWAGG Consulting</title>
 <meta name="description" content="Mission Control is the public front door to BaileyOS from SWAGG Consulting. Read the 81 Canon, or open 360° Brewing." />
+<link rel="canonical" href="https://os.swaggconsulting.com/mission-control/" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="SWAGG Consulting LLC | BaileyOS" />
+<meta property="og:description" content="A public page from SWAGG Consulting LLC on AI governance. Read the 81 Canon, or open 360° Brewing." />
+<meta property="og:url" content="https://os.swaggconsulting.com/mission-control/" />
+<meta property="og:image" content="https://os.swaggconsulting.com/mission-control/icon-512.png" />
+<meta property="og:image:alt" content="Gold star on a black square, the BaileyOS mark." />
+<meta property="og:image:width" content="512" />
+<meta property="og:image:height" content="512" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="SWAGG Consulting LLC | BaileyOS" />
+<meta name="twitter:description" content="A public page from SWAGG Consulting LLC on AI governance. Read the 81 Canon, or open 360° Brewing." />
+<meta name="twitter:image" content="https://os.swaggconsulting.com/mission-control/icon-512.png" />
+<meta name="twitter:image:alt" content="Gold star on a black square, the BaileyOS mark." />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -91,6 +105,59 @@
     line-height: 1.55;
     color: var(--muted);
   }
+  .share {
+    margin-top: 1.75rem;
+  }
+  .share-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.65rem;
+  }
+  .share-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .share-row a,
+  .share-row button {
+    font-family: inherit;
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    color: var(--accent);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.55rem 0.8rem;
+    min-height: 44px;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .share-row a:hover,
+  .share-row a:focus-visible,
+  .share-row button:hover,
+  .share-row button:focus-visible {
+    border-color: var(--accent);
+    outline: none;
+  }
+  .share-row a:focus-visible,
+  .share-row button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
   footer {
     border-top: 1px solid var(--border);
     padding: 1.25rem;
@@ -120,10 +187,76 @@
         <p>A public, timestamped audit trail. The map and optional check-in live here too, including an anonymous option.</p>
       </a>
     </div>
+    <section class="share" aria-labelledby="share-label">
+      <p id="share-label" class="share-label">Share</p>
+      <div class="share-row">
+        <a id="share-linkedin" href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fos.swaggconsulting.com%2Fmission-control%2F" target="_blank" rel="noopener noreferrer" aria-label="Share on LinkedIn">LinkedIn</a>
+        <a id="share-x" href="https://twitter.com/intent/tweet?url=https%3A%2F%2Fos.swaggconsulting.com%2Fmission-control%2F&amp;text=SWAGG%20Consulting%20LLC%20%7C%20BaileyOS%20%E2%80%94%20a%20public%20page%20on%20AI%20governance." target="_blank" rel="noopener noreferrer" aria-label="Share on X">X</a>
+        <a id="share-facebook" href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fos.swaggconsulting.com%2Fmission-control%2F" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook">Facebook</a>
+        <a id="share-email" href="mailto:?subject=SWAGG%20Consulting%20LLC%20%7C%20BaileyOS&amp;body=A%20public%20page%20from%20SWAGG%20Consulting%20LLC%20on%20AI%20governance.%0A%0Ahttps%3A%2F%2Fos.swaggconsulting.com%2Fmission-control%2F" target="_blank" rel="noopener noreferrer" aria-label="Share by email">Email</a>
+        <button type="button" id="share-copy" aria-label="Copy link">Copy link</button>
+      </div>
+      <p id="share-status" class="visually-hidden" role="status" aria-live="polite"></p>
+    </section>
   </main>
   <footer>
     SWAGG Consulting LLC · Grand Junction, CO<br>
     <a href="../">BaileyOS home</a>
   </footer>
+  <script>
+    (function () {
+      var FALLBACK = 'https://os.swaggconsulting.com/mission-control/';
+      var TITLE = 'SWAGG Consulting LLC | BaileyOS';
+      var BLURB = 'A public page from SWAGG Consulting LLC on AI governance.';
+      var pageUrl = FALLBACK;
+      try {
+        var href = window.location && window.location.href;
+        var protocol = window.location && window.location.protocol;
+        if (href && (protocol === 'http:' || protocol === 'https:')) pageUrl = href;
+      } catch (e) {}
+
+      function setHref(id, href) {
+        var el = document.getElementById(id);
+        if (el) el.setAttribute('href', href);
+      }
+
+      var encoded = encodeURIComponent(pageUrl);
+      var shareText = TITLE + ' — a public page on AI governance.';
+      setHref('share-linkedin', 'https://www.linkedin.com/sharing/share-offsite/?url=' + encoded);
+      setHref('share-x', 'https://twitter.com/intent/tweet?url=' + encoded + '&text=' + encodeURIComponent(shareText));
+      setHref('share-facebook', 'https://www.facebook.com/sharer/sharer.php?u=' + encoded);
+      setHref('share-email', 'mailto:?subject=' + encodeURIComponent(TITLE) + '&body=' + encodeURIComponent(BLURB + '\n\n' + pageUrl));
+
+      var copyBtn = document.getElementById('share-copy');
+      var status = document.getElementById('share-status');
+      if (!copyBtn) return;
+      copyBtn.addEventListener('click', function () {
+        var restore = copyBtn.textContent;
+        function confirmCopied() {
+          copyBtn.textContent = 'Copied';
+          copyBtn.setAttribute('aria-label', 'Copied');
+          if (status) status.textContent = 'Copied';
+          window.setTimeout(function () {
+            copyBtn.textContent = restore;
+            copyBtn.setAttribute('aria-label', 'Copy link');
+            if (status) status.textContent = '';
+          }, 1600);
+        }
+        function showFailure() {
+          copyBtn.textContent = 'Could not copy';
+          if (status) status.textContent = 'Could not copy the link.';
+          window.setTimeout(function () {
+            copyBtn.textContent = restore;
+            if (status) status.textContent = '';
+          }, 1600);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(pageUrl).then(confirmCopied).catch(showFailure);
+        } else {
+          showFailure();
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
