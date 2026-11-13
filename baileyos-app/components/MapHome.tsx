@@ -11,6 +11,7 @@ import { linkedInReturnInProgress, prepareSuiteHref } from '@/components/SuiteEn
 import { suiteReturnTarget } from '@/lib/suite/verify';
 import { legacyNeighborhoodHex, type MapViewBox } from '@/lib/neighborhood';
 import type { NeighborhoodPin } from '@/components/MapView';
+import type { VisitCategory } from '@/lib/visit';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false, loading: () => <div className="h-[340px]" /> });
 
@@ -34,9 +35,28 @@ function deviceToken(): string {
   } catch { return crypto.randomUUID() + crypto.randomUUID(); }
 }
 
+async function suiteAccessToken(): Promise<string | null> {
+  const configUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const configKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  if (!configUrl || !configKey) return null;
+  const { createClient } = await import('@supabase/supabase-js');
+  const client = createClient(configUrl, configKey, { auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, flowType: 'pkce' } });
+  const { data } = await client.auth.getSession();
+  return data.session?.access_token || null;
+}
+
+function logVisit(category: VisitCategory) {
+  void fetch('/api/visit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category }),
+    keepalive: true,
+  }).catch(() => undefined);
+}
+
 export default function Home() {
   const [neighborhoods, setNeighborhoods] = useState<NeighborhoodPin[]>([]);
-  const [phones, setPhones] = useState<number | null>(0);
+  const [people, setPeople] = useState<number>(0);
   const [zoomIn, setZoomIn] = useState(false);
   const [focusHex, setFocusHex] = useState<string | null>(null);
   const boundsRef = useRef<MapViewBox | null>(null);
@@ -46,16 +66,20 @@ export default function Home() {
   const [frameKey, setFrameKey] = useState(0);
   const [session, setSession] = useState<string | null>(null);
   const [suiteSignedIn, setSuiteSignedIn] = useState(false);
-  const [showLinkedIn, setShowLinkedIn] = useState(false);
   const [checkinHref, setCheckinHref] = useState<string | null>(null);
   const resumed = useRef(false);
+  const visitLogged = useRef<VisitCategory | null>(null);
   const onAccessToken = useCallback((token: string | null) => setSession(token), []);
   const onSuiteStatus = useCallback((status: { recorded: boolean } | null) => {
-    const signedIn = status?.recorded === true;
-    setSuiteSignedIn(signedIn);
-    if (!signedIn) setShowLinkedIn(false);
+    setSuiteSignedIn(status?.recorded === true);
   }, []);
   const sb = browserSupabase();
+
+  const recordVisit = useCallback((category: VisitCategory) => {
+    if (visitLogged.current === category) return;
+    visitLogged.current = category;
+    logVisit(category);
+  }, []);
 
   const load = useCallback(async (box?: MapViewBox) => {
     const view = box ?? boundsRef.current;
@@ -69,7 +93,7 @@ export default function Home() {
       if (!r.ok) return;
       const j = await r.json();
       setNeighborhoods(Array.isArray(j.neighborhoods) ? j.neighborhoods : []);
-      setPhones(typeof j.phones === 'number' ? j.phones : null);
+      setPeople(typeof j.people === 'number' ? j.people : 0);
       setZoomIn(j.zoom_in === true);
     } catch { /* the map keeps the last neighborhoods it could read */ }
   }, []);
@@ -108,6 +132,21 @@ export default function Home() {
     load(); const i = setInterval(load, 30000); return () => clearInterval(i);
   }, [load]);
 
+  useEffect(() => {
+    let cancel = false;
+    suiteAccessToken().then(token => {
+      if (cancel) return;
+      recordVisit(token ? 'logged_in' : 'logged_out_visitor');
+    }).catch(() => {
+      if (!cancel) recordVisit('logged_out_visitor');
+    });
+    return () => { cancel = true; };
+  }, [recordVisit]);
+
+  useEffect(() => {
+    if (suiteSignedIn) recordVisit('logged_in');
+  }, [suiteSignedIn, recordVisit]);
+
   const saveMine = (m: Mine | null) => { setMine(m); try { m ? localStorage.setItem(MINE_KEY, JSON.stringify(m)) : localStorage.removeItem(MINE_KEY); } catch {} };
 
   function share() {
@@ -115,31 +154,25 @@ export default function Home() {
     setBusy(true); setMsg('Finding your place…');
     navigator.geolocation.getCurrentPosition(async pos => {
       try {
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        const showProfile = suiteSignedIn && showLinkedIn;
-        if (showProfile) {
-          const configUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-          const configKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-          if (configUrl && configKey) {
-            const { createClient } = await import('@supabase/supabase-js');
-            const client = createClient(configUrl, configKey, { auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, flowType: 'pkce' } });
-            const { data } = await client.auth.getSession();
-            if (data.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`;
-          }
-        }
+        const token = await suiteAccessToken();
+        if (!token) { setMsg('Sign in with LinkedIn to check in.'); setBusy(false); return; }
         const r = await fetch('/api/place', {
-          method: 'POST', headers,
-          body: JSON.stringify({ lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy_m: pos.coords.accuracy, device_token: deviceToken(), timestamp: Date.now(), show_linkedin: showProfile })
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            accuracy_m: pos.coords.accuracy,
+            device_token: deviceToken(),
+            timestamp: Date.now(),
+          }),
         });
         const j = await r.json();
         if (!r.ok) setMsg(j.error || 'Could not place you.');
         else if (typeof j.h3 === 'string' && typeof j.placement_id === 'number' && typeof j.link_token === 'string') {
-          saveMine({ h3: j.h3, placement_id: j.placement_id, link_token: j.link_token, show_linkedin: j.shared_profile === true, linked: mine?.linked });
+          saveMine({ h3: j.h3, placement_id: j.placement_id, link_token: j.link_token, show_linkedin: false, linked: mine?.linked });
           setFocusHex(j.h3);
-          setShowLinkedIn(j.shared_profile === true);
-          setMsg(j.status === 'duplicate'
-            ? (j.shared_profile ? 'Your place is already counted. Your name and photo are on this check-in.' : 'Your place is already counted')
-            : 'Placed.');
+          setMsg('Placed. Your check-in is anonymous until you share your name.');
           await load();
         } else setMsg('Could not place you.');
       } catch { setMsg('Network error. Nothing was recorded.'); }
@@ -148,16 +181,32 @@ export default function Home() {
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
   }
 
+  async function shareName() {
+    if (!mine) return;
+    const token = await suiteAccessToken();
+    if (!token) { setMsg('Sign in with LinkedIn to share your name.'); return; }
+    const r = await fetch('/api/place', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ share: true, placement_id: mine.placement_id, link_token: mine.link_token }),
+    });
+    if (!r.ok) { setMsg('Could not share your name and photo.'); return; }
+    saveMine({ ...mine, show_linkedin: true });
+    setMsg('Your name and photo are on this check-in.');
+    await load();
+  }
+
   async function removeLinkedIn() {
     if (!mine) return;
+    const token = await suiteAccessToken();
+    if (!token) { setMsg('Sign in with LinkedIn to update your check-in.'); return; }
     const r = await fetch('/api/place', {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ placement_id: mine.placement_id, link_token: mine.link_token }),
     });
     if (!r.ok) { setMsg('Could not remove the name and photo.'); return; }
     saveMine({ ...mine, show_linkedin: false });
-    setShowLinkedIn(false);
     setMsg('Your name and photo were removed. The check-in stays on the map without them.');
     await load();
   }
@@ -181,7 +230,7 @@ export default function Home() {
       <p className="text-sm font-semibold text-gray-300">SWAGG Consulting</p>
       <div className="mt-2 text-sm font-bold tracking-[0.35em] text-cyanx">BAILEYOS</div>
       <h1 className="mt-3 text-4xl font-extrabold text-white">Show up. Get placed.</h1>
-      <p className="mt-2 text-gray-400">BaileyOS is a community map by SWAGG Consulting. People can share roughly where they are, and they can join 360° Brewing questions. An account is optional and does not place you on the map.</p>
+      <p className="mt-2 text-gray-400">BaileyOS is a community map by SWAGG Consulting. People can share roughly where they are, and they can join 360° Brewing questions. Check-in uses a LinkedIn sign-in. Your name stays off the map until you share it.</p>
       <section className="mt-5 rounded-2xl border border-gray-800 p-4" aria-labelledby="question-001-heading">
         <BrewLogo size={64} />
         <h2 id="question-001-heading" className="mt-3 text-lg font-semibold text-white">Question #001</h2>
@@ -193,30 +242,26 @@ export default function Home() {
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <button onClick={() => setFrameKey(k => k + 1)} className="text-xs font-bold tracking-widest text-cyanx">Frame my area</button>
-        <span className="text-right text-xs tracking-widest text-gray-500">{zoomIn ? 'Zoom in to count phones' : `Phones on this map: ${phones ?? 0}`}</span>
+        <span className="text-right text-xs tracking-widest text-gray-500">{zoomIn ? `Zoom in to see names. People on this map: ${people}` : `People on this map: ${people}`}</span>
       </div>
       <div className="mt-1 text-2xl font-bold text-white">{mine ? 'Your area is one neighborhood, about 2.5 km across.' : 'No area shared yet'}</div>
-      <p className="mt-1 text-gray-400">Nothing is saved until you tap Share my place. The browser asks for your location only then.</p>
+      <p className="mt-1 text-gray-400">Nothing is saved until you sign in and tap Share my place. The browser asks for your location only then.</p>
 
       {suiteSignedIn ? (
         <button onClick={share} disabled={busy} className="mt-5 w-full rounded-full bg-cyanx py-4 text-lg font-bold text-black disabled:opacity-60">Share my place</button>
       ) : (
         <>
           <a href={checkinHref ?? undefined} onClick={() => sessionStorage.setItem(BREW_RETURN_KEY, CHECKIN_RETURN)} className={`mt-5 flex min-h-12 w-full items-center justify-center rounded-full bg-cyanx py-4 text-lg font-bold text-black ${checkinHref ? '' : 'pointer-events-none opacity-60'}`}>Share my place</a>
-          <p className="mt-2 text-center text-sm text-gray-300">This signs you in with LinkedIn, then asks for your location.</p>
-          <button type="button" onClick={share} disabled={busy} className="mt-1 min-h-11 w-full text-sm text-gray-400 underline">Continue without signing in</button>
+          <p className="mt-2 text-center text-sm text-gray-300">This signs you in with LinkedIn, then asks for your location. Your name stays off the map until you share it.</p>
         </>
       )}
-      {suiteSignedIn && (
-        <label className="mt-3 flex min-h-11 items-start gap-2 text-sm text-gray-200">
-          <input type="checkbox" checked={showLinkedIn} onChange={event => setShowLinkedIn(event.target.checked)} />
-          <span>Show my LinkedIn profile with my check-in. This stays off until you turn it on. It adds the name and photo from your LinkedIn sign-in. A profile link is added only when LinkedIn provides one.</span>
-        </label>
+      {suiteSignedIn && mine && !mine.show_linkedin && (
+        <button type="button" onClick={shareName} className="mt-3 w-full min-h-12 rounded-full border border-cyanx/70 py-3 font-semibold text-cyanx">Show my name and photo</button>
       )}
       {suiteSignedIn && mine?.show_linkedin && (
         <button type="button" onClick={removeLinkedIn} className="mt-2 min-h-11 font-semibold text-gray-300 underline">Remove my name and photo</button>
       )}
-      <p className="mt-2 text-xs text-gray-500">A neighborhood appears after 3 different phones check in there in the last 7 days. The same phone counts once. Exact coordinates are not saved. A name and photo appear only when that person turns them on and the neighborhood meets that crowd.</p>
+      <p className="mt-2 text-xs text-gray-500">The count is signed-in people who have checked in. A name and photo appear only when that person chooses to share them. The same person has one place on the map; a new check-in moves that place.</p>
       <SuiteEntrance onSignedIn={setSuiteSignedIn} />
       <AccountPanel client={sb} onAccessToken={onAccessToken} deferProfile={suiteSignedIn} />
       {session && mine && (
