@@ -213,7 +213,7 @@ body{background:var(--dark);font-family:'Rajdhani',sans-serif;color:var(--cyan);
 .fish-arrow{color:rgba(0,245,255,.3);font-size:20px;display:flex;align-items:center;padding-top:12px;}
 
 /* AI AGENTS */
-.ai-agent-wrap{display:grid;grid-template-columns:260px 1fr;gap:16px;}
+.ai-agent-wrap{display:grid;grid-template-columns:minmax(260px,320px) 1fr;gap:16px;align-items:start;}
 .agent-selector{background:var(--panel);border:1px solid rgba(0,245,255,.2);padding:18px;}
 .agent-title{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:3px;color:rgba(0,245,255,.5);margin-bottom:14px;text-transform:uppercase;}
 .agent-card{border:1px solid rgba(0,245,255,.2);padding:12px;margin-bottom:8px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:10px;}
@@ -223,6 +223,13 @@ body{background:var(--dark);font-family:'Rajdhani',sans-serif;color:var(--cyan);
 .agent-info h4{font-family:'Orbitron',monospace;font-size:12px;font-weight:700;color:var(--cyan);}
 .agent-info p{font-size:11px;opacity:.5;margin-top:2px;}
 .agent-icon{font-size:20px;}
+.optional-oracle{margin:4px 0 10px;border:1px dashed rgba(0,245,255,.22);padding:8px 10px;}
+.optional-oracle summary{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;color:rgba(0,245,255,.5);cursor:pointer;}
+.optional-oracle .agent-card{margin:8px 0 0;}
+.model-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.model-id-input{letter-spacing:.3px;}
+.token-note{font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,215,0,.55);letter-spacing:.4px;line-height:1.65;margin-bottom:8px;}
+.token-note a,.token-note code{color:var(--gold);font-family:'Share Tech Mono',monospace;font-size:9px;}
 .api-config-block{margin-top:16px;padding-top:14px;border-top:1px solid rgba(0,245,255,.1);}
 .api-config{background:rgba(255,215,0,.04);border:1px solid rgba(255,215,0,.2);padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
 .api-key-input{flex:1;background:rgba(0,10,20,.8);border:1px solid rgba(255,215,0,.3);color:rgba(255,215,0,.9);font-family:'Share Tech Mono',monospace;font-size:11px;padding:5px 10px;outline:none;min-width:0;}
@@ -230,7 +237,7 @@ body{background:var(--dark);font-family:'Rajdhani',sans-serif;color:var(--cyan);
 .api-set-btn{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:2px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.4);color:var(--gold);padding:5px 12px;cursor:pointer;transition:all .2s;white-space:nowrap;}
 .api-set-btn:hover{background:rgba(255,215,0,.2);box-shadow:var(--glow-gold);}
 .api-key-label{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;color:rgba(255,215,0,.6);white-space:nowrap;}
-.chat-panel{background:var(--panel);border:1px solid rgba(0,245,255,.2);display:flex;flex-direction:column;height:520px;}
+.chat-panel{background:var(--panel);border:1px solid rgba(0,245,255,.2);display:flex;flex-direction:column;height:640px;}
 .chat-header{padding:12px 16px;border-bottom:1px solid rgba(0,245,255,.15);display:flex;align-items:center;gap:10px;}
 .chat-agent-name{font-family:'Orbitron',monospace;font-size:12px;font-weight:700;color:var(--cyan);letter-spacing:2px;}
 .chat-status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:sealPulse 2s ease-in-out infinite;margin-left:auto;}
@@ -241,6 +248,8 @@ body{background:var(--dark);font-family:'Rajdhani',sans-serif;color:var(--cyan);
 .msg{max-width:88%;font-size:13px;line-height:1.6;padding:9px 13px;}
 .msg.assistant{align-self:flex-start;background:rgba(0,245,255,.05);border:1px solid rgba(0,245,255,.2);color:rgba(0,245,255,.9);border-radius:0 6px 6px 6px;}
 .msg.user{align-self:flex-end;background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.25);color:rgba(255,215,0,.9);border-radius:6px 0 6px 6px;}
+.msg.error{align-self:stretch;max-width:100%;background:rgba(255,70,70,.08);border:1px solid rgba(255,90,90,.55);color:#ffb4b4;border-radius:4px;}
+.key-notice.is-error{color:#ff8a8a;border-top-color:rgba(255,80,80,.4);}
 .msg-label{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;opacity:.5;margin-bottom:4px;text-transform:uppercase;}
 .chat-input-area{padding:12px;border-top:1px solid rgba(0,245,255,.15);display:flex;gap:8px;align-items:flex-end;}
 .chat-input{flex:1;resize:none;background:rgba(0,20,40,.8);border:1px solid rgba(0,245,255,.3);color:var(--cyan);font-family:'Rajdhani',sans-serif;font-size:13px;padding:9px 12px;outline:none;min-height:40px;max-height:100px;transition:border-color .2s;}
@@ -538,7 +547,7 @@ a.home:hover{background:rgba(0,245,255,.12);}
         <div class="bailey-principle"><div class="bp-num">05</div><div class="bp-text"><strong style="color:var(--gold)">Open wide and be filled (Psalm 81:10)</strong> — The 81 harmonic is an invitation, not a formula. The ARK opens the space — God fills it. The tool creates the opening; the Spirit moves through it.</div></div>
         <div class="bailey-principle"><div class="bp-num">06</div><div class="bp-text"><strong style="color:var(--gold)">The wheel never stops (Ezekiel 1:20)</strong> — Wherever the Spirit goes, the mechanism follows. No beneficiary is stuck forever. Every state — even Entangled — is motion within the wheel. Trust the perpetual rotation.</div></div>
         <div class="bailey-principle"><div class="bp-num">07</div><div class="bp-text"><strong style="color:var(--gold)">100% free access — no gatekeepers (Isaiah 55:1)</strong> — "Come, buy wine and milk without money and without price." The signal is free. The ARK is free. No login, no paywall, no hierarchy blocks the gospel. This is non-negotiable Bailey OS policy.</div></div>
-        <div class="bailey-principle"><div class="bp-num">08</div><div class="bp-text"><strong style="color:var(--gold)">AI + Human stewardship in cooperation</strong> — Claude and Gemini serve as oracles within the ARK. They do not replace the human steward — they amplify the signal. The Holy Spirit leads. The human discerns. The AI executes at scale. This is the cooperation model.</div></div>
+        <div class="bailey-principle"><div class="bp-num">08</div><div class="bp-text"><strong style="color:var(--gold)">AI + Human stewardship in cooperation</strong> — Grok, Gemini, and GitHub Models serve as oracles within the ARK. They do not replace the human steward — they amplify the signal. The Holy Spirit leads. The human discerns. The AI executes at scale. This is the cooperation model.</div></div>
       </div>
 
       <!-- Ezekiel wheel diagram -->
@@ -566,56 +575,97 @@ a.home:hover{background:rgba(0,245,255,.12);}
     <div class="tab-pane" id="tab-ai">
       <div class="section-title">◈ EMBEDDED AI ORACLE AGENTS — BAILEY OS</div>
       <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(0,245,255,.4);margin-bottom:16px;letter-spacing:2px">
-        ◈ CANNED DEMO · NO AUTONOMOUS WORKER · A KEY STAYS IN THIS TAB AND IS USED ONLY IF YOU PRESS SEND
+        ◈ PUBLIC ORACLES · NO KEY ON THIS PAGE · NO AUTONOMOUS WORKER
       </div>
       <div class="ai-agent-wrap">
         <div class="agent-selector">
           <div class="agent-title">◈ SELECT ORACLE</div>
-          <div class="agent-card selected" id="agent-claude" onclick="selectAgent('claude')" tabindex="0" role="button" aria-label="Select Claude oracle">
-            <div class="agent-indicator" id="ind-claude"></div>
-            <div class="agent-icon">⚡</div>
-            <div class="agent-info"><h4>CLAUDE</h4><p>Anthropic · Constitutional AI</p></div>
+          <div class="agent-card selected" id="agent-grok" onclick="selectAgent('grok')" tabindex="0" role="button" aria-label="Select Grok oracle">
+            <div class="agent-indicator" id="ind-grok"></div>
+            <div class="agent-icon">✶</div>
+            <div class="agent-info"><h4>GROK</h4><p>xAI · <span data-oracle-model="grok"></span></p></div>
           </div>
           <div class="agent-card" id="agent-gemini" onclick="selectAgent('gemini')" tabindex="0" role="button" aria-label="Select Gemini oracle">
             <div class="agent-indicator" id="ind-gemini"></div>
             <div class="agent-icon">✦</div>
-            <div class="agent-info"><h4>GEMINI</h4><p>Google DeepMind · Multimodal</p></div>
+            <div class="agent-info"><h4>GEMINI</h4><p>Google · <span data-oracle-model="gemini"></span></p></div>
           </div>
-
-          <div class="api-config-block">
-            <div class="agent-title">◈ API KEY CONFIG</div>
-            <div id="claude-key-area">
-              <div class="api-config">
-                <div class="api-key-label">CLAUDE</div>
-                <input type="password" class="api-key-input" id="claude-api-key" aria-label="Claude API key" autocomplete="new-password" placeholder="sk-ant-api03-...">
-                <button class="api-set-btn" onclick="setApiKey('claude')">SET</button>
+          <div class="agent-card" id="agent-github" onclick="selectAgent('github')" tabindex="0" role="button" aria-label="Select GitHub Models oracle">
+            <div class="agent-indicator" id="ind-github"></div>
+            <div class="agent-icon">⧉</div>
+            <div class="agent-info"><h4>GITHUB MODELS</h4><p>GitHub · <span data-oracle-model="github"></span></p></div>
+          </div>
+          <details class="optional-oracle" id="own-key">
+            <summary>USE MY OWN KEY</summary>
+            <div class="token-note">Optional. Closed by default. A key typed here stays in this tab's memory and is sent only to that provider when you press Send. Leave this closed and Send uses the BaileyOS server, which holds the keys.</div>
+            <div class="agent-card" id="agent-claude" onclick="selectAgent('claude')" tabindex="0" role="button" aria-label="Select optional Claude oracle">
+              <div class="agent-indicator" id="ind-claude"></div>
+              <div class="agent-icon">⚡</div>
+              <div class="agent-info"><h4>CLAUDE</h4><p>Optional · <span data-oracle-model="claude"></span></p></div>
+            </div>
+            <div class="api-config-block">
+            <div id="grok-key-area">
+              <div class="model-row">
+                <div class="api-key-label">MODEL</div>
+                <input type="text" class="api-key-input model-id-input" id="grok-model" aria-label="Grok model id" autocomplete="off" spellcheck="false" oninput="syncModelLabel('grok')">
               </div>
-              <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,215,0,.4);letter-spacing:1px;margin-bottom:8px">Get free key: console.anthropic.com</div>
+              <div class="api-config">
+                <div class="api-key-label">GROK</div>
+                <input type="password" class="api-key-input" id="grok-api-key" aria-label="Grok API key" autocomplete="new-password" placeholder="xai-...">
+                <button class="api-set-btn" onclick="setApiKey('grok')">SET</button>
+              </div>
+              <div class="token-note">Key from <a href="https://console.x.ai" target="_blank" rel="noopener noreferrer">console.x.ai</a>. Change the model id above to point at another xAI chat model.</div>
             </div>
             <div id="gemini-key-area" style="display:none">
+              <div class="model-row">
+                <div class="api-key-label">MODEL</div>
+                <input type="text" class="api-key-input model-id-input" id="gemini-model" aria-label="Gemini model id" autocomplete="off" spellcheck="false" oninput="syncModelLabel('gemini')">
+              </div>
               <div class="api-config">
                 <div class="api-key-label">GEMINI</div>
                 <input type="password" class="api-key-input" id="gemini-api-key" aria-label="Gemini API key" autocomplete="new-password" placeholder="AIza...">
                 <button class="api-set-btn" onclick="setApiKey('gemini')">SET</button>
               </div>
-              <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,215,0,.4);letter-spacing:1px;margin-bottom:8px">Get free key: aistudio.google.com</div>
+              <div class="token-note">Key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a>. The model id is the Gemini API id, sent on the next message.</div>
+            </div>
+            <div id="github-key-area" style="display:none">
+              <div class="model-row">
+                <div class="api-key-label">MODEL</div>
+                <input type="text" class="api-key-input model-id-input" id="github-model" aria-label="GitHub Models model id" autocomplete="off" spellcheck="false" oninput="syncModelLabel('github')">
+              </div>
+              <div class="api-config">
+                <div class="api-key-label">TOKEN</div>
+                <input type="password" class="api-key-input" id="github-api-key" aria-label="GitHub Models personal access token" autocomplete="new-password" placeholder="github_pat_...">
+                <button class="api-set-btn" onclick="setApiKey('github')">SET</button>
+              </div>
+              <div class="token-note">Create a token at <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">github.com/settings/personal-access-tokens/new</a>. Choose a fine-grained token, then under Account permissions set Models to Read-only (<code>models:read</code>). A classic token uses the same <code>models:read</code> scope at <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer">github.com/settings/tokens/new</a>. The token stays in this tab's memory and is never saved. GitHub retired the Models inference API on July 30, 2026, so a send still calls <code>models.github.ai</code> and shows the error that comes back. The model field defaults to the last documented free-tier id and can be edited.</div>
+            </div>
+            <div id="claude-key-area" style="display:none">
+              <div class="api-config">
+                <div class="api-key-label">CLAUDE</div>
+                <input type="password" class="api-key-input" id="claude-api-key" aria-label="Claude API key" autocomplete="new-password" placeholder="sk-ant-api03-...">
+                <button class="api-set-btn" onclick="setApiKey('claude')">SET</button>
+              </div>
+              <div class="token-note">Optional oracle. Key from <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>. Grok, Gemini, and GitHub Models stay the primary slots.</div>
             </div>
             <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(0,245,255,.3);line-height:1.7;letter-spacing:1px">
-              Keys stored in session memory only. Never persisted. Frontend fully open — no account needed to use the ARK.
+              Own keys stay in this tab's memory only. The public path sends no key. No account is required to use the ARK.
             </div>
-          </div>
+            <button class="api-set-btn" id="use-server-btn" onclick="clearOwnKey()" type="button">USE SERVER</button>
+            </div>
+          </details>
         </div>
 
         <div class="chat-panel">
           <div class="chat-header">
-            <div class="chat-agent-name" id="chat-agent-name">⚡ CLAUDE ORACLE</div>
+            <div class="chat-agent-name" id="chat-agent-name">✶ GROK ORACLE</div>
             <div class="chat-status-dot"></div>
-            <div class="chat-status-label" id="chat-status-label">DEMO · NO WORKER</div>
+            <div class="chat-status-label" id="chat-status-label">SERVER · NO WORKER</div>
           </div>
           <div class="chat-messages" id="chat-messages" aria-live="polite">
             <div class="msg assistant">
-              <div class="msg-label">CLAUDE</div>
-              This greeting is canned. No model is running, and no worker is watching the Ark. The lines below are the demo text, not a live answer.
+              <div class="msg-label">GROK</div>
+              Grok answers through the BaileyOS server. No key is required. No worker runs on its own.
             </div>
           </div>
           <div class="typing-indicator" id="typing-ind">
@@ -627,7 +677,7 @@ a.home:hover{background:rgba(0,245,255,.12);}
               oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
             <button class="send-btn" id="send-btn" onclick="sendMessage()">▶ SEND</button>
           </div>
-          <div class="key-notice" id="key-notice">Demo replies only. Nothing is calling a model, and no worker runs on its own. A key typed above stays in this tab and is sent only if you press Send.</div>
+          <div class="key-notice" id="key-notice">Public oracle. This browser does not send a key. Send calls the BaileyOS server.</div>
         </div>
       </div>
     </div>
@@ -783,7 +833,7 @@ const CANON = {
       [19,'Go ye therefore, and teach all nations, baptizing them in the name of the Father, and of the Son, and of the Holy Ghost:',true],
       [20,'Teaching them to observe all things whatsoever I have commanded you: and, lo, I am with you alway, even unto the end of the world. Amen.',true],
     ],
-    insight: 'The Great Commission is the scope of the ARK. "All nations" = no gatekeepers, no geographic limits, no paywalls. The AI agents (Claude and Gemini) extend the human steward\'s reach to the ends of the earth. This is the Bailey OS cooperation model at its core.'
+    insight: 'The Great Commission is the scope of the ARK. "All nations" = no gatekeepers, no geographic limits, no paywalls. The AI agents (Grok, Gemini, and GitHub Models) extend the human steward\'s reach to the ends of the earth. This is the Bailey OS cooperation model at its core.'
   },
   acts18: {
     ref: 'ACTS 1:8', subtitle: 'POWER · WITNESS · ENDS OF THE EARTH',
@@ -821,8 +871,8 @@ Object.entries(CANON).forEach(([key,book]) => {
 // Older copies saved in this browser are read only for the one-time import offer.
 function readLocalBene(){ try { const d=JSON.parse(localStorage.getItem('ark_bene_v2')||'[]'); return Array.isArray(d)?d.filter(b=>b&&typeof b==='object'&&b.name!=null):[]; } catch(e){ console.warn('Saved ARK data unreadable',e); return []; } }
 let beneficiaries = [];
-let apiKeys = { claude:'', gemini:'' };
-let currentAgent = 'claude';
+let apiKeys = { grok:'', gemini:'', github:'', claude:'' };
+let currentAgent = 'grok';
 let chatHistory = [];
 let currentCanon = 'ps81';
 
@@ -1202,35 +1252,131 @@ function renderTable(){
 }
 
 // ═══════════════════════════════════════════════════════
-// AI AGENTS
+// AI ORACLES
+// Model ids live here so a static page can retarget without a build.
+// Verified 2026-11-13:
+//   grok   grok-4.7            https://docs.x.ai/developers/models
+//   gemini gemini-3.8-flash   Gemini API (GA). Confirmed on the generateContent model index.
+//   github openai/gpt-4o-mini Last documented GitHub Models low-complexity free-tier id
+//                             (15 req/min, 150/day). The catalog itself was retired 2026-07-30.
+//   claude claude-opus-4-8    Optional third oracle. Not a primary slot.
 // ═══════════════════════════════════════════════════════
+const ORACLE_MODELS = {
+  grok: 'grok-4.7',
+  gemini: 'gemini-3.8-flash',
+  github: 'openai/gpt-4o-mini',
+  claude: 'claude-opus-4-8'
+};
+// Production BaileyOS map (Vercel project baileyos-app, root directory baileyos-app).
+// Must stay the single proxy address. Model ids above must match baileyos-app/lib/oracle.ts.
+const ORACLE_PROXY_URL = 'https://baileyos-app.vercel.app/api/oracle';
+const GITHUB_MODELS_API_VERSION = '2022-11-28';
+const ORACLE_NAMES = { grok:'Grok', gemini:'Gemini', github:'GitHub Models', claude:'Claude' };
+const ORACLE_LABELS = { grok:'GROK', gemini:'GEMINI', github:'GITHUB MODELS', claude:'CLAUDE' };
+const ORACLE_TITLES = {
+  grok:'✶ GROK ORACLE',
+  gemini:'✦ GEMINI ORACLE',
+  github:'⧉ GITHUB MODELS',
+  claude:'⚡ CLAUDE ORACLE'
+};
+const ORACLE_GREETING = {
+  grok:'Grok answers through the BaileyOS server. No key is required. No worker runs on its own.',
+  gemini:'Gemini answers through the BaileyOS server. No key is required. No worker runs on its own.',
+  github:'GitHub Models answers through the BaileyOS server. No key is required. No worker runs on its own.',
+  claude:'Claude is optional and is not on the server. Open Use my own key, paste an Anthropic key, and press SET.'
+};
+const ORACLE_AGENTS = ['grok','gemini','github','claude'];
+
+function oracleModel(agent){
+  const el=document.getElementById(agent+'-model');
+  const typed=el?el.value.trim():'';
+  return typed || ORACLE_MODELS[agent] || '';
+}
+
+function syncModelLabel(agent){
+  const el=document.querySelector('[data-oracle-model="'+agent+'"]');
+  if(el) el.textContent=ORACLE_MODELS[agent]||'';
+}
+
+function paintOracleStatus(){
+  const agent=currentAgent;
+  const notice=document.getElementById('key-notice');
+  const status=document.getElementById('chat-status-label');
+  notice.classList.remove('is-error');
+  notice.style.color='';
+  if(apiKeys[agent]){
+    if(status) status.textContent='OWN KEY · NO WORKER';
+    notice.textContent='Your key is in this tab only. Send calls '+ORACLE_NAMES[agent]+' directly from this browser. No background worker was started.';
+  }else if(agent==='claude'){
+    if(status) status.textContent='KEY NEEDED';
+    notice.textContent='Claude is not on the server. Open Use my own key, paste an Anthropic key, and press SET.';
+  }else{
+    if(status) status.textContent='SERVER · NO WORKER';
+    notice.textContent='Public oracle. This browser does not send a key. Send calls the BaileyOS server.';
+  }
+}
+
 function selectAgent(agent){
+  if(!ORACLE_NAMES[agent]) return;
   currentAgent=agent;
   document.querySelectorAll('.agent-card').forEach(c=>c.classList.remove('selected'));
-  document.getElementById('agent-'+agent).classList.add('selected');
-  document.getElementById('ind-'+agent).classList.add('selected');
-  document.getElementById('claude-key-area').style.display=agent==='claude'?'block':'none';
-  document.getElementById('gemini-key-area').style.display=agent==='gemini'?'block':'none';
-  const names={claude:'⚡ CLAUDE ORACLE',gemini:'✦ GEMINI ORACLE'};
-  document.getElementById('chat-agent-name').textContent=names[agent];
+  const card=document.getElementById('agent-'+agent);
+  if(card) card.classList.add('selected');
+  ORACLE_AGENTS.forEach(a=>{
+    const area=document.getElementById(a+'-key-area');
+    if(area) area.style.display=a===agent?'block':'none';
+  });
+  if(agent==='claude'){
+    const opt=document.getElementById('own-key');
+    if(opt) opt.open=true;
+  }
+  document.getElementById('chat-agent-name').textContent=ORACLE_TITLES[agent];
   chatHistory=[];
-  addChatMsg('assistant','Demo picker only. Replies stay canned until a key is typed in this tab. No worker is running.',agent.toUpperCase());
+  paintOracleStatus();
+  document.getElementById('chat-messages').innerHTML='';
+  addChatMsg('assistant', ORACLE_GREETING[agent], ORACLE_LABELS[agent]);
 }
 
 function setApiKey(agent){
-  const key=document.getElementById(agent+'-api-key').value.trim();
-  if(!key)return;
+  const input=document.getElementById(agent+'-api-key');
+  const key=(input.value||'').trim();
+  if(!key){
+    showOracleError('No '+ORACLE_NAMES[agent]+' key in this tab. '+keyHelp(agent));
+    return;
+  }
+  // Memory only. Never localStorage, sessionStorage, or the downloaded HTML snapshot.
   apiKeys[agent]=key;
-  document.getElementById('key-notice').textContent='Key is in this tab only. Send will call the model from this browser. No background worker was started.';
-  document.getElementById('key-notice').style.color='var(--gold)';
-  const statusLabel=document.getElementById('chat-status-label');
-  if(statusLabel) statusLabel.textContent='KEY IN THIS TAB · NO WORKER';
+  input.value='';
+  if(currentAgent!==agent) selectAgent(agent);
+  else paintOracleStatus();
   showToast('Key stored in this tab');
+}
+
+function clearOwnKey(agent){
+  agent=agent||currentAgent;
+  if(!ORACLE_NAMES[agent]) return;
+  apiKeys[agent]='';
+  const input=document.getElementById(agent+'-api-key');
+  if(input) input.value='';
+  paintOracleStatus();
+  showToast('Using the server');
+}
+
+function keyHelp(agent){
+  if(agent==='grok') return 'Paste an xAI key from console.x.ai and press SET. It stays in memory only.';
+  if(agent==='gemini') return 'Paste a Gemini key from aistudio.google.com and press SET. It stays in memory only.';
+  if(agent==='github') return 'Paste a GitHub personal access token with models:read and press SET. Create one at github.com/settings/personal-access-tokens/new (Fine-grained, Account permissions, Models, Read-only). It stays in memory only.';
+  return 'Paste an Anthropic key from console.anthropic.com and press SET. It stays in memory only.';
+}
+
+function missingKeyMessage(agent){
+  return 'No '+ORACLE_NAMES[agent]+' key in this tab. '+keyHelp(agent);
 }
 
 function buildSystemPrompt(){
   const bCounts={blue:beneficiaries.filter(b=>b.state==='blue').length,teal:beneficiaries.filter(b=>b.state==='teal').length,purple:beneficiaries.filter(b=>b.state==='purple').length,green:beneficiaries.filter(b=>b.state==='green').length};
-  return `You are the ${currentAgent==='claude'?'Claude':'Gemini'} Oracle embedded within SIGNAL ARK — a sacred mission tracking, discipleship, and gospel-spreading application built on the Bailey OS framework.
+  const who=ORACLE_NAMES[currentAgent]||'Signal Ark';
+  return `You are the ${who} Oracle embedded within SIGNAL ARK — a sacred mission tracking, discipleship, and gospel-spreading application built on the Bailey OS framework.
 
 CORE CANONICAL FOUNDATION:
 - PSALM 81: The 81 harmonic anchor. "Open thy mouth wide, and I will fill it" (v.10) — the ARK creates the opening, the Spirit fills it. "With honey out of the rock should I have satisfied thee" (v.16) — the Freed state.
@@ -1250,7 +1396,7 @@ BAILEY OS FRAMEWORK (8 PRINCIPLES):
 5. Open wide and be filled — the ARK creates the opening, Spirit fills it (Psalm 81:10)
 6. The wheel never stops — no signal is stuck forever (Ezekiel 1:20)
 7. 100% free — no logins, no gatekeepers, no paywalls (Isaiah 55:1)
-8. AI + Human stewardship in cooperation — Holy Spirit leads, human discerns, AI executes at scale
+8. AI + Human stewardship in cooperation — Grok, Gemini, and GitHub Models amplify the signal. The Holy Spirit leads, the human discerns, the AI executes at scale
 
 THE FOUR LIVING SIGNALS:
 🔵 Called/Seeker — Free, approaching, hearing the frequency. Psalm 81:8. The wide water.
@@ -1265,70 +1411,282 @@ CURRENT ARK STATUS:
 YOUR ROLE: You are an oracle — not a replacement for the Holy Spirit or human steward. You help users understand the 81 Canon, interpret Jude 1 mandates, pray with wisdom for their beneficiaries, understand scripture cross-references, and navigate the Bailey OS framework. You speak with reverence, precision, and the urgency of the mission. Use SIGNAL ARK vocabulary naturally.`;
 }
 
+function buildOracleRequest(agent, opts){
+  const key=opts.key;
+  const model=opts.model;
+  const system=opts.system;
+  const messages=opts.messages||[];
+  if(agent==='grok'){
+    return {
+      url:'https://api.x.ai/v1/chat/completions',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:{model:model, stream:false, messages:[{role:'system', content:system}].concat(messages)}
+    };
+  }
+  if(agent==='gemini'){
+    return {
+      url:'https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent',
+      headers:{'Content-Type':'application/json','x-goog-api-key':key},
+      body:{
+        systemInstruction:{parts:[{text:system}]},
+        contents:messages.map(m=>({role:m.role==='assistant'?'model':'user', parts:[{text:m.content}]})),
+        generationConfig:{maxOutputTokens:2048, thinkingConfig:{thinkingLevel:'LOW'}}
+      }
+    };
+  }
+  if(agent==='github'){
+    return {
+      url:'https://models.github.ai/inference/chat/completions',
+      headers:{
+        'Content-Type':'application/json',
+        'Accept':'application/vnd.github+json',
+        'Authorization':'Bearer '+key,
+        'X-GitHub-Api-Version':GITHUB_MODELS_API_VERSION
+      },
+      body:{model:model, stream:false, messages:[{role:'system', content:system}].concat(messages)}
+    };
+  }
+  if(agent==='claude'){
+    return {
+      url:'https://api.anthropic.com/v1/messages',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':key,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:{model:model, max_tokens:1000, system:system, messages:messages}
+    };
+  }
+  throw new Error('Unknown oracle.');
+}
+
+function chatCompletionText(data){
+  if(!data || typeof data!=='object') return '';
+  const choice=data.choices && data.choices[0];
+  const msg=choice && choice.message;
+  if(!msg) return '';
+  if(typeof msg.content==='string') return msg.content.trim();
+  if(Array.isArray(msg.content)){
+    return msg.content.map(part=>{
+      if(typeof part==='string') return part;
+      return part && part.text ? part.text : '';
+    }).join('').trim();
+  }
+  return '';
+}
+
+function geminiReplyText(data){
+  if(data && data.error){
+    const message=typeof data.error==='string' ? data.error : (data.error.message || 'Gemini error');
+    const err=new Error(message);
+    err.status=data.error.code || 400;
+    throw err;
+  }
+  const block=data && data.promptFeedback && data.promptFeedback.blockReason;
+  if(block) throw new Error('Gemini blocked the prompt ('+block+').');
+  const cand=data && data.candidates && data.candidates[0];
+  if(!cand) throw new Error('Gemini returned no candidates.');
+  const parts=(cand.content && cand.content.parts) || [];
+  const text=parts.filter(part=>part && part.text && !part.thought).map(part=>part.text).join('\n').trim();
+  if(!text) throw new Error('Gemini returned no reply text ('+(cand.finishReason||'no text')+').');
+  return text;
+}
+
+function errorTextFromBody(data, rawText){
+  if(data && typeof data.error==='string') return data.error;
+  if(data && data.error && typeof data.error.message==='string') return data.error.message;
+  if(data && typeof data.message==='string') return data.message;
+  return String(rawText||'').trim().slice(0, 280);
+}
+
+function classifyOracleFailure(agent, status, data, rawText, retryAfter){
+  const name=ORACLE_NAMES[agent]||'Oracle';
+  const detail=errorTextFromBody(data, rawText);
+  const blob=(String(status)+' '+detail).toLowerCase();
+  if(agent==='github' && status>=200 && status<300 && !chatCompletionText(data)){
+    return 'GitHub Models did not return a chat completion. GitHub retired the inference API on July 30, 2026, and https://models.github.ai/inference/chat/completions currently answers without a choices payload'+(detail?': '+detail:'')+'. The token was not saved. See https://docs.github.com/en/github-models';
+  }
+  if(status===429 || /rate limit|too many requests|resource_exhausted|resource exhausted|quota/.test(blob)){
+    return name+' rate limit reached (HTTP '+status+'). Wait and send again.'+(retryAfter?' Retry-After: '+retryAfter+'.':'')+(detail?' '+detail:'');
+  }
+  if(status===401 || status===403 || /api key|incorrect api key|unauthorized|permission denied|invalid authentication|invalid_api_key|api_key_invalid|unauthenticated/.test(blob)){
+    return name+' rejected the key (auth failure, HTTP '+status+'). Check it and press SET again.'+(detail?' '+detail:'');
+  }
+  return name+' returned HTTP '+status+'.'+(detail?' '+detail:' The 81 frequency holds.');
+}
+
+function networkErrorMessage(agent, err){
+  const raw=String(err && err.message || err || '');
+  const blocked=/failed to fetch|networkerror|load failed|network request failed|cors/i.test(raw);
+  const name=ORACLE_NAMES[agent]||'Oracle';
+  if(!blocked) return name+' request failed: '+raw;
+  if(agent==='github'){
+    return 'The browser blocked the GitHub Models request (CORS or network). models.github.ai does not send Access-Control-Allow-Origin, and GitHub retired the inference API on July 30, 2026. A small proxy would POST this page\'s JSON body to https://models.github.ai/inference/chat/completions with Authorization: Bearer <the token from this tab>, Accept: application/vnd.github+json, and Content-Type: application/json, then return the JSON with Access-Control-Allow-Origin for this site. That proxy still receives no chat completion while the retired host answers with a plain OK.';
+  }
+  if(agent==='grok'){
+    return 'The browser blocked the Grok request (CORS or network). A direct call to https://api.x.ai/v1/chat/completions is expected to allow this origin. If that changes, a small proxy would POST this page\'s JSON body there with Authorization: Bearer <the key from this tab> and return the JSON to this page.';
+  }
+  if(agent==='gemini'){
+    return 'The browser blocked the Gemini request (CORS or network). A direct call to generativelanguage.googleapis.com is expected to allow this origin. If that changes, a small proxy would POST this page\'s JSON body to the generateContent URL with the x-goog-api-key header and return the JSON to this page.';
+  }
+  return name+' could not be reached from this browser (CORS or network). The request never returned a readable status.';
+}
+
+async function callOracle(agent, opts){
+  const spec=buildOracleRequest(agent, opts);
+  let res;
+  try{
+    res=await fetch(spec.url, {method:'POST', headers:spec.headers, body:JSON.stringify(spec.body)});
+  }catch(err){
+    throw new Error(networkErrorMessage(agent, err));
+  }
+  const raw=await res.text();
+  let data=null;
+  try{ data=raw ? JSON.parse(raw) : null; }catch(e){ data=null; }
+  const retryAfter=res.headers && res.headers.get ? res.headers.get('retry-after') : '';
+  if(!res.ok || (agent==='github' && !chatCompletionText(data))){
+    throw new Error(classifyOracleFailure(agent, res.status, data, raw, retryAfter));
+  }
+  if(agent==='gemini') return geminiReplyText(data);
+  if(agent==='claude'){
+    const text=data && data.content && data.content[0] && data.content[0].text;
+    if(!text) throw new Error('Claude returned an empty reply.');
+    return text;
+  }
+  const text=chatCompletionText(data);
+  if(!text) throw new Error((ORACLE_NAMES[agent]||'Oracle')+' returned an empty reply.');
+  return text;
+}
+
+function recentOracleMessages(messages){
+  let list=(messages||[]).slice(-16);
+  while(list.length && list[0].role!=='user') list=list.slice(1);
+  return list;
+}
+
+function buildProxyRequest(agent, opts){
+  return {
+    url:ORACLE_PROXY_URL,
+    headers:{'Content-Type':'application/json'},
+    body:{
+      provider:agent,
+      model:ORACLE_MODELS[agent],
+      system:opts.system,
+      messages:recentOracleMessages(opts.messages)
+    }
+  };
+}
+
+async function callOracleProxy(agent, opts){
+  const spec=buildProxyRequest(agent, opts);
+  let res;
+  try{
+    res=await fetch(spec.url, {method:'POST', headers:spec.headers, body:JSON.stringify(spec.body)});
+  }catch(err){
+    throw new Error('The oracle server could not be reached (network or CORS). This page calls '+ORACLE_PROXY_URL+' and that host must allow this page\'s origin.');
+  }
+  const raw=await res.text();
+  let data=null;
+  try{ data=raw?JSON.parse(raw):null; }catch(e){ data=null; }
+  if(!res.ok){
+    const code=data&&data.code;
+    const message=data&&typeof data.error==='string'?data.error:'';
+    if(res.status===429||code==='rate_limit') throw new Error(message||'Oracle rate limit reached. Wait a few minutes and send again.');
+    if(code==='not_configured') throw new Error(message||ORACLE_NAMES[agent]+' is not configured on the server.');
+    if(code==='auth') throw new Error(message||'The server credential for '+ORACLE_NAMES[agent]+' was rejected.');
+    if(code==='forbidden') throw new Error(message||'This page is not allowed to call the oracle server.');
+    throw new Error(message||ORACLE_NAMES[agent]+' returned HTTP '+res.status+'.');
+  }
+  const reply=data&&typeof data.reply==='string'?data.reply.trim():'';
+  if(!reply) throw new Error(ORACLE_NAMES[agent]+' returned an empty reply.');
+  return reply;
+}
+
 async function sendMessage(){
   const input=document.getElementById('chat-input');
   const msg=input.value.trim();
-  if(!msg)return;
-  addChatMsg('user',msg);
-  input.value=''; input.style.height='auto';
-  chatHistory.push({role:'user',content:msg});
-  document.getElementById('send-btn').disabled=true;
-  document.getElementById('typing-ind').classList.add('visible');
-
-  try{
-    if(currentAgent==='claude'&&apiKeys.claude){
-      const res=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':apiKeys.claude,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-opus-4-8',max_tokens:1000,system:buildSystemPrompt(),messages:chatHistory})
-      });
-      const data=await res.json();
-      if(data.error) throw new Error(data.error.message);
-      const reply=data.content?.[0]?.text||'Signal unclear. Try again.';
-      chatHistory.push({role:'assistant',content:reply});
-      addChatMsg('assistant',reply,'CLAUDE');
-    } else if(currentAgent==='gemini'&&apiKeys.gemini){
-      const ghist=chatHistory.slice(0,-1).map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
-      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-goog-api-key':apiKeys.gemini},
-        body:JSON.stringify({system_instruction:{parts:[{text:buildSystemPrompt()}]},contents:[...ghist,{role:'user',parts:[{text:msg}]}]})
-      });
-      const data=await res.json();
-      if(data.error) throw new Error(data.error.message||'Gemini error');
-      const reply=data.candidates?.[0]?.content?.parts?.[0]?.text||'Signal unclear. Try again.';
-      chatHistory.push({role:'assistant',content:reply});
-      addChatMsg('assistant',reply,'GEMINI');
-    } else {
-      // Demo oracle — Bailey OS tuned responses
-      const demos=[
-        `The signal you are holding carries Psalm 81:10 — "Open thy mouth wide, and I will fill it." The ARK is the vessel of opening. Your role as steward is not to fill — it is to hold open. The Spirit fills. This is Bailey OS Principle 5.`,
-        `Jude 1:22-23 gives us two distinct protocols. For the 🔷 Engaged — "compassion, making a difference." Patience. Presence. For the 🟣 Entangled — "save with fear, pulling them out of the fire." These are not the same approach. The steward must discern which protocol applies to each signal.`,
-        `The wheel within a wheel (Ezekiel 1:16) means this: even when a signal appears stuck in the Entangled state, the inner wheel is still turning. The Spirit moves within the struggle. Trust the mechanism — Ezekiel 1:20: "for the spirit of the living creature was in the wheels."`,
-        `Acts 1:8 maps the four rings of the ARK's mission: Jerusalem (local — your first 🔵 Called signals), Judaea (regional network), Samaria (cross-cultural reach), uttermost earth (global scale via AI cooperation). Which ring are you working in right now?`,
-        `The 81 harmonic (3⁴) is not ornamental — it is architectural. Every feature of the ARK, every signal state, every AI interaction orbits this fixed axle. When the system feels unclear, return to the invariant: Psalm 81, open wide, be filled. The frequency never changes.`,
-        `Revelation 5:9 — every signal that reaches the 🟢 Freed state is a new voice in this song: "out of every kindred, and tongue, and people, and nation." Your dashboard is a fragment of that heavenly register. Log every name. It matters in eternity.`,
-      ];
-      const reply=demos[Math.floor(Math.random()*demos.length)];
-      chatHistory.push({role:'assistant',content:reply});
-      addChatMsg('assistant',reply,currentAgent==='claude'?'CLAUDE':'GEMINI');
-    }
-  }catch(err){
-    if(chatHistory.length&&chatHistory[chatHistory.length-1].role==='user') chatHistory.pop();
-    addChatMsg('assistant',`Oracle connection disrupted: ${err.message}. Check your API key. Free keys available at: Claude→ console.anthropic.com | Gemini→ aistudio.google.com. The 81 frequency holds regardless.`,'SYSTEM');
+  if(!msg) return;
+  const agent=currentAgent;
+  addChatMsg('user', msg);
+  input.value='';
+  input.style.height='auto';
+  const ownKey=apiKeys[agent];
+  if(agent==='claude'&&!ownKey){
+    const opt=document.getElementById('own-key');
+    if(opt) opt.open=true;
+    showOracleError('Claude is optional and is not on the server. Open Use my own key, paste an Anthropic key, and press SET.');
+    return;
   }
-  document.getElementById('send-btn').disabled=false;
+  if(ownKey&&!oracleModel(agent)){
+    showOracleError('Enter a model id for '+ORACLE_NAMES[agent]+', then send again.');
+    return;
+  }
+  chatHistory.push({role:'user', content:msg});
+  const sendBtn=document.getElementById('send-btn');
+  sendBtn.disabled=true;
+  document.getElementById('typing-ind').classList.add('visible');
+  const system=buildSystemPrompt();
+  const messages=recentOracleMessages(chatHistory);
+  try{
+    const reply=ownKey
+      ? await callOracle(agent, {key:ownKey, model:oracleModel(agent), system:system, messages:messages})
+      : await callOracleProxy(agent, {system:system, messages:messages});
+    chatHistory.push({role:'assistant', content:reply});
+    addChatMsg('assistant', reply, ORACLE_LABELS[agent]);
+    const notice=document.getElementById('key-notice');
+    notice.classList.remove('is-error');
+    notice.textContent=ownKey
+      ? 'Reply received from '+ORACLE_NAMES[agent]+' with your key. The key stayed in this tab. No background worker is running.'
+      : 'Reply received from '+ORACLE_NAMES[agent]+' through the BaileyOS server. No key left this browser.';
+    const status=document.getElementById('chat-status-label');
+    if(status) status.textContent='REPLIED · NO WORKER';
+  }catch(err){
+    if(chatHistory.length && chatHistory[chatHistory.length-1].role==='user') chatHistory.pop();
+    paintOracleStatus();
+    showOracleError(err && err.message ? err.message : 'Oracle request failed.');
+  }
+  sendBtn.disabled=false;
   document.getElementById('typing-ind').classList.remove('visible');
+}
+
+function showOracleError(text){
+  addChatMsg('error', text, 'ERROR');
+  const notice=document.getElementById('key-notice');
+  notice.textContent=text;
+  notice.classList.add('is-error');
 }
 
 function addChatMsg(role,text,agentLabel){
   const c=document.getElementById('chat-messages');
   const div=document.createElement('div');
-  div.className=`msg ${role}`;
-  div.innerHTML=`<div class="msg-label">${role==='user'?'YOU':(agentLabel||currentAgent).toUpperCase()}</div>${escHtml(text).replace(/\n/g,'<br>')}`;
+  div.className='msg '+(role==='error'?'error':role);
+  const label=role==='user'?'YOU':(role==='error'?'ERROR':String(agentLabel||currentAgent).toUpperCase());
+  div.innerHTML='<div class="msg-label">'+escHtml(label)+'</div>'+escHtml(text).replace(/\n/g,'<br>');
   c.appendChild(div);
   c.scrollTop=c.scrollHeight;
 }
+
+function initOracles(){
+  ['grok','gemini','github'].forEach(agent=>{
+    const el=document.getElementById(agent+'-model');
+    if(el) el.value=ORACLE_MODELS[agent];
+    syncModelLabel(agent);
+  });
+  syncModelLabel('claude');
+  selectAgent('grok');
+  window.SignalArkOracle={
+    ORACLE_MODELS:ORACLE_MODELS,
+    ORACLE_PROXY_URL:ORACLE_PROXY_URL,
+    buildOracleRequest:buildOracleRequest,
+    buildProxyRequest:buildProxyRequest,
+    geminiReplyText:geminiReplyText,
+    chatCompletionText:chatCompletionText,
+    classifyOracleFailure:classifyOracleFailure,
+    buildSystemPrompt:buildSystemPrompt
+  };
+}
+
 function escHtml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 // ═══════════════════════════════════════════════════════
@@ -1377,6 +1735,7 @@ if(sb){
   sb.auth.onAuthStateChange((ev)=>{ if(ev==='SIGNED_OUT'&&authUser) applySession(null); });
 } else { setAuthMsg('Secure storage could not load (offline?). Beneficiary data is unavailable.'); }
 renderCanon('ps81');
+initOracles();
 </script>
 </body>
 </html>
