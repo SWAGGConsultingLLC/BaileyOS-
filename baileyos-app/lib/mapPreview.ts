@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const MAP_TITLE = 'BaileyOS by SWAGG Consulting';
-export const MAP_DESCRIPTION = 'BaileyOS is the neighborhood map from SWAGG Consulting. Share a rough area, see a place after three phones check in, and add your voice to Question #001 in 360° Brewing.';
+export const MAP_DESCRIPTION = 'BaileyOS is the neighborhood map from SWAGG Consulting. Sign in and check in to see pins in your neighborhood, and add your voice to Question #001 in 360° Brewing.';
 export const MAP_IMAGE_PATH = '/brew/question-001.png?v=2';
 
 const PUBLIC_HOSTS = new Set([

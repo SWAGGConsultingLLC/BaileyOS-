@@ -16,8 +16,11 @@ test('the public map header does not show the steward mark and links to Question
   assert.match(src, /Show my name and photo/);
   assert.match(src, /Remove my name and photo/);
   assert.match(src, /People on this map/);
+  assert.match(src, /neighborhood you have checked into/);
+  assert.match(src, /Logged-out visitors see no pins/);
   assert.equal(src.includes('Phones on this map'), false);
   assert.equal(src.includes('3 different phones'), false);
+  assert.equal(src.includes('three phones'), false);
   const signIn = src.indexOf('Sign in with 360° Brewing');
   const headline = src.indexOf('Show up. Get placed.');
   assert.ok(signIn > 0 && headline > signIn);

@@ -4,9 +4,10 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CONFIG } from '@/lib/config';
 import type { CheckInCard } from '@/lib/checkInProfile';
+import type { PublicPin } from '@/lib/crowd';
 import { hexCenter, jitterInHex, type MapViewBox } from '@/lib/neighborhood';
 
-export type NeighborhoodPin = { hex: string; cards: CheckInCard[] };
+export type NeighborhoodPin = { hex: string; pins: PublicPin[] };
 type MinePin = { h3: string };
 type Props = {
   neighborhoods: NeighborhoodPin[];
@@ -57,10 +58,12 @@ export default function MapView({ neighborhoods, mine, focusHex, frameKey, onBou
     if (!g) return;
     g.clearLayers();
     for (const area of neighborhoods) {
-      try {
-        L.circleMarker(jitterInHex(area.hex), { radius: 4, color: '#22d3ee', weight: 0, fillColor: '#22d3ee', fillOpacity: 0.8, interactive: false }).addTo(g);
-        for (const card of area.cards) namedPin(jitterInHex(area.hex), card).addTo(g);
-      } catch { /* a bad hex is skipped */ }
+      for (const pin of area.pins ?? []) {
+        try {
+          if (pin.name) namedPin(jitterInHex(area.hex), { name: pin.name, photo: pin.photo, profileUrl: pin.profileUrl }).addTo(g);
+          else L.circleMarker(jitterInHex(area.hex), { radius: 6, color: '#22d3ee', weight: 0, fillColor: '#22d3ee', fillOpacity: 0.85, interactive: false }).addTo(g);
+        } catch { /* a bad hex is skipped */ }
+      }
     }
     if (mine?.h3) {
       try {
