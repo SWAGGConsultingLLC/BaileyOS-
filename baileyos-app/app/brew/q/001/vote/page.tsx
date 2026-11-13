@@ -5,12 +5,26 @@ import { createClient } from '@supabase/supabase-js';
 import { BackToMap } from '@/components/BackToMap';
 import { BrewLogo } from '@/components/BrewLogo';
 import { linkedInReturnInProgress, prepareSuiteHref } from '@/components/SuiteEntrance';
-import { BREW_RETURN_KEY, QUESTION_PROMPT, QUESTION_VOTE_PATH, VOTE_OPTIONS, voteLabel, type PublicTally, type VoteOption } from '@/lib/brew/question001';
+import { BREW_RETURN_KEY, QUESTION_PROMPT, QUESTION_VOTE_PATH, VOTE_OPTIONS, closedQuestionMessage, questionIsClosed, voteLabel, votingClosesMessage, type PublicResults, type PublicTally, type VoteOption } from '@/lib/brew/question001';
 import { suiteConfig } from '@/lib/suite/verify';
 
 type Mine = { option: VoteOption | null; label: string | null };
 
 const LINKEDIN_VOTE = 'Voting needs a LinkedIn sign-in. These choices sign you in with LinkedIn and bring you back to this question.';
+
+function applyWindow(body: Partial<PublicResults>, setClosed: (value: boolean) => void, setWindowMessage: (value: string) => void) {
+  if (typeof body.closes_at !== 'string' && body.closed !== true) return;
+  const closesAt = typeof body.closes_at === 'string' ? body.closes_at : null;
+  const isClosed = body.closed === true || questionIsClosed(closesAt);
+  setClosed(isClosed);
+  if (typeof body.message === 'string' && body.message) {
+    setWindowMessage(body.message);
+  } else if (isClosed) {
+    setWindowMessage(closedQuestionMessage(closesAt));
+  } else if (closesAt) {
+    setWindowMessage(votingClosesMessage(closesAt));
+  }
+}
 
 export default function QuestionVote() {
   const [tally, setTally] = useState<PublicTally | null>(null);
@@ -19,11 +33,15 @@ export default function QuestionVote() {
   const [href, setHref] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [closed, setClosed] = useState(false);
+  const [windowMessage, setWindowMessage] = useState('');
 
   useEffect(() => {
     let cancel = false;
     fetch('/api/brew/q/001/results', { cache: 'no-store' }).then(res => res.json()).then(body => {
-      if (!cancel && typeof body.total === 'number' && Array.isArray(body.options)) setTally(body);
+      if (cancel) return;
+      if (typeof body.total === 'number' && Array.isArray(body.options)) setTally(body);
+      applyWindow(body, setClosed, setWindowMessage);
     }).catch(() => undefined);
     if (!linkedInReturnInProgress(window.location.href)) {
       prepareSuiteHref(window.location.origin + '/suite').then(ready => {
@@ -81,30 +99,50 @@ export default function QuestionVote() {
       setNotice(LINKEDIN_VOTE);
       return;
     }
+    if (res.status === 409 || body.closed) {
+      const closesAt = typeof body.closes_at === 'string' ? body.closes_at : null;
+      setClosed(true);
+      setWindowMessage(typeof body.error === 'string' ? body.error : closedQuestionMessage(closesAt));
+      setNotice('');
+      const results = await fetch('/api/brew/q/001/results', { cache: 'no-store' }).then(item => item.json()).catch(() => null);
+      if (results && typeof results.total === 'number') {
+        setTally(results);
+        applyWindow(results, setClosed, setWindowMessage);
+      }
+      return;
+    }
     if (!res.ok || !body.option) {
       setNotice('The vote could not be recorded.');
       return;
     }
     setMine({ option: body.option, label: body.label });
     const results = await fetch('/api/brew/q/001/results', { cache: 'no-store' }).then(item => item.json()).catch(() => null);
-    if (results && typeof results.total === 'number') setTally(results);
+    if (results && typeof results.total === 'number') {
+      setTally(results);
+      applyWindow(results, setClosed, setWindowMessage);
+    }
   }
+
+  const showChoices = !closed && !mine?.option;
 
   return (
     <main className="mx-auto max-w-xl px-4 py-10">
       <BrewLogo />
       <h1 className="mt-2 text-3xl font-bold">Question #001</h1>
       <p className="mt-4 text-lg text-gray-200">{QUESTION_PROMPT}</p>
+      {windowMessage && (
+        <p className="mt-4 text-lg font-semibold text-amber-50" role="status">{windowMessage}</p>
+      )}
       {mine?.option && (
         <p className="mt-4 text-lg font-semibold text-amber-50" role="status">Your vote is recorded. {mine.label ?? voteLabel(mine.option)}</p>
       )}
-      {!mine?.option && (needsLinkedIn || notice) && (
+      {showChoices && (needsLinkedIn || notice) && (
         <div className="mt-6 rounded-xl border-2 border-amber-200 bg-amber-950 px-4 py-4 text-lg font-semibold text-amber-50" role={notice ? 'alert' : 'status'}>
           {needsLinkedIn && <p>{LINKEDIN_VOTE}</p>}
           {notice && notice !== LINKEDIN_VOTE && <p className={needsLinkedIn ? 'mt-2' : ''}>{notice}</p>}
         </div>
       )}
-      {!mine?.option && (
+      {showChoices && (
         <div className="mt-6 space-y-3">
           {VOTE_OPTIONS.map(item => needsLinkedIn ? (
             <a key={item.option} href={href ?? undefined} onClick={() => sessionStorage.setItem(BREW_RETURN_KEY, QUESTION_VOTE_PATH)} className={`flex min-h-12 items-center rounded-lg bg-white px-4 font-semibold text-black ${href ? '' : 'pointer-events-none opacity-60'}`}>

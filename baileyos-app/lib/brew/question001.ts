@@ -62,3 +62,48 @@ export function assertNoIdentity(value: unknown): void {
     if (text.includes(`"${key}"`)) throw new Error(`identity field ${key}`);
   }
 }
+
+export type QuestionWindow = {
+  opensAt: string | null;
+  closesAt: string | null;
+  closed: boolean;
+};
+
+export type PublicResults = PublicTally & {
+  closed: boolean;
+  opens_at: string | null;
+  closes_at: string | null;
+  message: string;
+};
+
+export function questionIsClosed(closesAt: string | null | undefined, now = new Date()): boolean {
+  if (!closesAt) return false;
+  const close = new Date(closesAt);
+  if (Number.isNaN(close.getTime())) return false;
+  return now.getTime() >= close.getTime();
+}
+
+export function formatQuestionDate(iso: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Denver',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(iso));
+}
+
+export function closedQuestionMessage(closesAt?: string | null): string {
+  if (closesAt && !Number.isNaN(new Date(closesAt).getTime())) {
+    return `This question closed on ${formatQuestionDate(closesAt)}. Final results are below.`;
+  }
+  return 'This question is closed. Final results are below.';
+}
+
+export function votingClosesMessage(closesAt: string): string {
+  return `Voting closes ${formatQuestionDate(closesAt)}`;
+}
+
+export function questionStatusMessage(window: QuestionWindow): string {
+  if (!window.closesAt) return '';
+  return window.closed ? closedQuestionMessage(window.closesAt) : votingClosesMessage(window.closesAt);
+}
