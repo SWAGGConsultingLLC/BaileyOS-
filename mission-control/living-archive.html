@@ -242,7 +242,7 @@
   <div class="modal-header">
     <div>
       <div class="modal-title"><span class="live-dot"></span>ARK VERIFICATION BACKEND</div>
-      <div class="modal-sub">SUPABASE · age_verifications + ark_entries · SWAGGCONSULTING.COM/ARK · ZERO PII</div>
+      <div class="modal-sub">SUPABASE · age_gate_public + ark_entries · SWAGGCONSULTING.COM/ARK · ZERO PII · 28 DAYS</div>
     </div>
     <button class="modal-close" onclick="toggleAdmin()">✕ CLOSE</button>
   </div>
@@ -382,41 +382,38 @@ function bootLive(){
   if(!window.supabase){setTimeout(bootLive,500);return;}
   db=window.supabase.createClient(SB_URL,SB_KEY);
 
-  // Try age_verifications first (swaggconsulting schema)
-  db.from('age_verifications').select('*',{count:'exact',head:true}).then(({count,error})=>{
-    if(!error){counts.total=count||0;updateCounts();}
-  });
-  db.from('age_verifications').select('*',{count:'exact',head:true}).eq('verified',true).then(({count,error})=>{
-    if(!error){counts.verified=count||0;updateCounts();}
-  });
-  db.from('age_verifications').select('*',{count:'exact',head:true}).eq('verified',false).then(({count,error})=>{
-    if(!error){counts.declined=count||0;updateCounts();}
-  });
-  // Also check ark_verifications as fallback
-  db.from('ark_verifications').select('*',{count:'exact',head:true}).then(({count,error})=>{
-    if(!error&&(count||0)>counts.total){counts.total=count||0;updateCounts();}
-  }).catch(()=>{});
-  // ark_entries count
-  db.from('ark_entries').select('*',{count:'exact',head:true}).then(({count})=>{
+  refreshAgeCounts();
+  db.from('ark_entries').select('id',{count:'exact',head:true}).then(({count})=>{
     document.getElementById('m-entries').textContent=count||'0';
   }).catch(()=>{});
 
-  // Realtime — age_verifications
-  db.channel('public:age_verifications')
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'age_verifications'},(payload)=>{
-      const r=payload.new; counts.total++;
-      if(r.verified){counts.verified++;eventQueue.push('verified');playPulse();}
-      else{counts.declined++;eventQueue.push('declined');playDecline();}
-      updateCounts();flashEvent(r);
-      if(adminOpen&&activeTab==='agv'){allRecords.agv.unshift(r);renderTable();setTimeout(()=>{const f=document.querySelector('.rec-row');if(f)f.classList.add('nf');},50);}
-    }).subscribe(s=>setLiveDot(s==='SUBSCRIBED'?'live':'connect'));
+  // age_gate_public is a view, so it has no realtime. Refresh counts on a timer.
+  setLiveDot('live');
+  if(document.getElementById('rt-status')){
+    const rt=document.getElementById('rt-status');
+    rt.textContent='REFRESH 30s';
+    rt.style.color='rgba(201,148,58,0.85)';
+  }
+  setInterval(function(){
+    refreshAgeCounts();
+    if(adminOpen&&activeTab==='agv') loadRecords();
+  }, 30000);
+}
 
-  // Realtime — ark_verifications (fallback)
-  db.channel('public:ark_verifications')
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'ark_verifications'},(payload)=>{
-      const r=payload.new; const v=r.boolean_decision;
-      if(counts.total===0){counts.total++;if(v)counts.verified++;else counts.declined++;updateCounts();flashEvent({...r,verified:v,source:r.content_category||'ark'});}
-    }).subscribe();
+const AGE_GATE_PUBLIC_COLS='id, verified, verified_at, source, event';
+
+function refreshAgeCounts(){
+  if(!db)return;
+  db.from('age_gate_public').select('id',{count:'exact',head:true}).then(({count,error})=>{
+    if(!error){counts.total=count||0;updateCounts();setLiveDot('live');}
+    else setLiveDot('offline');
+  }).catch(()=>setLiveDot('offline'));
+  db.from('age_gate_public').select('id',{count:'exact',head:true}).eq('verified',true).then(({count,error})=>{
+    if(!error){counts.verified=count||0;updateCounts();}
+  });
+  db.from('age_gate_public').select('id',{count:'exact',head:true}).eq('verified',false).then(({count,error})=>{
+    if(!error){counts.declined=count||0;updateCounts();}
+  });
 }
 document.addEventListener('DOMContentLoaded',bootLive);
 
@@ -525,12 +522,8 @@ async function loadRecords(){
   list.innerHTML='<div class="panel-loading">◌ FETCHING…</div>';
   try{
     if(activeTab==='agv'){
-      let{data,error}=await db.from('age_verifications').select('*').order('verified_at',{ascending:false}).limit(500);
-      if(error||!data?.length){
-        // fallback to ark_verifications
-        const fb=await db.from('ark_verifications').select('*').order('created_at',{ascending:false}).limit(500);
-        if(!fb.error) data=(fb.data||[]).map(r=>({...r,verified:r.boolean_decision,verified_at:r.created_at,source:r.content_category||'bailey-oasis'}));
-      }
+      let{data,error}=await db.from('age_gate_public').select(AGE_GATE_PUBLIC_COLS).order('verified_at',{ascending:false}).limit(500);
+      if(error) throw error;
       allRecords.agv=data||[];
     } else {
       const{data,error}=await db.from('ark_entries').select('*').order('created_at',{ascending:false}).limit(500);
@@ -552,7 +545,7 @@ function showDetail(r){
     <div class="df"><div class="df-label">VERIFIED AT</div><div class="df-val">${r.verified_at?new Date(r.verified_at).toLocaleString():'—'}</div></div>
     <div class="df"><div class="df-label">SOURCE</div><div class="df-val gold">${escHtml((r.source||'—').toUpperCase())}</div></div>
     <div class="df"><div class="df-label">RECORD ID</div><div class="df-val">${escHtml(r.id||'—')}</div></div>
-    ${r.token_hash?`<div class="df full"><div class="df-label">TOKEN HASH</div><div class="df-val">${escHtml(r.token_hash)}</div></div>`:''}`;
+    <div class="df"><div class="df-label">EVENT</div><div class="df-val">${escHtml(r.event||'—')}</div></div>`;
   } else {
     const cfg=TAG_CFG[r.tag]||{cls:'tag-arch',label:(r.tag||'—').toUpperCase()};
     fields=`<div class="df"><div class="df-label">TAG</div><div class="df-val"><span class="tag-pill ${cfg.cls}">${escHtml(cfg.label)}</span></div></div>
@@ -568,11 +561,11 @@ function closeDetail(){ document.getElementById('rec-detail').classList.remove('
 function exportCSV(tab){
   const data=allRecords[tab]||[];
   if(!data.length){loadRecords().then(()=>exportCSV(tab));return;}
-  const cols=Object.keys(data[0]);
+  const cols=tab==='agv'?['id','verified','verified_at','source','event']:Object.keys(data[0]);
   const csv=[cols.join(','),...data.map(r=>cols.map(c=>'"'+String(r[c]??'').replace(/"/g,'""')+'"').join(','))].join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download=(tab==='agv'?'age_verifications':'ark_entries')+'.csv'; a.click();
+  a.download=(tab==='agv'?'age_gate_public':'ark_entries')+'.csv'; a.click();
 }
 
 // Original UI

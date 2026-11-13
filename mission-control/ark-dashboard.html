@@ -177,7 +177,7 @@
   This log contains <strong>no personal information</strong> — no names, emails, dates of birth,
   IP addresses, or identifying data of any kind. Verification events record only a
   <strong>yes/no result</strong> and a <strong>timestamp</strong>.
-  All records are automatically deleted after <strong>30 days</strong>.
+  All records are automatically deleted after <strong>28 days</strong>.
 </div>
 
 <div class="section">
@@ -196,7 +196,7 @@
 
 <footer>
   <p>Bailey ARK &mdash; <a href="https://swaggconsulting.com" target="_blank">SWAGG Consulting LLC</a> &mdash; 81OS</p>
-  <p style="margin-top:0.3rem">Records auto-delete after 30 days &bull; No PII ever stored</p>
+  <p style="margin-top:0.3rem">Records auto-delete after 28 days &bull; No PII ever stored</p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -217,7 +217,7 @@
 
   async function countExact(table, applyFilter) {
     if (!db) return null;
-    var q = db.from(table).select('*', { count: 'exact', head: true });
+    var q = db.from(table).select('id', { count: 'exact', head: true });
     if (applyFilter) q = applyFilter(q);
     var result = await q;
     if (result.error) return null;
@@ -251,13 +251,8 @@
 
   async function loadStats() {
     try {
-      var total = await countExact('age_verifications');
-      var fallback = await countExact('ark_verifications');
-      if (total === null || (fallback !== null && fallback > total)) total = fallback || 0;
-      var verified = await countExact('age_verifications', function (q) { return q.eq('verified', true); });
-      if (verified === null) {
-        verified = await countExact('ark_verifications', function (q) { return q.eq('boolean_decision', true); }) || 0;
-      }
+      var total = await countExact('age_gate_public');
+      var verified = await countExact('age_gate_public', function (q) { return q.eq('verified', true); });
       var entries = await countExact('ark_entries');
       var deployed = await countExact('ark_entries', function (q) { return q.eq('tag', 'deploy'); });
       animateNum('stat-verifications', total || 0);
@@ -301,13 +296,9 @@
   async function loadVerifications() {
     var wrap = document.getElementById('verif-log');
     try {
-      var primary = await db.from('age_verifications').select('*').order('verified_at', { ascending: false }).limit(20);
-      var rows = (!primary.error && primary.data && primary.data.length) ? primary.data : null;
-      if (!rows) {
-        var fb = await db.from('ark_verifications').select('*').order('created_at', { ascending: false }).limit(20);
-        rows = fb.data || [];
-      }
-      renderVerifRows(rows);
+      var primary = await db.from('age_gate_public').select('id, verified, verified_at, source, event').order('verified_at', { ascending: false }).limit(20);
+      if (primary.error) throw primary.error;
+      renderVerifRows(primary.data || []);
     } catch (e) {
       wrap.innerHTML = '<div class="ark-empty">Could not load verification events.</div>';
     }
@@ -340,26 +331,22 @@
     }
   }
 
-  // ── Realtime: same combined channels as Signal Finder ───────────────────────
+  // age_gate_public is a view, so it has no realtime. Refresh the yes/no log on a timer.
+  // ark_entries is still a table and can keep a realtime subscribe.
   function subscribeRealtime() {
-    db.channel('public:age_verifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'age_verifications' }, function (payload) {
-        prependVerification(payload.new);
-        loadStats();
-      })
-      .subscribe();
-    db.channel('public:ark_verifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ark_verifications' }, function (payload) {
-        prependVerification(payload.new);
-        loadStats();
-      })
-      .subscribe();
     db.channel('public:ark_entries')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ark_entries' }, function () {
         loadEntries();
         loadStats();
       })
       .subscribe();
+  }
+
+  function startPeriodicRefresh() {
+    setInterval(function () {
+      loadStats();
+      loadVerifications();
+    }, 30000);
   }
 
   function prependVerification(raw) {
@@ -385,6 +372,7 @@
     loadVerifications();
     loadEntries();
     subscribeRealtime();
+    startPeriodicRefresh();
   }
   bootArk();
 </script>
