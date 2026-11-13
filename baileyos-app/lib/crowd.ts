@@ -1,58 +1,52 @@
 import type { CheckInCard } from './checkInProfile';
 
-/** A neighborhood is shown after this many different phones in the window. */
-export const CROWD_MIN = 3;
-export const CROWD_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-
-export type CrowdRow = {
-  hex: string;
-  phoneKey: string | null;
-  at: number;
-  card?: CheckInCard | null;
-};
-
 export type PublicNeighborhood = {
   hex: string;
-  phones: number;
   cards: CheckInCard[];
 };
 
 export type PublicPlacements = {
-  phones: number | null;
+  people: number;
   neighborhoods: PublicNeighborhood[];
   zoom_in: boolean;
 };
 
-/**
- * Count distinct phones, not rows. A missing phone marker is a kept historical
- * check-in and does not count. Cards are included only inside a neighborhood
- * that meets the crowd rule.
- */
-export function publicNeighborhoods(rows: CrowdRow[], onScreen: ReadonlySet<string>, now: number): PublicPlacements {
-  const cutoff = now - CROWD_WINDOW_MS;
-  const grouped = new Map<string, { phones: Set<string>; cards: Map<string, { at: number; card: CheckInCard }> }>();
-  for (const row of rows) {
-    if (!row.phoneKey || row.at < cutoff || !onScreen.has(row.hex)) continue;
-    const group = grouped.get(row.hex) ?? { phones: new Set<string>(), cards: new Map() };
-    group.phones.add(row.phoneKey);
-    if (row.card && (group.cards.get(row.phoneKey)?.at ?? -1) < row.at) {
-      group.cards.set(row.phoneKey, { at: row.at, card: row.card });
-    }
-    grouped.set(row.hex, group);
-  }
+function cardFromUnknown(value: unknown): CheckInCard | null {
+  if (!value || typeof value !== 'object') return null;
+  const row = value as { name?: unknown; photo?: unknown; profileUrl?: unknown };
+  if (typeof row.name !== 'string' || row.name.length < 1) return null;
+  const photo = typeof row.photo === 'string' && row.photo.startsWith('https://') ? row.photo : null;
+  const profileUrl = typeof row.profileUrl === 'string' && row.profileUrl.startsWith('https://') ? row.profileUrl : null;
+  return { name: row.name, photo, profileUrl };
+}
+
+/** Shape returned to the map. Anonymous pins are not included. */
+export function publicMapBody(input: {
+  people: unknown;
+  neighborhoods: unknown;
+  zoom_in: boolean;
+}): PublicPlacements {
+  const people = typeof input.people === 'number' && Number.isFinite(input.people) && input.people >= 0
+    ? Math.floor(input.people)
+    : 0;
   const neighborhoods: PublicNeighborhood[] = [];
-  let phones = 0;
-  for (const [hex, group] of grouped) {
-    if (group.phones.size < CROWD_MIN) continue;
-    phones += group.phones.size;
-    neighborhoods.push({
-      hex,
-      phones: group.phones.size,
-      cards: [...group.cards.values()].map(item => item.card),
-    });
+  if (Array.isArray(input.neighborhoods)) {
+    for (const item of input.neighborhoods) {
+      if (!item || typeof item !== 'object') continue;
+      const row = item as { hex?: unknown; cards?: unknown };
+      if (typeof row.hex !== 'string' || !/^[0-9a-f]{15}$/.test(row.hex)) continue;
+      const cards = Array.isArray(row.cards)
+        ? row.cards.flatMap(card => {
+            const parsed = cardFromUnknown(card);
+            return parsed ? [parsed] : [];
+          })
+        : [];
+      if (cards.length === 0) continue;
+      neighborhoods.push({ hex: row.hex, cards });
+    }
   }
   neighborhoods.sort((a, b) => a.hex.localeCompare(b.hex));
-  return { phones, neighborhoods, zoom_in: false };
+  return { people, neighborhoods, zoom_in: input.zoom_in === true };
 }
 
 export function ownerPlacementBody(input: {
