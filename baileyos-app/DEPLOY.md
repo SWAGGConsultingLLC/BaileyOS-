@@ -40,7 +40,7 @@ The public map settings and the public Supabase address are in `.env.local.examp
 | --- | --- |
 | `CRON_SECRET` | A password for the cleanup address `/api/retention`. The database already deletes old rows on a schedule, so you can leave this blank. |
 | `DEDUPE_WINDOW_HOURS` | Hours before the same device can place again. Blank uses 24. |
-| `RETENTION_DAYS` | How many days a placement is kept. Blank uses 90. |
+| `RETENTION_DAYS` | How many days a placement is kept. Blank uses 28. |
 
 Apply the variables to **Production**. Add the same ones to **Preview** if you want Vercel’s preview links to work too.
 

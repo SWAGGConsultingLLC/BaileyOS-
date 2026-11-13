@@ -10,6 +10,8 @@ test('the map preview describes the business in plain words', () => {
   assert.match(MAP_DESCRIPTION, /BaileyOS/);
   assert.match(MAP_DESCRIPTION, /Question #001/);
   assert.match(MAP_DESCRIPTION, /360° Brewing/);
+  assert.match(MAP_DESCRIPTION, /your neighborhood/);
+  assert.equal(/three phones/i.test(MAP_DESCRIPTION), false);
   assert.equal(MAP_DESCRIPTION.includes('81ABSCS81'), false);
   assert.equal(/steward/i.test(MAP_DESCRIPTION), false);
   assert.equal(MAP_TITLE.includes('81ABSCS81'), false);

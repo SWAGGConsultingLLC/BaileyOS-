@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test lib/account.test.ts lib/placeRequest.test.ts lib/suite/verify.test.ts lib/steward/decide.test.ts lib/steward/report.test.ts lib/identity.test.ts lib/brew/question.test.ts lib/homeHeader.test.ts lib/checkInProfile.test.ts lib/neighborhood.test.ts lib/mapPreview.test.ts lib/visit.test.ts lib/ageGateLog.test.ts",
+    "test": "tsx --test lib/account.test.ts lib/placeRequest.test.ts lib/suite/verify.test.ts lib/steward/decide.test.ts lib/steward/report.test.ts lib/identity.test.ts lib/brew/question.test.ts lib/homeHeader.test.ts lib/checkInProfile.test.ts lib/neighborhood.test.ts lib/mapPreview.test.ts lib/mapVisibility.test.ts lib/visit.test.ts lib/ageGateLog.test.ts",
     "test:brew": "bash tests/brew/run.sh",
     "test:steward": "bash tests/steward-authority/run.sh",
     "test:rls": "bash tests/rls/run.sh"

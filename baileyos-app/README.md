@@ -28,8 +28,8 @@ An account is optional. Without `NEXT_PUBLIC_SUPABASE_ANON_KEY`, the account for
 - Rate limiting is in-memory. On serverless or several instances, replace `lib/rateLimit.ts` with Redis/Upstash.
 - Linking a placement to a desk account is explicit and reversible, but while linked, the account is associated with a 5 km cell. The link token comes from the placement response. The same email does not attach an old placement.
 - A member profile stores a display name and an optional short bio. Other people and anonymous visitors cannot read it. It does not grant a role.
-- Retention: `purge_old_placements(90)` deletes old rows and clears dangling links; the total stays. Schedule it with pg_cron (see the end of the migration) or call `POST /api/retention` with `Authorization: Bearer $CRON_SECRET` daily.
+- Retention: check-ins older than 28 days are removed. The Compass schedule calls `purge_old_placements(28)`. `POST /api/retention` with `Authorization: Bearer $CRON_SECRET` uses `RETENTION_DAYS`, or 28 when that variable is blank.
 - Secret rotation: changing `PLACEMENT_SECRET` changes every future dedupe key, so people can place once more in the current window. Rotate on a quiet boundary. Link tokens also change, so existing links can't be extended.
 
 ## Status
-Migration and a daily pg_cron purge (03:17 UTC, 90 days) are already applied to the BaileyOS Signal Finder Compass project. Use `.env.local.example` and fill in the service-role key and PLACEMENT_SECRET.
+Migration and a daily pg_cron purge (03:17 UTC, 28 days) are already applied to the BaileyOS Signal Finder Compass project. Use `.env.local.example` and fill in the service-role key and PLACEMENT_SECRET.

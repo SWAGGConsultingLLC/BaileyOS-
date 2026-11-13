@@ -1,8 +1,14 @@
 import type { CheckInCard } from './checkInProfile';
 
+export type PublicPin = {
+  name: string | null;
+  photo: string | null;
+  profileUrl: string | null;
+};
+
 export type PublicNeighborhood = {
   hex: string;
-  cards: CheckInCard[];
+  pins: PublicPin[];
 };
 
 export type PublicPlacements = {
@@ -11,16 +17,17 @@ export type PublicPlacements = {
   zoom_in: boolean;
 };
 
-function cardFromUnknown(value: unknown): CheckInCard | null {
+function pinFromUnknown(value: unknown): PublicPin | null {
   if (!value || typeof value !== 'object') return null;
   const row = value as { name?: unknown; photo?: unknown; profileUrl?: unknown };
-  if (typeof row.name !== 'string' || row.name.length < 1) return null;
-  const photo = typeof row.photo === 'string' && row.photo.startsWith('https://') ? row.photo : null;
-  const profileUrl = typeof row.profileUrl === 'string' && row.profileUrl.startsWith('https://') ? row.profileUrl : null;
-  return { name: row.name, photo, profileUrl };
+  if (row.name != null && typeof row.name !== 'string') return null;
+  const name = typeof row.name === 'string' && row.name.trim().length > 0 ? row.name : null;
+  const photo = name && typeof row.photo === 'string' && row.photo.startsWith('https://') ? row.photo : null;
+  const profileUrl = name && typeof row.profileUrl === 'string' && row.profileUrl.startsWith('https://') ? row.profileUrl : null;
+  return { name, photo, profileUrl };
 }
 
-/** Shape returned to the map. Anonymous pins are not included. */
+/** Shape returned to the map. Anonymous pins stay, without a name or photo. */
 export function publicMapBody(input: {
   people: unknown;
   neighborhoods: unknown;
@@ -33,16 +40,17 @@ export function publicMapBody(input: {
   if (Array.isArray(input.neighborhoods)) {
     for (const item of input.neighborhoods) {
       if (!item || typeof item !== 'object') continue;
-      const row = item as { hex?: unknown; cards?: unknown };
+      const row = item as { hex?: unknown; pins?: unknown };
       if (typeof row.hex !== 'string' || !/^[0-9a-f]{15}$/.test(row.hex)) continue;
-      const cards = Array.isArray(row.cards)
-        ? row.cards.flatMap(card => {
-            const parsed = cardFromUnknown(card);
-            return parsed ? [parsed] : [];
-          })
+      const pins = Array.isArray(row.pins)
+        ? row.pins.flatMap(pin => {
+          const parsed = pinFromUnknown(pin);
+          return parsed ? [parsed] : [];
+        })
         : [];
-      if (cards.length === 0) continue;
-      neighborhoods.push({ hex: row.hex, cards });
+      if (pins.length === 0) continue;
+      pins.sort((a, b) => (a.name ?? '\uffff').localeCompare(b.name ?? '\uffff'));
+      neighborhoods.push({ hex: row.hex, pins });
     }
   }
   neighborhoods.sort((a, b) => a.hex.localeCompare(b.hex));

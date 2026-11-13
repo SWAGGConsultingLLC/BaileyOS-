@@ -60,6 +60,7 @@ export default function Home() {
   const [zoomIn, setZoomIn] = useState(false);
   const [focusHex, setFocusHex] = useState<string | null>(null);
   const boundsRef = useRef<MapViewBox | null>(null);
+  const requestId = useRef(0);
   const [mine, setMine] = useState<Mine | null>(null);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
@@ -88,9 +89,16 @@ export default function Home() {
     const q = new URLSearchParams({
       west: view.west.toFixed(2), south: view.south.toFixed(2), east: view.east.toFixed(2), north: view.north.toFixed(2),
     });
+    const request = ++requestId.current;
+    const token = await suiteAccessToken();
+    if (request !== requestId.current) return;
+    if (!token) setNeighborhoods([]);
     try {
-      const r = await fetch(`/api/placements?${q}`, { cache: 'no-store' });
-      if (!r.ok) return;
+      const r = await fetch(`/api/placements?${q}`, {
+        cache: 'no-store',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (request !== requestId.current || !r.ok) return;
       const j = await r.json();
       setNeighborhoods(Array.isArray(j.neighborhoods) ? j.neighborhoods : []);
       setPeople(typeof j.people === 'number' ? j.people : 0);
@@ -131,6 +139,8 @@ export default function Home() {
     } catch { /* a stored pin that cannot be read stays off the map */ }
     load(); const i = setInterval(load, 30000); return () => clearInterval(i);
   }, [load]);
+
+  useEffect(() => { void load(); }, [load, suiteSignedIn]);
 
   useEffect(() => {
     let cancel = false;
@@ -238,13 +248,13 @@ export default function Home() {
         <a className="mt-4 inline-flex min-h-12 items-center rounded-lg bg-white px-4 font-semibold text-black" href="/brew/q/001">Answer Question #001</a>
       </section>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border-2 border-goldx/70"><MapView neighborhoods={neighborhoods} mine={mine} focusHex={focusHex} frameKey={frameKey} onBounds={onBounds} /></div>
+      <div className="mt-5 overflow-hidden rounded-2xl border-2 border-goldx/70"><MapView neighborhoods={neighborhoods} mine={suiteSignedIn ? mine : null} focusHex={focusHex} frameKey={frameKey} onBounds={onBounds} /></div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <button onClick={() => setFrameKey(k => k + 1)} className="text-xs font-bold tracking-widest text-cyanx">Frame my area</button>
         <span className="text-right text-xs tracking-widest text-gray-500">{zoomIn ? `Zoom in to see names. People on this map: ${people}` : `People on this map: ${people}`}</span>
       </div>
-      <div className="mt-1 text-2xl font-bold text-white">{mine ? 'Your area is one neighborhood, about 2.5 km across.' : 'No area shared yet'}</div>
+      <div className="mt-1 text-2xl font-bold text-white">{suiteSignedIn && mine ? 'Your area is one neighborhood, about 2.5 km across.' : 'No area shared yet'}</div>
       <p className="mt-1 text-gray-400">Nothing is saved until you sign in and tap Share my place. The browser asks for your location only then.</p>
 
       {suiteSignedIn ? (
@@ -261,7 +271,7 @@ export default function Home() {
       {suiteSignedIn && mine?.show_linkedin && (
         <button type="button" onClick={removeLinkedIn} className="mt-2 min-h-11 font-semibold text-gray-300 underline">Remove my name and photo</button>
       )}
-      <p className="mt-2 text-xs text-gray-500">The count is signed-in people who have checked in. A name and photo appear only when that person chooses to share them. The same person has one place on the map; a new check-in moves that place.</p>
+      <p className="mt-2 text-xs text-gray-500">The count is signed-in people who have checked in. You see a separate pin for each person in a neighborhood you have checked into. Logged-out visitors see no pins. A name and photo appear only when that person chooses to share them. The same person has one place on the map; a new check-in moves that place.</p>
       <SuiteEntrance onSignedIn={setSuiteSignedIn} />
       <AccountPanel client={sb} onAccessToken={onAccessToken} deferProfile={suiteSignedIn} />
       {session && mine && (
