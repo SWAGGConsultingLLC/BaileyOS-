@@ -1,7 +1,7 @@
 // sw.js — Bailey OS Service Worker v2.0
 // Handles: offline cache, postMessage-triggered notifications, notification click routing
 
-const CACHE_NAME = 'bailey-os-mc-v4';
+const CACHE_NAME = 'bailey-os-mc-v5';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
