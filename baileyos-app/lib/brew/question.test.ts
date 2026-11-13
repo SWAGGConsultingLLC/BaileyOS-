@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { MISSION_BODY, MISSION_TITLE, QUESTION_DESCRIPTION, QUESTION_IMAGE, QUESTION_PROMPT, QUESTION_TITLE, VOTE_OPTIONS, brewReturnPath, publicTally, voteOption } from './question001.ts';
+import { MISSION_BODY, MISSION_TITLE, QUESTION_DESCRIPTION, QUESTION_IMAGE, QUESTION_PROMPT, QUESTION_TITLE, VOTE_OPTIONS, brewReturnPath, closedQuestionMessage, formatQuestionDate, publicTally, questionIsClosed, voteOption, votingClosesMessage } from './question001.ts';
 import { publicVoteRow, voteReceipt } from './receipt.ts';
 
 const SUBJECT = '11111111-1111-4111-8111-111111111111';
@@ -101,4 +101,44 @@ test('the vote route and the vote table reject changes', () => {
   assert.match(sql, /before update/);
   assert.match(sql, /before delete/);
   assert.doesNotMatch(route, /user_metadata|email ===/);
+});
+
+const QUESTION_001_CLOSES_AT = '2026-12-08T02:52:47.000Z';
+
+test('question dates are shown in Mountain Time', () => {
+  assert.equal(formatQuestionDate(QUESTION_001_CLOSES_AT), 'Dec 7, 2026');
+  assert.equal(formatQuestionDate('2026-12-08 02:52:47+00'), 'Dec 7, 2026');
+  assert.equal(closedQuestionMessage(QUESTION_001_CLOSES_AT), 'This question closed on Dec 7, 2026. Final results are below.');
+  assert.equal(votingClosesMessage(QUESTION_001_CLOSES_AT), 'Voting closes Dec 7, 2026');
+  assert.equal(questionIsClosed(QUESTION_001_CLOSES_AT, new Date('2026-12-08T02:52:46.999Z')), false);
+  assert.equal(questionIsClosed(QUESTION_001_CLOSES_AT, new Date('2026-12-08T02:52:47.000Z')), true);
+  assert.equal(questionIsClosed(QUESTION_001_CLOSES_AT, new Date('2026-12-08T03:00:00.000Z')), true);
+  assert.equal(questionIsClosed(null), false);
+});
+
+test('the vote page hides choices after the question closes', () => {
+  const page = readFileSync(new URL('../../app/brew/q/001/vote/page.tsx', import.meta.url), 'utf8');
+  assert.match(page, /closedQuestionMessage/);
+  assert.match(page, /votingClosesMessage/);
+  assert.match(page, /const showChoices = !closed && !mine\?\.option/);
+  assert.match(page, /showChoices && \(/);
+  assert.match(page, /res.status === 409 \|\| body.closed/);
+  assert.doesNotMatch(page, /user_metadata|email ===/);
+});
+
+test('the results API reports the close window and prefers the public tally table', () => {
+  const results = readFileSync(new URL('../../app/api/brew/q/001/results/route.ts', import.meta.url), 'utf8');
+  const route = readFileSync(new URL('../../app/api/brew/q/001/vote/route.ts', import.meta.url), 'utf8');
+  const store = readFileSync(new URL('./store.ts', import.meta.url), 'utf8');
+  assert.match(results, /readPublicResults/);
+  assert.match(results, /no-store/);
+  assert.match(route, /QuestionClosedError/);
+  assert.match(route, /status: 409/);
+  assert.match(store, /consensus_tallies/);
+  assert.match(store, /opens_at, closes_at/);
+  assert.match(store, /QuestionClosedError/);
+  assert.match(store, /is closed/i);
+  const tally = publicTally({ A: 0, B: 2, C: 1 });
+  assert.equal(tally.total, 3);
+  assert.deepEqual(tally.options.map(item => [item.option, item.count]), [['A', 0], ['B', 2], ['C', 1]]);
 });

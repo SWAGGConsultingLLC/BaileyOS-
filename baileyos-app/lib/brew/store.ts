@@ -1,6 +1,50 @@
 import { admin } from '../supabaseAdmin';
-import { QUESTION_ID, publicTally, voteOption, type PublicTally, type VoteOption } from './question001';
+import { QUESTION_ID, closedQuestionMessage, publicTally, questionIsClosed, questionStatusMessage, voteOption, type PublicResults, type PublicTally, type QuestionWindow, type VoteOption } from './question001';
 import { newSalt, publicVoteRow } from './receipt';
+
+export class QuestionClosedError extends Error {
+  closesAt: string | null;
+  constructor(closesAt?: string | null) {
+    super(closedQuestionMessage(closesAt));
+    this.name = 'QuestionClosedError';
+    this.closesAt = closesAt ?? null;
+  }
+}
+
+function closedErrorMessage(error: { message?: string } | null | undefined): boolean {
+  return /is closed/i.test(error?.message ?? '');
+}
+
+export async function readQuestionWindow(): Promise<QuestionWindow> {
+  const { data, error } = await admin()
+    .from('consensus_questions')
+    .select('opens_at, closes_at')
+    .eq('id', QUESTION_ID)
+    .maybeSingle();
+  if (error || !data) {
+    return { opensAt: null, closesAt: null, closed: false };
+  }
+  const opensAt = typeof data.opens_at === 'string' ? data.opens_at : null;
+  const closesAt = typeof data.closes_at === 'string' ? data.closes_at : null;
+  return { opensAt, closesAt, closed: questionIsClosed(closesAt) };
+}
+
+async function countsFromTallies(): Promise<Record<VoteOption, number> | null> {
+  const { data, error } = await admin()
+    .from('consensus_tallies')
+    .select('option, count')
+    .eq('question_id', QUESTION_ID);
+  if (error || !data || data.length === 0) return null;
+  const totals: Record<VoteOption, number> = { A: 0, B: 0, C: 0 };
+  for (const row of data) {
+    const option = voteOption(row.option);
+    const count = typeof row.count === 'number' ? row.count : Number(row.count);
+    if (!option || !Number.isFinite(count) || count < 0) return null;
+    totals[option] = count;
+  }
+  return totals;
+}
+
 
 async function counts(): Promise<Record<VoteOption, number>> {
   const totals: Record<VoteOption, number> = { A: 0, B: 0, C: 0 };
@@ -14,7 +58,19 @@ async function counts(): Promise<Record<VoteOption, number>> {
 }
 
 export async function readPublicTally(): Promise<PublicTally> {
-  return publicTally(await counts());
+  const fromTallies = await countsFromTallies();
+  return publicTally(fromTallies ?? await counts());
+}
+
+export async function readPublicResults(): Promise<PublicResults> {
+  const window = await readQuestionWindow();
+  return {
+    ...await readPublicTally(),
+    closed: window.closed,
+    opens_at: window.opensAt,
+    closes_at: window.closesAt,
+    message: questionStatusMessage(window),
+  };
 }
 
 export async function readOwnVote(subjectId: string): Promise<VoteOption | null> {
@@ -55,6 +111,8 @@ async function salt(): Promise<string> {
 export async function recordVote(subjectId: string, option: VoteOption): Promise<{ option: VoteOption; already: boolean }> {
   const prior = await readOwnVote(subjectId);
   if (prior) return { option: prior, already: true };
+  const window = await readQuestionWindow();
+  if (window.closed) throw new QuestionClosedError(window.closesAt);
   const { error } = await admin().from('consensus_votes').insert({
     question_id: QUESTION_ID,
     subject_id: subjectId,
@@ -65,6 +123,7 @@ export async function recordVote(subjectId: string, option: VoteOption): Promise
     if (!saved) throw new Error('vote write failed');
     return { option: saved, already: true };
   }
+  if (closedErrorMessage(error)) throw new QuestionClosedError(window.closesAt);
   if (error) throw new Error('vote write failed');
   return { option, already: false };
 }

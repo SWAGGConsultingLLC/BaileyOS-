@@ -1,5 +1,5 @@
 import { QUESTION_ID, voteLabel, voteOption } from '@/lib/brew/question001';
-import { readOwnVote, recordVote, subjectIsVerified } from '@/lib/brew/store';
+import { QuestionClosedError, readOwnVote, recordVote, subjectIsVerified } from '@/lib/brew/store';
 import { fetchSuiteUser } from '@/lib/suite/hosted';
 import { decideSuiteSubject, suiteConfig } from '@/lib/suite/verify';
 
@@ -47,7 +47,13 @@ export async function POST(req: Request) {
       label: voteLabel(saved.option),
       already: saved.already,
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof QuestionClosedError) {
+      return Response.json(
+        { error: err.message, closed: true, closes_at: err.closesAt },
+        { status: 409 },
+      );
+    }
     return Response.json({ error: 'The vote could not be recorded.' }, { status: 500 });
   }
 }
