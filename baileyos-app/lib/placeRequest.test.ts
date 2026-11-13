@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { getResolution } from 'h3-js';
 import { destination } from './geo.ts';
@@ -16,7 +17,7 @@ function body(over: Record<string, unknown> = {}) {
   return { lat, lon, accuracy_m: 20, device_token: token, timestamp: now, ...over };
 }
 
-test('anonymous placement near the center is accepted without an email', () => {
+test('a placement near the center is prepared without an email', () => {
   const ready = preparePlacement({ body: body(), now, ip: '203.0.113.5', allow: allowAll });
   assert.equal(ready.ok, true);
   if (ready.ok) {
@@ -72,7 +73,16 @@ test('map request rejects a missing body, an impossible point, a stale clock, an
   if (!vague.ok) assert.equal(vague.error, 'Location not precise enough');
 });
 
-test('rate limit still blocks an otherwise valid anonymous place', () => {
+test('rate limit still blocks an otherwise valid place preparation', () => {
   const blocked = preparePlacement({ body: body(), now, ip: '203.0.113.9', allow: () => false });
   assert.deepEqual(blocked, { ok: false, error: 'Too many requests', status: 429 });
+});
+
+
+test('the place route requires a verified LinkedIn identity and uses one pin per person', () => {
+  const route = readFileSync(new URL('../app/api/place/route.ts', import.meta.url), 'utf8');
+  assert.match(route, /upsert_placement_for_subject/);
+  assert.match(route, /Sign in with LinkedIn to check in/);
+  assert.equal(route.includes('insert_placement_hex'), false);
+  assert.match(route, /body.share === true/);
 });

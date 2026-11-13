@@ -6,7 +6,7 @@ import { CONFIG } from '@/lib/config';
 import type { CheckInCard } from '@/lib/checkInProfile';
 import { hexCenter, jitterInHex, type MapViewBox } from '@/lib/neighborhood';
 
-export type NeighborhoodPin = { hex: string; phones: number; cards: CheckInCard[] };
+export type NeighborhoodPin = { hex: string; cards: CheckInCard[] };
 type MinePin = { h3: string };
 type Props = {
   neighborhoods: NeighborhoodPin[];
