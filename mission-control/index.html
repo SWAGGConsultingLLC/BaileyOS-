@@ -724,7 +724,7 @@
             <div class="project-meta">
               Privacy-first age verification — zero PII stored<br>
               Backend: <code>aklxxrmytplbrjqunkpg.supabase.co</code><br>
-              Edge Function: <code>verify-age</code> · Tables: <code>age_verifications</code> + <code>ark_entries</code> (fallback <code>ark_verifications</code>)
+              Edge Function: <code>verify-age</code> · Tables: <code>age_gate_public</code> + <code>ark_entries</code>
             </div>
             <a href="./ark-dashboard.html" class="project-link">Open ARK Dashboard →</a>
             <a href="./living-archive.html" class="project-link" style="margin-left:0.4rem;">Living Archive →</a>
@@ -1303,7 +1303,7 @@
 
     async function countExact(table, applyFilter) {
       if (!db) return null;
-      var q = db.from(table).select('*', { count: 'exact', head: true });
+      var q = db.from(table).select('id', { count: 'exact', head: true });
       if (applyFilter) q = applyFilter(q);
       var result = await q;
       if (result.error) return null;
@@ -1329,9 +1329,7 @@
 
     async function loadArkStats() {
       try {
-        var total = await countExact('age_verifications');
-        var fallback = await countExact('ark_verifications');
-        if (total === null || (fallback !== null && fallback > total)) total = fallback || 0;
+        var total = await countExact('age_gate_public');
         var entries = await countExact('ark_entries');
         animateNum('sc-verifications', total || 0);
         animateNum('sc-entries', entries || 0);
@@ -1395,22 +1393,18 @@
     }
 
     function subscribeRealtime() {
-      db.channel('public:age_verifications')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'age_verifications' }, function () {
-          loadArkStats();
-        })
-        .subscribe();
-      db.channel('public:ark_verifications')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ark_verifications' }, function () {
-          loadArkStats();
-        })
-        .subscribe();
       db.channel('public:ark_entries')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'ark_entries' }, function () {
           loadArkEntries();
           loadArkStats();
         })
         .subscribe();
+    }
+
+    function startPeriodicRefresh() {
+      setInterval(function () {
+        loadArkStats();
+      }, 30000);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1441,6 +1435,7 @@
       loadArkStats();
       loadArkEntries();
       subscribeRealtime();
+      startPeriodicRefresh();
     }
     bootArk();
 
