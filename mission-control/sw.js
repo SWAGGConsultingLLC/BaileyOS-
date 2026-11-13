@@ -1,7 +1,7 @@
 // sw.js — Bailey OS Service Worker v2.0
 // Handles: offline cache, postMessage-triggered notifications, notification click routing
 
-const CACHE_NAME = 'bailey-os-mc-v4';
+const CACHE_NAME = 'bailey-os-mc-v6';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -12,7 +12,7 @@ const ASSETS_TO_CACHE = [
   './icon-512.png',
 ];
 
-// ── Install: pre-cache the app shell ─────────────────────────────────────────
+// ── Install: pre-cache the app shell ─────────────────────────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -21,7 +21,7 @@ self.addEventListener('install', event => {
   );
 });
 
-// ── Activate: delete old caches ───────────────────────────────────────────────
+// ── Activate: delete old caches ───────────────────────────────────────────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
