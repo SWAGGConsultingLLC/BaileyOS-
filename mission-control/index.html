@@ -1,1446 +1,262 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bailey OS — Mission Control v2.0</title>
-
-  <!-- PWA -->
-  <link rel="manifest" href="./manifest.json" />
-  <meta name="theme-color" content="#C5A028" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Bailey OS" />
-  <link rel="apple-touch-icon" href="./icon-192.svg" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #0a0a0a;
-      --bg2: #111111;
-      --bg3: #1a1a1a;
-      --border: #1e1e1e;
-      --gold: #C5A028;
-      --teal: #2a8a8a;
-      --text: #e0e0e0;
-      --muted: #555555;
-      --green: #4caf50;
-      --yellow: #f59e0b;
-      --red: #ef5350;
-      /* v2.0 additions */
-      --stoic-blue: #7a9fbf;
-      --bible-amber: #bf9a7a;
-      --burst-bg: #0e0e0e;
-      --burst-border: #2a2a2a;
-      --signal-purple: #a855f7;
-    }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      min-height: 100vh;
-      padding: 0 0 4rem;
-    }
-
-    /* ── Header ── */
-    header {
-      background: var(--bg2);
-      border-bottom: 1px solid rgba(42,138,138,0.27);
-      padding: 1.5rem 2rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-    .logo { font-size: 1.5rem; font-weight: 700; color: var(--gold); letter-spacing: 0.1em; }
-    .logo span { color: var(--teal); }
-    .logo-sub { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.2rem; }
-    .header-right { text-align: right; }
-    .clock { font-size: 1.4rem; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; letter-spacing: 0.05em; }
-    .clock-date { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 0.2rem; }
-    .version-badge {
-      display: inline-block; margin-top: 0.4rem;
-      background: rgba(197,160,40,0.12); border: 1px solid rgba(197,160,40,0.3);
-      border-radius: 4px; padding: 0.15rem 0.6rem;
-      font-size: 0.68rem; color: var(--gold); letter-spacing: 0.06em; font-weight: 600;
-    }
-
-    /* ── Stats bar ── */
-    .stats-bar {
-      display: flex; gap: 1px; background: var(--bg3);
-      border-bottom: 1px solid var(--border); flex-wrap: wrap;
-    }
-    .stat-card {
-      flex: 1; min-width: 140px;
-      background: var(--bg2); padding: 1.25rem 1.5rem;
-      border-right: 1px solid var(--border);
-    }
-    .stat-card:last-child { border-right: none; }
-    .stat-value { font-size: 2rem; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
-    .stat-value.loading { opacity: 0.4; }
-    .stat-value.green { color: var(--green); }
-    .stat-value.yellow { color: var(--yellow); }
-    .stat-value.red { color: var(--red); }
-    .stat-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 0.25rem; }
-
-    /* ── Animations ── */
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-    @keyframes pulse-fast { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-
-    /* ── Canon Burst Panel ── */
-    .burst-panel {
-      display: flex;
-      gap: 1.5rem;
-      padding: 1rem 2rem 0;
-      flex-wrap: wrap;
-    }
-    .burst-panel-left {
-      flex: 2;
-      min-width: 300px;
-      background: var(--burst-bg);
-      border: 1px solid var(--burst-border);
-      border-radius: 8px;
-      padding: 1.25rem 1.5rem;
-    }
-    .burst-panel-right {
-      flex: 1;
-      min-width: 220px;
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
-    }
-    .burst-header-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 0.65rem;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-    #bp-num {
-      font-size: 0.82rem;
-      color: var(--gold);
-      letter-spacing: 0.12em;
-      font-family: 'Cascadia Code', 'Fira Code', monospace;
-      font-weight: 600;
-    }
-    .bp-theme-badge {
-      font-size: 0.65rem;
-      padding: 0.2rem 0.6rem;
-      border-radius: 12px;
-      background: rgba(197,160,40,0.12);
-      color: var(--gold);
-      border: 1px solid rgba(197,160,40,0.3);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      font-weight: 600;
-    }
-    .burst-countdown {
-      font-size: 0.78rem;
-      color: var(--teal);
-      letter-spacing: 0.07em;
-      margin-bottom: 0.85rem;
-      padding: 0.4rem 0.75rem;
-      background: rgba(42,138,138,0.07);
-      border: 1px solid rgba(42,138,138,0.2);
-      border-radius: 4px;
-      font-variant-numeric: tabular-nums;
-      font-family: 'Cascadia Code', 'Fira Code', monospace;
-    }
-    .burst-countdown.firing {
-      color: var(--gold);
-      background: rgba(197,160,40,0.1);
-      border-color: rgba(197,160,40,0.4);
-      animation: pulse-fast 0.8s ease-in-out infinite;
-    }
-    .burst-quote-block { margin-bottom: 0.85rem; }
-    .burst-quote-label {
-      font-size: 0.7rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      margin-bottom: 0.45rem;
-      font-weight: 600;
-    }
-    .stoic-label { color: var(--stoic-blue); }
-    .bible-label  { color: var(--bible-amber); }
-    .burst-quote-text {
-      font-size: 0.88rem;
-      line-height: 1.6;
-      font-style: italic;
-      color: var(--text);
-      padding-left: 1rem;
-      border-left: 2px solid var(--burst-border);
-    }
-    .burst-quote-attr {
-      font-size: 0.72rem;
-      color: var(--muted);
-      padding-left: 1rem;
-      margin-top: 0.35rem;
-    }
-    .burst-divider {
-      border: none;
-      border-top: 1px solid var(--burst-border);
-      margin: 0.85rem 0;
-    }
-    #bp-counter-text {
-      font-size: 0.68rem;
-      color: var(--muted);
-      letter-spacing: 0.08em;
-      text-align: right;
-      margin-top: 0.4rem;
-    }
-
-    /* ── Burst right column controls ── */
-    .burst-controls {
-      display: flex;
-      gap: 0.4rem;
-      flex-wrap: wrap;
-    }
-    .bp-mode {
-      flex: 1;
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      font-family: inherit;
-      font-size: 0.72rem;
-      padding: 0.45rem 0.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      transition: all 0.15s;
-      min-height: 44px;
-    }
-    .bp-mode:hover { background: var(--bg3); color: var(--text); }
-    .bp-mode.active {
-      background: rgba(42,138,138,0.15);
-      border-color: rgba(42,138,138,0.4);
-      color: var(--teal);
-    }
-    .burst-nav {
-      display: flex;
-      gap: 0.4rem;
-    }
-    .burst-nav button {
-      flex: 1;
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 0.78rem;
-      padding: 0.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background 0.15s;
-      min-height: 44px;
-    }
-    .burst-nav button:hover { background: var(--bg3); }
-
-    /* ── Burst schedule ── */
-    .burst-schedule {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.75rem;
-    }
-    .schedule-label {
-      font-size: 0.68rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.09em;
-      margin-bottom: 0.5rem;
-      font-weight: 600;
-    }
-    .schedule-time {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.25rem 0;
-      font-size: 0.78rem;
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
-    }
-    .schedule-time:last-child { border-bottom: none; }
-    .schedule-time.next-burst { color: var(--teal); }
-    .sched-chip {
-      font-size: 0.62rem;
-      padding: 0.1rem 0.4rem;
-      border-radius: 3px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-weight: 600;
-    }
-    .sched-fired { background: rgba(76,175,80,0.1); color: var(--green); }
-    .sched-next  { background: rgba(42,138,138,0.15); color: var(--teal); }
-    .sched-pending { background: rgba(85,85,85,0.15); color: var(--muted); }
-
-    /* ── Signal button ── */
-    .signal-btn {
-      width: 100%;
-      background: rgba(168,85,247,0.1);
-      border: 1px solid rgba(168,85,247,0.35);
-      color: var(--signal-purple);
-      font-family: inherit;
-      font-size: 0.82rem;
-      font-weight: 600;
-      padding: 0.65rem 1rem;
-      border-radius: 6px;
-      cursor: pointer;
-      letter-spacing: 0.06em;
-      transition: background 0.15s;
-      text-transform: uppercase;
-      min-height: 44px;
-    }
-    .signal-btn:hover { background: rgba(168,85,247,0.2); }
-    .signal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .signal-feedback {
-      font-size: 0.72rem;
-      text-align: center;
-      min-height: 1rem;
-      color: var(--muted);
-    }
-    .signal-feedback.ok  { color: var(--green); }
-    .signal-feedback.err { color: var(--red); }
-
-    /* ── Notification button ── */
-    .notif-btn {
-      width: 100%;
-      background: rgba(197,160,40,0.08);
-      border: 1px solid rgba(197,160,40,0.25);
-      color: var(--gold);
-      font-family: inherit;
-      font-size: 0.78rem;
-      padding: 0.55rem 1rem;
-      border-radius: 6px;
-      cursor: pointer;
-      letter-spacing: 0.05em;
-      transition: background 0.15s;
-      min-height: 44px;
-    }
-    .notif-btn:hover { background: rgba(197,160,40,0.15); }
-    .notif-btn.granted {
-      border-color: rgba(76,175,80,0.35);
-      color: var(--green);
-      background: rgba(76,175,80,0.08);
-      cursor: default;
-    }
-    .notif-btn.denied {
-      border-color: rgba(239,83,80,0.3);
-      color: var(--red);
-      background: rgba(239,83,80,0.06);
-      cursor: default;
-    }
-
-    /* ── Live dot inline ── */
-    .live-dot-inline {
-      display: inline-block;
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: var(--green);
-      margin-left: 0.5rem;
-      vertical-align: middle;
-      animation: pulse 1.8s ease-in-out infinite;
-    }
-
-    /* ── Main grid ── */
-    .main-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-      padding: 1.5rem 2rem 0;
-    }
-    @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
-
-    /* ── Cards ── */
-    .card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .card-header {
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid var(--border);
-      border-left: 3px solid var(--teal);
-      font-size: 0.78rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.09em;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-    }
-    .card-header.gold { border-left-color: var(--gold); }
-    .card-header.red  { border-left-color: var(--red); }
-    .card-body { padding: 1rem 1.25rem; }
-
-    /* ── Service rows ── */
-    .service-row {
-      display: flex; align-items: center; gap: 0.75rem;
-      padding: 0.55rem 0;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-      font-size: 0.88rem;
-    }
-    .service-row:last-child { border-bottom: none; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .dot-green  { background: var(--green);  animation: pulse 2.5s ease-in-out infinite; }
-    .dot-yellow { background: var(--yellow); animation: pulse-fast 1.2s ease-in-out infinite; }
-    .dot-red    { background: var(--red); }
-    .service-name { flex: 1; color: var(--text); }
-    .status-chip {
-      font-size: 0.68rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 4px;
-      text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0;
-    }
-    .chip-green  { background: rgba(76,175,80,0.15);  color: var(--green); }
-    .chip-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
-    .chip-red    { background: rgba(239,83,80,0.15);  color: var(--red); }
-    .chip-muted  { background: rgba(255,255,255,0.06); color: var(--muted); }
-    .dot-muted   { background: #666; }
-
-    /* ── Project cards ── */
-    .project-card {
-      background: var(--bg3); border: 1px solid var(--border);
-      border-radius: 6px; padding: 1rem; margin-bottom: 0.75rem;
-    }
-    .project-card:last-child { margin-bottom: 0; }
-    .project-card.ark    { border-left: 3px solid var(--gold); }
-    .project-card.agegate { border-left: 3px solid var(--teal); }
-    .project-title {
-      font-size: 0.92rem; font-weight: 600; color: var(--text);
-      display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem;
-    }
-    .project-meta { font-size: 0.78rem; color: var(--muted); line-height: 1.7; }
-    .project-meta code { font-size: 0.73rem; color: var(--teal); background: rgba(42,138,138,0.1); padding: 0.1rem 0.35rem; border-radius: 3px; }
-    .project-link {
-      display: inline-block; margin-top: 0.65rem;
-      font-size: 0.75rem; color: var(--gold); text-decoration: none;
-      border: 1px solid rgba(197,160,40,0.3); border-radius: 4px; padding: 0.25rem 0.75rem;
-      transition: background 0.15s;
-    }
-    .project-link:hover { background: rgba(197,160,40,0.1); }
-
-    /* ── ARK log entries ── */
-    .ark-entry {
-      background: var(--bg3); border: 1px solid var(--border);
-      border-radius: 6px; padding: 0.85rem 1rem; margin-bottom: 0.6rem;
-      animation: fadeIn 0.3s ease;
-    }
-    .ark-entry:last-child { margin-bottom: 0; }
-    .ark-entry-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem; flex-wrap: wrap; }
-    .ark-tag {
-      font-size: 0.65rem; font-weight: 700; letter-spacing: 0.07em; padding: 0.15rem 0.5rem;
-      border-radius: 3px; text-transform: uppercase;
-    }
-    .tag-arch   { background: rgba(42,138,138,0.2);   color: var(--teal); }
-    .tag-legal  { background: rgba(197,160,40,0.15);  color: var(--gold); }
-    .tag-deploy { background: rgba(76,175,80,0.15);   color: var(--green); }
-    .tag-verify { background: rgba(139,92,246,0.15);  color: #a78bfa; }
-    .tag-signal { background: rgba(239,83,80,0.12);   color: #f87171; }
-    .ark-entry-id    { font-size: 0.72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-    .ark-entry-title { font-size: 0.85rem; font-weight: 600; color: var(--text); }
-    .ark-entry-date  { font-size: 0.72rem; color: var(--muted); margin-left: auto; }
-    .ark-entry-body  { font-size: 0.8rem; color: #888; line-height: 1.55; }
-    .ark-empty { padding: 1rem; font-size: 0.82rem; color: var(--muted); }
-
-    /* ── Microsoft 365 readiness ── */
-    .ms365-status {
-      display: flex; align-items: center; gap: 0.75rem;
-      margin-bottom: 1rem; padding: 0.75rem; background: var(--bg3); border-radius: 6px;
-      border: 1px solid rgba(239,83,80,0.25);
-    }
-    .ms365-status-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
-    .ms365-status-dot.ready { background: var(--green); animation: pulse 2.5s ease-in-out infinite; }
-    .ms365-status-text { font-size: 0.85rem; }
-    .ms365-status-label { font-weight: 600; color: var(--red); text-transform: uppercase; font-size: 0.78rem; letter-spacing: 0.06em; }
-    .ms365-status-label.ready { color: var(--green); }
-    .ms365-account { font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem; }
-    .ms365-account code { color: var(--teal); font-size: 0.73rem; }
-    .progress-wrap { margin-bottom: 1rem; }
-    .progress-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; display: flex; justify-content: space-between; }
-    .progress-bar-bg { height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); }
-    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--teal)); border-radius: 3px; transition: width 0.4s ease; }
-    .ms365-checklist { list-style: none; }
-    .ms365-checklist li { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.45rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.83rem; line-height: 1.5; }
-    .ms365-checklist li:last-child { border-bottom: none; }
-    .ms365-checklist input[type="checkbox"] { margin-top: 0.15rem; flex-shrink: 0; accent-color: var(--gold); width: 14px; height: 14px; cursor: pointer; }
-    .ms365-checklist label { cursor: pointer; color: var(--text); }
-    .ms365-checklist li.checked label { color: var(--muted); text-decoration: line-through; }
-    .ms365-account-info { margin-top: 0.75rem; padding: 0.65rem; background: rgba(42,138,138,0.07); border: 1px solid rgba(42,138,138,0.2); border-radius: 5px; font-size: 0.78rem; }
-    .ms365-account-info .label { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.2rem; }
-    .ms365-account-info code { color: var(--gold); }
-
-    /* ── Copy button ── */
-    .copy-block { margin-top: 0.75rem; }
-    .copy-wrap { position: relative; }
-    .copy-code {
-      display: block; background: #000; border: 1px solid var(--border);
-      border-radius: 5px; padding: 0.65rem 3rem 0.65rem 0.85rem;
-      font-size: 0.78rem; color: var(--teal); font-family: 'Cascadia Code', 'Fira Code', monospace;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .copy-btn {
-      position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%);
-      background: rgba(197,160,40,0.15); border: 1px solid rgba(197,160,40,0.3);
-      color: var(--gold); font-size: 0.65rem; font-weight: 600; letter-spacing: 0.05em;
-      padding: 0.2rem 0.5rem; border-radius: 3px; cursor: pointer; transition: background 0.15s;
-      text-transform: uppercase;
-    }
-    .copy-btn:hover { background: rgba(197,160,40,0.25); }
-
-    /* ── Dev servers strip ── */
-    .servers-strip { display: flex; gap: 0.75rem; flex-wrap: wrap; padding: 1.5rem 2rem 0; }
-    .server-card {
-      flex: 1; min-width: 200px;
-      background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem;
-    }
-    .server-name { font-size: 0.85rem; font-weight: 600; color: var(--text); margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.5rem; }
-    .port-badge {
-      font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.5rem;
-      background: rgba(42,138,138,0.15); color: var(--teal); border-radius: 4px; letter-spacing: 0.04em;
-    }
-    .server-meta { font-size: 0.75rem; color: var(--muted); line-height: 1.6; }
-
-    /* ── Plugins accordion ── */
-    .plugins-section { padding: 1.5rem 2rem 0; }
-    .plugins-toggle-btn {
-      background: var(--bg2); border: 1px solid var(--border); color: var(--text);
-      font-size: 0.82rem; padding: 0.65rem 1.25rem; border-radius: 6px; cursor: pointer;
-      display: flex; align-items: center; gap: 0.5rem; transition: background 0.15s;
-      font-family: inherit; width: 100%; text-align: left;
-    }
-    .plugins-toggle-btn:hover { background: var(--bg3); }
-    .toggle-arrow { font-size: 0.7rem; transition: transform 0.2s; }
-    .plugins-toggle-btn.open .toggle-arrow { transform: rotate(90deg); }
-    .plugins-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 0.6rem; margin-top: 0.75rem;
-      max-height: 0; overflow: hidden; transition: max-height 0.35s ease;
-    }
-    .plugins-grid.open { max-height: 2000px; }
-    .plugin-chip {
-      background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.85rem;
-    }
-    .plugin-chip-name { font-size: 0.78rem; font-weight: 600; color: var(--text); margin-bottom: 0.15rem; }
-    .plugin-chip-cat  { font-size: 0.68rem; color: var(--muted); }
-    .plugin-chip.dev         { border-left: 2px solid #60a5fa; }
-    .plugin-chip.cloud       { border-left: 2px solid #fb923c; }
-    .plugin-chip.integration { border-left: 2px solid var(--teal); }
-    .plugin-chip.ai          { border-left: 2px solid #a78bfa; }
-    .plugin-chip.mgmt        { border-left: 2px solid var(--gold); }
-    .plugin-chip.lsp         { border-left: 2px solid #6b7280; }
-
-    /* ── Section labels ── */
-    .section-label {
-      font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em;
-      font-weight: 600; padding: 1.5rem 2rem 0;
-      display: flex; align-items: center; gap: 0.75rem;
-    }
-    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-
-    /* ── Footer ── */
-    footer {
-      margin-top: 3rem; padding: 1.5rem 2rem;
-      border-top: 1px solid var(--border); text-align: center;
-      font-size: 0.72rem; color: var(--muted); line-height: 2;
-    }
-    footer strong { color: var(--gold); }
-    .signal-anchors { font-size: 0.65rem; letter-spacing: 0.12em; color: rgba(85,85,85,0.7); }
-    .tablet-hint { font-size: 0.68rem; color: rgba(42,138,138,0.6); margin-top: 0.25rem; }
-
-    /* ── Mobile responsive ── */
-    @media (max-width: 768px) {
-      header { padding: 1rem; }
-      .burst-panel { padding: 1rem 1rem 0; gap: 1rem; }
-      .burst-panel-left, .burst-panel-right { min-width: 0; width: 100%; flex: 1 1 100%; box-sizing: border-box; }
-      .main-grid > * { min-width: 0; }
-      .project-meta code, .ms365-account code, .ms365-account-info code { word-break: break-all; }
-      .ms365-status-text { min-width: 0; }
-      .stats-bar .stat-card { min-width: 50%; }
-      .main-grid { padding: 1rem 1rem 0; gap: 1rem; }
-      .section-label { padding: 1.25rem 1rem 0; }
-      .servers-strip { padding: 1rem 1rem 0; }
-      .plugins-section { padding: 1rem 1rem 0; }
-    }
-
-    /* ── Tablet landscape (G99 target ~1024–1280px) ── */
-    @media (min-width: 769px) and (max-width: 1280px) {
-      header { padding: 1.25rem 1.5rem; }
-      .burst-panel { padding: 1.25rem 1.5rem 0; }
-      .main-grid { padding: 1.25rem 1.5rem 0; }
-      .section-label, .servers-strip, .plugins-section { padding-left: 1.5rem; padding-right: 1.5rem; }
-      .burst-panel-left { min-width: 380px; }
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mission Control | SWAGG Consulting</title>
+<meta name="description" content="Mission Control is the public front door to BaileyOS from SWAGG Consulting. Read the 81 Canon, or open 360° Brewing." />
+<link rel="canonical" href="https://os.swaggconsulting.com/mission-control/" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="SWAGG Consulting LLC | BaileyOS" />
+<meta property="og:description" content="A public page from SWAGG Consulting LLC on AI governance. Read the 81 Canon, or open 360° Brewing." />
+<meta property="og:url" content="https://os.swaggconsulting.com/mission-control/" />
+<meta property="og:image" content="https://os.swaggconsulting.com/mission-control/icon-512.png" />
+<meta property="og:image:alt" content="Gold star on a black square, the BaileyOS mark." />
+<meta property="og:image:width" content="512" />
+<meta property="og:image:height" content="512" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="SWAGG Consulting LLC | BaileyOS" />
+<meta name="twitter:description" content="A public page from SWAGG Consulting LLC on AI governance. Read the 81 Canon, or open 360° Brewing." />
+<meta name="twitter:image" content="https://os.swaggconsulting.com/mission-control/icon-512.png" />
+<meta name="twitter:image:alt" content="Gold star on a black square, the BaileyOS mark." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #222222;
+    --accent: #c9943a;
+    --text: #e8e8e8;
+    --muted: #8a8a8a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', ui-monospace, monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .wrap {
+    width: 100%;
+    max-width: 36rem;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 2.5rem;
+    flex: 1;
+  }
+  .kicker {
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+  }
+  h1 {
+    font-size: clamp(1.4rem, 6vw, 1.85rem);
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 0.85rem;
+  }
+  .lede {
+    font-size: 0.9rem;
+    line-height: 1.65;
+    color: var(--text);
+    margin-bottom: 1.25rem;
+  }
+  .note {
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--muted);
+    margin-bottom: 2rem;
+  }
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  a.card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.15rem 1.2rem;
+  }
+  a.card:hover, a.card:focus-visible {
+    border-color: var(--accent);
+    outline: none;
+  }
+  a.card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .card h2 {
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    margin-bottom: 0.4rem;
+  }
+  .card p {
+    font-size: 0.8rem;
+    line-height: 1.55;
+    color: var(--muted);
+  }
+  .share {
+    margin-top: 1.75rem;
+  }
+  .share-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.65rem;
+  }
+  .share-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .share-row a,
+  .share-row button {
+    font-family: inherit;
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    color: var(--accent);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.55rem 0.8rem;
+    min-height: 44px;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .share-row a:hover,
+  .share-row a:focus-visible,
+  .share-row button:hover,
+  .share-row button:focus-visible {
+    border-color: var(--accent);
+    outline: none;
+  }
+  .share-row a:focus-visible,
+  .share-row button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 1.25rem;
+    text-align: center;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover, footer a:focus-visible { text-decoration: underline; }
+</style>
 </head>
 <body>
-
-  <!-- ── HEADER ── -->
-  <header>
-    <div>
-      <div class="logo">BAILEY <span>OS</span></div>
-      <div class="logo-sub">SWAGG Consulting LLC — Mission Control</div>
+  <main class="wrap">
+    <p class="kicker">SWAGG Consulting LLC</p>
+    <h1>Mission Control</h1>
+    <p class="lede">Mission Control is the public front door to BaileyOS, the privacy-first suite from SWAGG Consulting in Grand Junction, Colorado.</p>
+    <p class="note">Signed-in tools will open here later. For now, anyone can read the 81 Canon or visit 360° Brewing.</p>
+    <div class="cards">
+      <a class="card" href="https://os.swaggconsulting.com/canon/">
+        <h2>The 81 Canon</h2>
+        <p>Free to read, forever. No sign-in, no gate.</p>
+      </a>
+      <a class="card" href="https://360degreebrewing.swaggconsulting.com">
+        <h2>360° Brewing</h2>
+        <p>A public, timestamped audit trail. The map and optional check-in live here too, including an anonymous option.</p>
+      </a>
     </div>
-    <div class="header-right">
-      <div class="clock" id="clock">--:--:--</div>
-      <div class="clock-date" id="clock-date">Loading...</div>
-      <div><span class="version-badge">BAILEY OS v2.0</span></div>
-    </div>
-  </header>
-
-  <!-- ── STATS BAR ── -->
-  <div class="stats-bar">
-    <div class="stat-card">
-      <div class="stat-value">34</div>
-      <div class="stat-label">Plugins Installed</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value loading" id="sc-verifications">—</div>
-      <div class="stat-label">ARK Verifications</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value loading" id="sc-entries">—</div>
-      <div class="stat-label">ARK Log Entries</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value">2</div>
-      <div class="stat-label">Active Projects</div>
-    </div>
-  </div>
-
-  <!-- ── CANON BURST PANEL ── -->
-  <div class="section-label">Canon Burst Engine</div>
-  <div class="burst-panel" id="burst-panel">
-
-    <div class="burst-panel-left">
-      <div class="burst-header-row">
-        <span id="bp-num">★ CANON BURST #01</span>
-        <span class="bp-theme-badge" id="bp-theme-badge">RESILIENCE</span>
+    <section class="share" aria-labelledby="share-label">
+      <p id="share-label" class="share-label">Share</p>
+      <div class="share-row">
+        <a id="share-linkedin" href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fos.swaggconsulting.com%2Fmission-control%2F" target="_blank" rel="noopener noreferrer" aria-label="Share on LinkedIn">LinkedIn</a>
+        <a id="share-x" href="https://twitter.com/intent/tweet?url=https%3A%2F%2Fos.swaggconsulting.com%2Fmission-control%2F&amp;text=SWAGG%20Consulting%20LLC%20%7C%20BaileyOS%20%E2%80%94%20a%20public%20page%20on%20AI%20governance." target="_blank" rel="noopener noreferrer" aria-label="Share on X">X</a>
+        <a id="share-facebook" href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fos.swaggconsulting.com%2Fmission-control%2F" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook">Facebook</a>
+        <a id="share-email" href="mailto:?subject=SWAGG%20Consulting%20LLC%20%7C%20BaileyOS&amp;body=A%20public%20page%20from%20SWAGG%20Consulting%20LLC%20on%20AI%20governance.%0A%0Ahttps%3A%2F%2Fos.swaggconsulting.com%2Fmission-control%2F" target="_blank" rel="noopener noreferrer" aria-label="Share by email">Email</a>
+        <button type="button" id="share-copy" aria-label="Copy link">Copy link</button>
       </div>
-      <p style="font-size:0.78rem;color:var(--muted);line-height:1.45;margin:0 0 0.75rem;">Manual. Next and Random change the quote. The countdown is a clock on this device. It does not publish a burst, start a worker, or call a model.</p>
-      <div class="burst-countdown" id="bp-countdown">Next burst in: --:--:--</div>
-
-      <div class="burst-quote-block" id="bp-stoic-section">
-        <div class="burst-quote-label stoic-label">⚡ Stoic</div>
-        <div class="burst-quote-text" id="bp-stoic-text"></div>
-        <div class="burst-quote-attr" id="bp-stoic-attr"></div>
-      </div>
-
-      <hr class="burst-divider" id="bp-divider">
-
-      <div class="burst-quote-block" id="bp-bible-section">
-        <div class="burst-quote-label bible-label">✝ Bible</div>
-        <div class="burst-quote-text" id="bp-bible-text"></div>
-        <div class="burst-quote-attr" id="bp-bible-attr"></div>
-      </div>
-
-      <div id="bp-counter-text">Canon 1 of 81 · RESILIENCE</div>
-    </div>
-
-    <div class="burst-panel-right">
-
-      <div class="burst-controls">
-        <button id="bp-btn-both"  class="bp-mode active" onclick="bpSetMode('both')">⚡✝ Both</button>
-        <button id="bp-btn-stoic" class="bp-mode"        onclick="bpSetMode('stoic')">⚡ Stoic</button>
-        <button id="bp-btn-bible" class="bp-mode"        onclick="bpSetMode('bible')">✝ Bible</button>
-      </div>
-
-      <div class="burst-nav">
-        <button onclick="bpNext()">→ Next</button>
-        <button onclick="bpRandom()">⟳ Random</button>
-      </div>
-
-      <div class="burst-schedule">
-        <div class="schedule-label">Daily Burst Times</div>
-        <div id="bp-schedule-times"></div>
-      </div>
-
-      <button id="signal-btn" class="signal-btn" onclick="sendSlackSignal()">📡 Send Signal to Slack</button>
-      <div id="signal-feedback" class="signal-feedback"></div>
-
-      <button id="notif-btn" class="notif-btn" onclick="requestNotifPermission()">🔔 Enable Burst Alerts</button>
-
-    </div>
-  </div>
-
-  <!-- ── MAIN GRID ── -->
-  <div class="main-grid">
-
-    <!-- LEFT COLUMN -->
-    <div>
-
-      <!-- MCP Connections -->
-      <div class="card" style="margin-bottom:1.25rem;">
-        <div class="card-header">MCP Connections</div>
-        <div class="card-body">
-
-          <p style="font-size:0.78rem;color:var(--muted);line-height:1.45;margin-bottom:0.75rem;">Static inventory. This page does not connect, authorize, or check these services. A label here is not a live status.</p>
-          <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.5rem;">Not checked from this page</div>
-
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Google Calendar</div><span class="status-chip chip-muted">Unverified</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Gmail</div><span class="status-chip chip-muted">Unverified</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Slack</div><span class="status-chip chip-muted">Unverified</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">HubSpot CRM</div><span class="status-chip chip-muted">Unverified</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Notion</div><span class="status-chip chip-muted">Unverified</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Linear</div><span class="status-chip chip-muted">Unverified</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Figma Dev Tools</div><span class="status-chip chip-muted">Unverified</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Canva</div><span class="status-chip chip-muted">Unverified</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Apollo GraphQL</div><span class="status-chip chip-muted">Unverified</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Chrome DevTools</div><span class="status-chip chip-muted">Unverified</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Claude Preview</div><span class="status-chip chip-muted">Unverified</span></div>
-
-          <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin:1rem 0 0.5rem;">No authorize action on this page</div>
-
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Asana</div><span class="status-chip chip-muted">Not set up here</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Adspirer Ads Agent</div><span class="status-chip chip-muted">Not set up here</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Circleback (Meeting Notes)</div><span class="status-chip chip-muted">Not set up here</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Atlassian (Jira + Confluence)</div><span class="status-chip chip-muted">Not set up here</span></div>
-          <div class="service-row"><div class="dot dot-muted"></div><div class="service-name">Figma (Plugin OAuth)</div><span class="status-chip chip-muted">Not set up here</span></div>
-
-          <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin:1rem 0 0.5rem;">Not Configured</div>
-
-          <div class="service-row"><div class="dot dot-red"></div><div class="service-name">Microsoft Outlook</div><span class="status-chip chip-red">Not Installed</span></div>
-          <div class="service-row"><div class="dot dot-red"></div><div class="service-name">Microsoft Teams</div><span class="status-chip chip-red">Not Installed</span></div>
-          <div class="service-row"><div class="dot dot-red"></div><div class="service-name">OneDrive / SharePoint</div><span class="status-chip chip-red">Not Installed</span></div>
-
-        </div>
-      </div>
-
-      <!-- Active Projects -->
-      <div class="card">
-        <div class="card-header gold">Active Projects</div>
-        <div class="card-body">
-
-          <div class="project-card ark">
-            <div class="project-title">
-              Bailey ARK
-              <span class="status-chip chip-muted" style="font-size:0.65rem;">Unverified</span>
-            </div>
-            <div class="project-meta">
-              Privacy-first age verification — zero PII stored<br>
-              Backend: <code>aklxxrmytplbrjqunkpg.supabase.co</code><br>
-              Edge Function: <code>verify-age</code> · Tables: <code>age_gate_public</code> + <code>ark_entries</code>
-            </div>
-            <a href="./ark-dashboard.html" class="project-link">Open ARK Dashboard →</a>
-            <a href="./living-archive.html" class="project-link" style="margin-left:0.4rem;">Living Archive →</a>
-                        <a href="./burst-preview.html" class="project-link" style="margin-left:0.4rem;">Burst Preview →</a>
-            <a href="./intent-engineering.html" class="project-link" style="margin-left:0.4rem;">Intent Engineering →</a>
-            <a href="./alignment-compass.html" class="project-link" style="margin-left:0.4rem;">Alignment Compass →</a>
-          </div>
-
-          <div class="project-card agegate">
-            <div class="project-title">
-              Privacy-Age-Gate
-              <span class="status-chip chip-yellow" style="font-size:0.65rem;">DEV</span>
-            </div>
-            <div class="project-meta">
-              Full-stack age verification system — Docker Compose
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-    </div>
-
-    <!-- RIGHT COLUMN -->
-    <div>
-
-      <!-- ARK Log — LIVE from Supabase -->
-      <div class="card" style="margin-bottom:1.25rem;">
-        <div class="card-header">
-          Bailey ARK — Sovereign Log
-          <span style="font-size:0.68rem;color:var(--muted);font-weight:600;">Unverified until rows load</span>
-        </div>
-        <div class="card-body">
-          <div id="ark-entries-wrap">
-            <div class="ark-empty">Loading entries…</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Microsoft 365 Readiness -->
-      <div class="card">
-        <div class="card-header red">Microsoft 365 Readiness</div>
-        <div class="card-body">
-
-          <p style="font-size:0.78rem;color:var(--muted);line-height:1.45;margin-bottom:0.75rem;">Checking a box stores a note in this browser. It does not configure Microsoft 365, and a full checklist is not a verified status.</p>
-          <div class="ms365-status" id="ms365-status-bar">
-            <div class="ms365-status-dot" id="ms365-status-dot"></div>
-            <div class="ms365-status-text">
-              <div class="ms365-status-label" id="ms365-status-label">Not Configured</div>
-            </div>
-          </div>
-
-          <div class="progress-wrap">
-            <div class="progress-label">
-              <span>Setup Progress</span>
-              <span id="progress-text">0 / 5 steps</span>
-            </div>
-            <div class="progress-bar-bg">
-              <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
-            </div>
-          </div>
-
-          <ul class="ms365-checklist" id="ms365-checklist">
-            <li id="step-li-0"><input type="checkbox" id="ms365-0"><label for="ms365-0">Purchase Microsoft 365 Business plan (Basic $6/mo or Standard $12.50/mo)</label></li>
-            <li id="step-li-1"><input type="checkbox" id="ms365-1"><label for="ms365-1">Create Azure App Registration at portal.azure.com for Graph API OAuth</label></li>
-            <li id="step-li-2"><input type="checkbox" id="ms365-2"><label for="ms365-2">Grant Graph API permissions: Mail, Calendars, Contacts, Files, Teams Chat</label></li>
-            <li id="step-li-3"><input type="checkbox" id="ms365-3"><label for="ms365-3">Search plugin registry for Microsoft 365 MCP: <code style="color:var(--teal);font-size:0.73rem;">/plugin discover</code></label></li>
-            <li id="step-li-4"><input type="checkbox" id="ms365-4"><label for="ms365-4">Install + authorize MCP (or use Zapier bridge — already installed)</label></li>
-          </ul>
-
-
-          <div class="copy-block">
-            <div style="font-size:0.72rem;color:var(--muted);margin-bottom:0.35rem;text-transform:uppercase;letter-spacing:0.06em;">Search for plugin after purchase:</div>
-            <div class="copy-wrap">
-              <code class="copy-code">/plugin discover</code>
-              <button class="copy-btn" onclick="copyCmd(this, '/plugin discover')">Copy</button>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-
-  <!-- ── PLUGINS ACCORDION ── -->
-  <div class="section-label">Plugins</div>
-  <div class="plugins-section">
-    <button class="plugins-toggle-btn" id="plugins-btn" onclick="togglePlugins()">
-      <span class="toggle-arrow">▶</span>
-      Show All 34 Installed Plugins
-    </button>
-    <div class="plugins-grid" id="plugins-grid">
-      <div class="plugin-chip cloud"><div class="plugin-chip-name">deploy-on-aws</div><div class="plugin-chip-cat">Cloud · AWS deployment</div></div>
-      <div class="plugin-chip cloud"><div class="plugin-chip-name">aws-serverless</div><div class="plugin-chip-cat">Cloud · Lambda, API Gateway</div></div>
-      <div class="plugin-chip cloud"><div class="plugin-chip-name">amazon-location-service</div><div class="plugin-chip-cat">Cloud · Maps, geocoding</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">asana</div><div class="plugin-chip-cat">Integration · Project tasks ⚠ not set up on this page</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">atlassian</div><div class="plugin-chip-cat">Integration · Jira + Confluence ⚠ not set up on this page</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">circleback</div><div class="plugin-chip-cat">Integration · Meeting notes ⚠ not set up on this page</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">adspirer-ads-agent</div><div class="plugin-chip-cat">Integration · Google Ads ⚠ not set up on this page</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">figma</div><div class="plugin-chip-cat">Integration · Design editing ⚠ not set up on this page</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">zapier</div><div class="plugin-chip-cat">Integration · Automation bridge — not checked</div></div>
-      <div class="plugin-chip dev"><div class="plugin-chip-name">code-review</div><div class="plugin-chip-cat">Dev · PR code review</div></div>
-      <div class="plugin-chip dev"><div class="plugin-chip-name">code-simplifier</div><div class="plugin-chip-cat">Dev · Refactor & optimize</div></div>
-      <div class="plugin-chip dev"><div class="plugin-chip-name">coderabbit</div><div class="plugin-chip-cat">Dev · AI code review + autofix</div></div>
-      <div class="plugin-chip dev"><div class="plugin-chip-name">autofix-bot</div><div class="plugin-chip-cat">Dev · Automatic fix suggestions</div></div>
-      <div class="plugin-chip dev"><div class="plugin-chip-name">feature-dev</div><div class="plugin-chip-cat">Dev · Feature development workflow</div></div>
-      <div class="plugin-chip dev"><div class="plugin-chip-name">commit-commands</div><div class="plugin-chip-cat">Dev · Git commit, push, PR</div></div>
-      <div class="plugin-chip dev"><div class="plugin-chip-name">chrome-devtools-mcp</div><div class="plugin-chip-cat">Dev · Browser automation — not checked</div></div>
-      <div class="plugin-chip ai"><div class="plugin-chip-name">agent-sdk-dev</div><div class="plugin-chip-cat">AI · Build Claude Agent SDK apps</div></div>
-      <div class="plugin-chip ai"><div class="plugin-chip-name">atomic-agents</div><div class="plugin-chip-cat">AI · Multi-agent framework</div></div>
-      <div class="plugin-chip ai"><div class="plugin-chip-name">context7</div><div class="plugin-chip-cat">AI · Context management</div></div>
-      <div class="plugin-chip lsp"><div class="plugin-chip-name">clangd-lsp</div><div class="plugin-chip-cat">LSP · C / C++ intelligence</div></div>
-      <div class="plugin-chip lsp"><div class="plugin-chip-name">csharp-lsp</div><div class="plugin-chip-cat">LSP · C# intelligence</div></div>
-      <div class="plugin-chip mgmt"><div class="plugin-chip-name">claude-code-setup</div><div class="plugin-chip-cat">Mgmt · Setup & automation wizard</div></div>
-      <div class="plugin-chip mgmt"><div class="plugin-chip-name">claude-md-management</div><div class="plugin-chip-cat">Mgmt · CLAUDE.md audit</div></div>
-      <div class="plugin-chip mgmt"><div class="plugin-chip-name">explanatory-output-style</div><div class="plugin-chip-cat">Mgmt · Educational output mode</div></div>
-      <div class="plugin-chip cloud"><div class="plugin-chip-name">data</div><div class="plugin-chip-cat">Cloud · Airflow, data warehouse</div></div>
-      <div class="plugin-chip dev"><div class="plugin-chip-name">figma (dev tools)</div><div class="plugin-chip-cat">Dev · Design context, screenshots — not checked</div></div>
-      <div class="plugin-chip integration"><div class="plugin-chip-name">apollo-graphql</div><div class="plugin-chip-cat">Integration · GraphQL docs — not checked</div></div>
-      <div class="plugin-chip cloud"><div class="plugin-chip-name">amazon-location</div><div class="plugin-chip-cat">Cloud · Location + maps services</div></div>
-    </div>
-  </div>
-
-  <!-- ── FOOTER ── -->
+      <p id="share-status" class="visually-hidden" role="status" aria-live="polite"></p>
+    </section>
+  </main>
   <footer>
-    <strong>Bailey OS v2.0</strong> — SWAGG Consulting LLC · Brian McRoberts<br>
-    Grand Junction, CO<br>
-    Report generated: 2026-03-20 · Last refreshed: <span id="footer-time"></span><br>
-    <div class="tablet-hint">On tablet: open swaggconsultingllc.github.io/BaileyOS-/mission-control/ → 3-dot menu → Add to Home Screen · <a href="../" style="color:inherit">← BaileyOS home</a></div>
-    <div class="signal-anchors">signal.rooster · origin.bear · guard.lion</div>
+    SWAGG Consulting LLC · Grand Junction, CO<br>
+    <a href="../">BaileyOS home</a>
   </footer>
-
   <script>
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CONFIG
-    // ═══════════════════════════════════════════════════════════════════════════
-    const SUPABASE_URL  = 'https://aklxxrmytplbrjqunkpg.supabase.co';
-    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrbHh4cm15dHBsYnJqcXVua3BnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMzc0NDcsImV4cCI6MjA4NzgxMzQ0N30.7NBf784LfeulBFH2u8HAdVHJgPIksfeAor7iA5R36f0';
-    let db = null;
-    // ── PLACEHOLDER: Brian fills this in from api.slack.com/apps → Incoming Webhooks ──
-    // Do NOT paste a real webhook here: this page is public. It is asked for once and kept only on this device.
-    let SLACK_WEBHOOK_URL = localStorage.getItem('bos_slack_webhook') || 'https://hooks.slack.com/services/REPLACE/WITH/YOUR_WEBHOOK';
-    // ───────────────────────────────────────────────────────────────────────────
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CLOCK
-    // ═══════════════════════════════════════════════════════════════════════════
-    function updateClock() {
-      const now = new Date();
-      document.getElementById('clock').textContent =
-        now.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      document.getElementById('clock-date').textContent =
-        now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-      document.getElementById('footer-time').textContent = now.toLocaleTimeString();
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MS365 CHECKLIST
-    // ═══════════════════════════════════════════════════════════════════════════
-    const STORAGE_KEY = 'ms365-checklist-v1';
-    const STEPS = 5;
-
-    function loadChecklist() {
+    (function () {
+      var FALLBACK = 'https://os.swaggconsulting.com/mission-control/';
+      var TITLE = 'SWAGG Consulting LLC | BaileyOS';
+      var BLURB = 'A public page from SWAGG Consulting LLC on AI governance.';
+      var pageUrl = FALLBACK;
       try {
-        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        saved.forEach((checked, i) => {
-          const cb = document.getElementById('ms365-' + i);
-          if (cb && checked) {
-            cb.checked = true;
-            document.getElementById('step-li-' + i).classList.add('checked');
-          }
-        });
-      } catch(e) {}
-      updateProgress();
-    }
+        var href = window.location && window.location.href;
+        var protocol = window.location && window.location.protocol;
+        if (href && (protocol === 'http:' || protocol === 'https:')) pageUrl = href;
+      } catch (e) {}
 
-    function saveChecklist() {
-      const state = [];
-      for (let i = 0; i < STEPS; i++) {
-        const cb = document.getElementById('ms365-' + i);
-        state.push(cb ? cb.checked : false);
-        const li = document.getElementById('step-li-' + i);
-        if (li) li.classList.toggle('checked', cb && cb.checked);
-      }
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
-      updateProgress();
-    }
-
-    function updateProgress() {
-      let count = 0;
-      for (let i = 0; i < STEPS; i++) {
-        const cb = document.getElementById('ms365-' + i);
-        if (cb && cb.checked) count++;
-      }
-      const pct = Math.round((count / STEPS) * 100);
-      document.getElementById('progress-fill').style.width = pct + '%';
-      document.getElementById('progress-text').textContent = count + ' / ' + STEPS + ' steps';
-      const isReady = count === STEPS;
-      const dot   = document.getElementById('ms365-status-dot');
-      const label = document.getElementById('ms365-status-label');
-      const bar   = document.getElementById('ms365-status-bar');
-      if (isReady) {
-        dot.classList.add('ready'); label.classList.add('ready');
-        label.textContent = 'Notes only — not verified';
-        bar.style.borderColor = 'rgba(76,175,80,0.25)';
-      } else {
-        dot.classList.remove('ready'); label.classList.remove('ready');
-        label.textContent = 'Not Configured';
-        bar.style.borderColor = 'rgba(239,83,80,0.25)';
-      }
-    }
-
-    for (let i = 0; i < STEPS; i++) {
-      const cb = document.getElementById('ms365-' + i);
-      if (cb) cb.addEventListener('change', saveChecklist);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // COPY BUTTON
-    // ═══════════════════════════════════════════════════════════════════════════
-    function copyCmd(btn, text) {
-      navigator.clipboard.writeText(text).then(() => {
-        const orig = btn.textContent;
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = orig; }, 1500);
-      }).catch(() => {
-        btn.textContent = 'Error';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
-      });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PLUGINS ACCORDION
-    // ═══════════════════════════════════════════════════════════════════════════
-    function togglePlugins() {
-      const grid = document.getElementById('plugins-grid');
-      const btn  = document.getElementById('plugins-btn');
-      const isOpen = grid.classList.toggle('open');
-      btn.classList.toggle('open', isOpen);
-      btn.querySelector('.toggle-arrow').textContent = isOpen ? '▼' : '▶';
-      btn.childNodes[1].textContent = isOpen ? ' Hide Plugins' : ' Show All 34 Installed Plugins';
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // 81 CANON BURST LIBRARY
-    // ═══════════════════════════════════════════════════════════════════════════
-    const library = [
-      // RESILIENCE
-      { theme:"RESILIENCE", stoic:{quote:"The impediment to action advances action. What stands in the way becomes the way.",author:"Marcus Aurelius"}, bible:{verse:"And we know that in all things God works for the good of those who love him.",ref:"Romans 8:28"} },
-      { theme:"RESILIENCE", stoic:{quote:"You have power over your mind — not outside events. Realize this, and you will find strength.",author:"Marcus Aurelius"}, bible:{verse:"I can do all this through him who gives me strength.",ref:"Philippians 4:13"} },
-      { theme:"RESILIENCE", stoic:{quote:"He who fears death will never do anything worthy of a man who is alive.",author:"Seneca"}, bible:{verse:"Even though I walk through the darkest valley, I will fear no evil, for you are with me.",ref:"Psalm 23:4"} },
-      { theme:"RESILIENCE", stoic:{quote:"Difficulties strengthen the mind, as labor does the body.",author:"Seneca"}, bible:{verse:"Consider it pure joy whenever you face trials of many kinds, because the testing of your faith produces perseverance.",ref:"James 1:2-3"} },
-      { theme:"RESILIENCE", stoic:{quote:"Our life is what our thoughts make it.",author:"Marcus Aurelius"}, bible:{verse:"Finally, brothers and sisters, whatever is true, whatever is noble... think about such things.",ref:"Philippians 4:8"} },
-      { theme:"RESILIENCE", stoic:{quote:"No man is more unhappy than he who never faces adversity.",author:"Seneca"}, bible:{verse:"Blessed is the one who perseveres under trial because, having stood the test, they will receive the crown of life.",ref:"James 1:12"} },
-      { theme:"RESILIENCE", stoic:{quote:"Where the disease is greatest, the remedy must be strongest.",author:"Seneca"}, bible:{verse:"My grace is sufficient for you, for my power is made perfect in weakness.",ref:"2 Corinthians 12:9"} },
-      { theme:"RESILIENCE", stoic:{quote:"Waste no more time arguing about what a good man should be. Be one.",author:"Marcus Aurelius"}, bible:{verse:"Be strong and courageous. Do not be afraid; do not be discouraged, for the Lord your God will be with you.",ref:"Joshua 1:9"} },
-      { theme:"RESILIENCE", stoic:{quote:"Fall seven times, stand up eight.",author:"Epictetus"}, bible:{verse:"Though the righteous fall seven times, they rise again.",ref:"Proverbs 24:16"} },
-      // DISCIPLINE
-      { theme:"DISCIPLINE", stoic:{quote:"No man is free who is not master of himself.",author:"Epictetus"}, bible:{verse:"Like a city whose walls are broken through is a person who lacks self-control.",ref:"Proverbs 25:28"} },
-      { theme:"DISCIPLINE", stoic:{quote:"Endure and renounce.",author:"Epictetus"}, bible:{verse:"Everyone who competes in the games goes into strict training.",ref:"1 Corinthians 9:25"} },
-      { theme:"DISCIPLINE", stoic:{quote:"First say to yourself what you would be; and then do what you have to do.",author:"Epictetus"}, bible:{verse:"Commit to the Lord whatever you do, and he will establish your plans.",ref:"Proverbs 16:3"} },
-      { theme:"DISCIPLINE", stoic:{quote:"Confine yourself to the present.",author:"Marcus Aurelius"}, bible:{verse:"Do not worry about tomorrow, for tomorrow will worry about itself.",ref:"Matthew 6:34"} },
-      { theme:"DISCIPLINE", stoic:{quote:"You become what you give your attention to.",author:"Epictetus"}, bible:{verse:"Set your minds on things above, not on earthly things.",ref:"Colossians 3:2"} },
-      { theme:"DISCIPLINE", stoic:{quote:"Small deeds done are better than great deeds planned.",author:"Peter Marshall"}, bible:{verse:"Whatever you do, work at it with all your heart, as working for the Lord.",ref:"Colossians 3:23"} },
-      { theme:"DISCIPLINE", stoic:{quote:"The first and greatest victory is to conquer yourself.",author:"Plato"}, bible:{verse:"But I discipline my body and keep it under control.",ref:"1 Corinthians 9:27"} },
-      { theme:"DISCIPLINE", stoic:{quote:"Do not indulge in expectations of what you cannot control.",author:"Epictetus"}, bible:{verse:"You ought to say, 'If it is the Lord's will...'",ref:"James 4:13-15"} },
-      { theme:"DISCIPLINE", stoic:{quote:"How long are you going to wait before you demand the best for yourself?",author:"Epictetus"}, bible:{verse:"Wake up, sleeper, rise from the dead, and Christ will shine on you.",ref:"Ephesians 5:14"} },
-      // WISDOM
-      { theme:"WISDOM", stoic:{quote:"It is the mark of an educated mind to be able to entertain a thought without accepting it.",author:"Marcus Aurelius"}, bible:{verse:"The heart of the discerning acquires knowledge, for the ears of the wise seek it out.",ref:"Proverbs 18:15"} },
-      { theme:"WISDOM", stoic:{quote:"Seek not the good in external things; seek it in yourself.",author:"Epictetus"}, bible:{verse:"For the Lord gives wisdom; from his mouth come knowledge and understanding.",ref:"Proverbs 2:6"} },
-      { theme:"WISDOM", stoic:{quote:"If you are distressed by anything external, the pain is not due to the thing itself but to your own estimate of it.",author:"Marcus Aurelius"}, bible:{verse:"Do not conform to the pattern of this world, but be transformed by the renewing of your mind.",ref:"Romans 12:2"} },
-      { theme:"WISDOM", stoic:{quote:"Know thyself.",author:"Socrates"}, bible:{verse:"For who knows a person's thoughts except their own spirit within them?",ref:"1 Corinthians 2:11"} },
-      { theme:"WISDOM", stoic:{quote:"The more we value things outside our control, the less control we have.",author:"Epictetus"}, bible:{verse:"But seek first his kingdom and his righteousness, and all these things will be given to you as well.",ref:"Matthew 6:33"} },
-      { theme:"WISDOM", stoic:{quote:"Very little is needed to make a happy life; it is all within yourself, in your way of thinking.",author:"Marcus Aurelius"}, bible:{verse:"Godliness with contentment is great gain.",ref:"1 Timothy 6:6"} },
-      { theme:"WISDOM", stoic:{quote:"He is a wise man who does not grieve for the things which he has not, but rejoices for those which he has.",author:"Epictetus"}, bible:{verse:"I have learned, in whatsoever state I am, therewith to be content.",ref:"Philippians 4:11"} },
-      { theme:"WISDOM", stoic:{quote:"Accept wise counsel.",author:"Marcus Aurelius"}, bible:{verse:"Plans fail for lack of counsel, but with many advisers they succeed.",ref:"Proverbs 15:22"} },
-      { theme:"WISDOM", stoic:{quote:"Every new beginning comes from some other beginning's end.",author:"Seneca"}, bible:{verse:"See, I am doing a new thing! Now it springs up; do you not perceive it?",ref:"Isaiah 43:19"} },
-      // COURAGE
-      { theme:"COURAGE", stoic:{quote:"He who is brave is free.",author:"Seneca"}, bible:{verse:"For the Spirit God gave us does not make us timid, but gives us power, love and self-discipline.",ref:"2 Timothy 1:7"} },
-      { theme:"COURAGE", stoic:{quote:"Luck is what happens when preparation meets opportunity.",author:"Seneca"}, bible:{verse:"Whatever your hand finds to do, do it with all your might.",ref:"Ecclesiastes 9:10"} },
-      { theme:"COURAGE", stoic:{quote:"Begin at once to live, and count each day as a separate life.",author:"Seneca"}, bible:{verse:"This is the day the Lord has made; let us rejoice and be glad in it.",ref:"Psalm 118:24"} },
-      { theme:"COURAGE", stoic:{quote:"Act bravely.",author:"Marcus Aurelius"}, bible:{verse:"For I am not ashamed of the gospel, because it is the power of God that brings salvation.",ref:"Romans 1:16"} },
-      { theme:"COURAGE", stoic:{quote:"It is not because things are difficult that we do not dare; it is because we do not dare that they are difficult.",author:"Seneca"}, bible:{verse:"Have I not commanded you? Be strong and courageous.",ref:"Joshua 1:9"} },
-      { theme:"COURAGE", stoic:{quote:"Throw me to the wolves and I will return leading the pack.",author:"Seneca"}, bible:{verse:"No weapon forged against you will prevail.",ref:"Isaiah 54:17"} },
-      { theme:"COURAGE", stoic:{quote:"The greatest bravery is the courage of every-day life.",author:"Epictetus"}, bible:{verse:"Be on your guard; stand firm in the faith; be courageous; be strong.",ref:"1 Corinthians 16:13"} },
-      { theme:"COURAGE", stoic:{quote:"He who has a why to live can bear almost any how.",author:"Nietzsche"}, bible:{verse:"For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you.",ref:"Jeremiah 29:11"} },
-      { theme:"COURAGE", stoic:{quote:"Courage is knowing what not to fear.",author:"Plato"}, bible:{verse:"There is no fear in love. But perfect love drives out fear.",ref:"1 John 4:18"} },
-      // PEACE
-      { theme:"PEACE", stoic:{quote:"Nowhere can man find a quieter or more untroubled retreat than in his own soul.",author:"Marcus Aurelius"}, bible:{verse:"And the peace of God, which transcends all understanding, will guard your hearts and your minds in Christ Jesus.",ref:"Philippians 4:7"} },
-      { theme:"PEACE", stoic:{quote:"True happiness is to enjoy the present, without anxious dependence upon the future.",author:"Seneca"}, bible:{verse:"Cast all your anxiety on him because he cares for you.",ref:"1 Peter 5:7"} },
-      { theme:"PEACE", stoic:{quote:"Never let the future disturb you. You will meet it with the same weapons of reason which today arm you against the present.",author:"Marcus Aurelius"}, bible:{verse:"Do not be anxious about anything, but in every situation, by prayer and petition... present your requests to God.",ref:"Philippians 4:6"} },
-      { theme:"PEACE", stoic:{quote:"To bear trials with a calm mind robs misfortune of its strength and burden.",author:"Seneca"}, bible:{verse:"You will keep in perfect peace those whose minds are steadfast, because they trust in you.",ref:"Isaiah 26:3"} },
-      { theme:"PEACE", stoic:{quote:"Ask yourself at every moment, 'Is this necessary?'",author:"Marcus Aurelius"}, bible:{verse:"Be still, and know that I am God.",ref:"Psalm 46:10"} },
-      { theme:"PEACE", stoic:{quote:"The things that hurt, instruct.",author:"Seneca"}, bible:{verse:"For our light and momentary troubles are achieving for us an eternal glory that far outweighs them all.",ref:"2 Corinthians 4:17"} },
-      { theme:"PEACE", stoic:{quote:"Peace is not absence of conflict, it is the ability to handle conflict by peaceful means.",author:"Marcus Aurelius"}, bible:{verse:"Blessed are the peacemakers, for they will be called children of God.",ref:"Matthew 5:9"} },
-      { theme:"PEACE", stoic:{quote:"Concentrate the mind on the present moment.",author:"Marcus Aurelius"}, bible:{verse:"Give your entire attention to what God is doing right now.",ref:"Matthew 6:34"} },
-      { theme:"PEACE", stoic:{quote:"Man is not worried by real problems so much as by his imagined anxieties about real problems.",author:"Epictetus"}, bible:{verse:"Humble yourselves, therefore, under God's mighty hand, that he may lift you up in due time.",ref:"1 Peter 5:6"} },
-      // GRATITUDE
-      { theme:"GRATITUDE", stoic:{quote:"Wealth consists not in having great possessions, but in having few wants.",author:"Epictetus"}, bible:{verse:"Give thanks in all circumstances; for this is God's will for you in Christ Jesus.",ref:"1 Thessalonians 5:18"} },
-      { theme:"GRATITUDE", stoic:{quote:"He who is not satisfied with a little, is satisfied with nothing.",author:"Epicurus"}, bible:{verse:"The Lord is my shepherd; I shall not want.",ref:"Psalm 23:1"} },
-      { theme:"GRATITUDE", stoic:{quote:"Receive without pride, relinquish without struggle.",author:"Marcus Aurelius"}, bible:{verse:"The Lord gave, and the Lord has taken away; blessed be the name of the Lord.",ref:"Job 1:21"} },
-      { theme:"GRATITUDE", stoic:{quote:"Do not spoil what you have by desiring what you have not.",author:"Epicurus"}, bible:{verse:"Better one handful with tranquility than two handfuls with toil.",ref:"Ecclesiastes 4:6"} },
-      { theme:"GRATITUDE", stoic:{quote:"Enjoy the present pleasures in such a way as not to injure the future ones.",author:"Seneca"}, bible:{verse:"Every good and perfect gift is from above, coming down from the Father of the heavenly lights.",ref:"James 1:17"} },
-      { theme:"GRATITUDE", stoic:{quote:"Amor fati: Love your fate, which is in fact your life.",author:"Marcus Aurelius"}, bible:{verse:"In everything give thanks: for this is the will of God in Christ Jesus concerning you.",ref:"1 Thessalonians 5:18"} },
-      { theme:"GRATITUDE", stoic:{quote:"A grateful mind is a great mind which eventually attracts to itself great things.",author:"Plato"}, bible:{verse:"Let the peace of Christ rule in your hearts... And be thankful.",ref:"Colossians 3:15"} },
-      { theme:"GRATITUDE", stoic:{quote:"Real riches are the riches possessed inside.",author:"Seneca"}, bible:{verse:"But godliness with contentment is great gain.",ref:"1 Timothy 6:6-7"} },
-      { theme:"GRATITUDE", stoic:{quote:"It is not the man who has too little, but the man who craves more, that is poor.",author:"Seneca"}, bible:{verse:"I have learned, in whatever situation I am, to be content.",ref:"Philippians 4:11"} },
-      // PURPOSE
-      { theme:"PURPOSE", stoic:{quote:"Man is disturbed not by things, but by the opinions about things.",author:"Epictetus"}, bible:{verse:"For we are God's handiwork, created in Christ Jesus to do good works, which God prepared in advance for us to do.",ref:"Ephesians 2:10"} },
-      { theme:"PURPOSE", stoic:{quote:"The purpose of life is to live in agreement with nature.",author:"Zeno of Citium"}, bible:{verse:"Before I formed you in the womb I knew you, before you were born I set you apart.",ref:"Jeremiah 1:5"} },
-      { theme:"PURPOSE", stoic:{quote:"You can foresee the future by looking at the past.",author:"Marcus Aurelius"}, bible:{verse:"Many are the plans in a person's heart, but it is the Lord's purpose that prevails.",ref:"Proverbs 19:21"} },
-      { theme:"PURPOSE", stoic:{quote:"He suffers more than necessary, who suffers before it is necessary.",author:"Seneca"}, bible:{verse:"For everything there is a season, and a time for every matter under heaven.",ref:"Ecclesiastes 3:1"} },
-      { theme:"PURPOSE", stoic:{quote:"Life is long if you know how to use it.",author:"Seneca"}, bible:{verse:"Teach us to number our days, that we may gain a heart of wisdom.",ref:"Psalm 90:12"} },
-      { theme:"PURPOSE", stoic:{quote:"Wherever there is a human being, there is an opportunity for a kindness.",author:"Seneca"}, bible:{verse:"Whatever you did for one of the least of these brothers and sisters of mine, you did for me.",ref:"Matthew 25:40"} },
-      { theme:"PURPOSE", stoic:{quote:"If it is not right do not do it; if it is not true do not say it.",author:"Marcus Aurelius"}, bible:{verse:"Do not let any unwholesome talk come out of your mouths, but only what is helpful for building others up.",ref:"Ephesians 4:29"} },
-      { theme:"PURPOSE", stoic:{quote:"Let us not become weary in doing good.",author:"Marcus Aurelius"}, bible:{verse:"Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.",ref:"Galatians 6:9"} },
-      { theme:"PURPOSE", stoic:{quote:"What man actually needs is not a tensionless state but rather the striving and struggling for a worthwhile goal.",author:"Epictetus"}, bible:{verse:"Run in such a way as to get the prize.",ref:"1 Corinthians 9:24"} },
-      // HUMILITY
-      { theme:"HUMILITY", stoic:{quote:"You are a little soul carrying around a corpse.",author:"Marcus Aurelius"}, bible:{verse:"For all have sinned and fall short of the glory of God.",ref:"Romans 3:23"} },
-      { theme:"HUMILITY", stoic:{quote:"If someone shows me I'm wrong, I will happily change.",author:"Marcus Aurelius"}, bible:{verse:"Pride goes before destruction, a haughty spirit before a fall.",ref:"Proverbs 16:18"} },
-      { theme:"HUMILITY", stoic:{quote:"Never esteem anything as of advantage to you that will make you break your word or lose your self-respect.",author:"Marcus Aurelius"}, bible:{verse:"Do nothing out of selfish ambition or vain conceit. Rather, in humility value others above yourselves.",ref:"Philippians 2:3"} },
-      { theme:"HUMILITY", stoic:{quote:"The happiness of your life depends upon the quality of your thoughts.",author:"Marcus Aurelius"}, bible:{verse:"For those who exalt themselves will be humbled, and those who humble themselves will be exalted.",ref:"Matthew 23:12"} },
-      { theme:"HUMILITY", stoic:{quote:"Accept the things to which fate binds you.",author:"Marcus Aurelius"}, bible:{verse:"Humble yourselves before the Lord, and he will lift you up.",ref:"James 4:10"} },
-      { theme:"HUMILITY", stoic:{quote:"Do not think of what is absent as already lost.",author:"Marcus Aurelius"}, bible:{verse:"The Lord is close to the brokenhearted and saves those who are crushed in spirit.",ref:"Psalm 34:18"} },
-      { theme:"HUMILITY", stoic:{quote:"Make the best use of what is in your power, and take the rest as it happens.",author:"Epictetus"}, bible:{verse:"Casting all your care upon him; for he careth for you.",ref:"1 Peter 5:7"} },
-      { theme:"HUMILITY", stoic:{quote:"The world is a mere change of scene. Time is a river.",author:"Marcus Aurelius"}, bible:{verse:"What is your life? You are a mist that appears for a little while and then vanishes.",ref:"James 4:14"} },
-      { theme:"HUMILITY", stoic:{quote:"If you really want to escape the things that harass you, what you're needing is not to be in a different place but to be a different person.",author:"Seneca"}, bible:{verse:"Therefore, if anyone is in Christ, the new creation has come: The old has gone, the new is here!",ref:"2 Corinthians 5:17"} },
-      // HOPE
-      { theme:"HOPE", stoic:{quote:"The sun also rises.",author:"Marcus Aurelius"}, bible:{verse:"The steadfast love of the Lord never ceases; his mercies never come to an end; they are new every morning.",ref:"Lamentations 3:22-23"} },
-      { theme:"HOPE", stoic:{quote:"This too shall pass.",author:"Persian proverb"}, bible:{verse:"Weeping may stay for the night, but rejoicing comes in the morning.",ref:"Psalm 30:5"} },
-      { theme:"HOPE", stoic:{quote:"While there is life there is hope.",author:"Cicero"}, bible:{verse:"But those who hope in the Lord will renew their strength. They will soar on wings like eagles.",ref:"Isaiah 40:31"} },
-      { theme:"HOPE", stoic:{quote:"Turn your wounds into wisdom.",author:"Epictetus"}, bible:{verse:"He heals the brokenhearted and binds up their wounds.",ref:"Psalm 147:3"} },
-      { theme:"HOPE", stoic:{quote:"If you are going through hell, keep going.",author:"Seneca"}, bible:{verse:"Even though I walk through the darkest valley, I will fear no evil, for you are with me.",ref:"Psalm 23:4"} },
-      { theme:"HOPE", stoic:{quote:"The bravest sight in the world is to see a great man struggling against adversity.",author:"Seneca"}, bible:{verse:"We are hard pressed on every side, but not crushed; perplexed, but not in despair.",ref:"2 Corinthians 4:8"} },
-      { theme:"HOPE", stoic:{quote:"A gem cannot be polished without friction, nor a man perfected without trials.",author:"Seneca"}, bible:{verse:"See, I have refined you, though not as silver; I have tested you in the furnace of affliction.",ref:"Isaiah 48:10"} },
-      { theme:"HOPE", stoic:{quote:"What we plant in the soil of contemplation, we shall reap in the harvest of action.",author:"Meister Eckhart"}, bible:{verse:"Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.",ref:"Galatians 6:9"} },
-      { theme:"HOPE", stoic:{quote:"After winter, spring.",author:"Marcus Aurelius"}, bible:{verse:"For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.",ref:"Jeremiah 29:11"} },
-    ];
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CANON BURST ENGINE
-    // ═══════════════════════════════════════════════════════════════════════════
-    let bpIndex = 0;
-    let bpMode  = 'both';
-
-    // 5 daily burst times as [hour, minute] in local time
-    const BURST_TIMES  = [[6,30],[10,54],[15,18],[19,42],[0,6]];
-    const BURST_LABELS = ['6:30 AM','10:54 AM','3:18 PM','7:42 PM','12:06 AM'];
-
-    function bpSetMode(m) {
-      bpMode = m;
-      ['both','stoic','bible'].forEach(x => {
-        document.getElementById('bp-btn-' + x).classList.toggle('active', x === m);
-      });
-      bpRender();
-    }
-
-    function bpNext() {
-      bpIndex = (bpIndex + 1) % library.length;
-      bpRender();
-    }
-
-    function bpRandom() {
-      bpIndex = Math.floor(Math.random() * library.length);
-      bpRender();
-    }
-
-    function bpRender() {
-      const e = library[bpIndex];
-      document.getElementById('bp-num').textContent =
-        '★  CANON BURST #' + String(bpIndex + 1).padStart(2, '0');
-      document.getElementById('bp-theme-badge').textContent = e.theme;
-
-      const stoicSec = document.getElementById('bp-stoic-section');
-      const bibleSec = document.getElementById('bp-bible-section');
-      const divider  = document.getElementById('bp-divider');
-
-      if (bpMode === 'both' || bpMode === 'stoic') {
-        stoicSec.style.display = 'block';
-        document.getElementById('bp-stoic-text').textContent = '"' + e.stoic.quote + '"';
-        document.getElementById('bp-stoic-attr').textContent = '— ' + e.stoic.author;
-      } else {
-        stoicSec.style.display = 'none';
+      function setHref(id, href) {
+        var el = document.getElementById(id);
+        if (el) el.setAttribute('href', href);
       }
 
-      divider.style.display = (bpMode === 'both') ? 'block' : 'none';
+      var encoded = encodeURIComponent(pageUrl);
+      var shareText = TITLE + ' — a public page on AI governance.';
+      setHref('share-linkedin', 'https://www.linkedin.com/sharing/share-offsite/?url=' + encoded);
+      setHref('share-x', 'https://twitter.com/intent/tweet?url=' + encoded + '&text=' + encodeURIComponent(shareText));
+      setHref('share-facebook', 'https://www.facebook.com/sharer/sharer.php?u=' + encoded);
+      setHref('share-email', 'mailto:?subject=' + encodeURIComponent(TITLE) + '&body=' + encodeURIComponent(BLURB + '\n\n' + pageUrl));
 
-      if (bpMode === 'both' || bpMode === 'bible') {
-        bibleSec.style.display = 'block';
-        document.getElementById('bp-bible-text').textContent = '"' + e.bible.verse + '"';
-        document.getElementById('bp-bible-attr').textContent = '— ' + e.bible.ref;
-      } else {
-        bibleSec.style.display = 'none';
-      }
-
-      document.getElementById('bp-counter-text').textContent =
-        'Canon ' + (bpIndex + 1) + ' of 81  ·  ' + e.theme;
-    }
-
-    function getNextBurstTime(now) {
-      const results = BURST_TIMES.map(([h, m], i) => {
-        const candidate = new Date(now);
-        candidate.setHours(h, m, 0, 0);
-        if (candidate <= now) candidate.setDate(candidate.getDate() + 1);
-        return { label: BURST_LABELS[i], msUntil: candidate - now, index: i };
-      });
-      return results.reduce((a, b) => a.msUntil < b.msUntil ? a : b);
-    }
-
-    function renderBurstSchedule(now, nextIndex) {
-      const el = document.getElementById('bp-schedule-times');
-      el.innerHTML = BURST_TIMES.map(([h, m], i) => {
-        const t = new Date(now);
-        t.setHours(h, m, 0, 0);
-        const fired  = t < now;
-        const isNext = i === nextIndex;
-        let chip = '';
-        if (isNext)      chip = '<span class="sched-chip sched-next">Next</span>';
-        else if (fired)  chip = '<span class="sched-chip sched-fired">Fired</span>';
-        else             chip = '<span class="sched-chip sched-pending">Later</span>';
-        return '<div class="schedule-time' + (isNext ? ' next-burst' : '') + '">'
-          + '<span>' + BURST_LABELS[i] + '</span>' + chip + '</div>';
-      }).join('');
-    }
-
-    function updateBurstCountdown() {
-      const now  = new Date();
-      const next = getNextBurstTime(now);
-      const ms   = next.msUntil;
-      const h    = Math.floor(ms / 3600000);
-      const m    = Math.floor((ms % 3600000) / 60000);
-      const s    = Math.floor((ms % 60000) / 1000);
-      const pad  = n => String(n).padStart(2, '0');
-      const el   = document.getElementById('bp-countdown');
-      el.textContent = 'Next burst in: ' + pad(h) + ':' + pad(m) + ':' + pad(s) + '  (' + next.label + ')';
-      el.classList.toggle('firing', ms < 60000);
-      renderBurstSchedule(now, next.index);
-    }
-
-    // ── Burst fire detection (every 30s) ──────────────────────────────────────
-    let lastFiredBurst = -1;
-
-    function checkBurstFire() {
-      const now = new Date();
-      BURST_TIMES.forEach(([h, m], i) => {
-        const tStart = new Date(now);
-        tStart.setHours(h, m, 0, 0);
-        const tEnd = new Date(tStart.getTime() + 30000);
-        if (now >= tStart && now < tEnd && lastFiredBurst !== tStart.getTime()) {
-          lastFiredBurst = tStart.getTime();
-          fireBurstNotification(i);
+      var copyBtn = document.getElementById('share-copy');
+      var status = document.getElementById('share-status');
+      if (!copyBtn) return;
+      copyBtn.addEventListener('click', function () {
+        var restore = copyBtn.textContent;
+        function confirmCopied() {
+          copyBtn.textContent = 'Copied';
+          copyBtn.setAttribute('aria-label', 'Copied');
+          if (status) status.textContent = 'Copied';
+          window.setTimeout(function () {
+            copyBtn.textContent = restore;
+            copyBtn.setAttribute('aria-label', 'Copy link');
+            if (status) status.textContent = '';
+          }, 1600);
+        }
+        function showFailure() {
+          copyBtn.textContent = 'Could not copy';
+          if (status) status.textContent = 'Could not copy the link.';
+          window.setTimeout(function () {
+            copyBtn.textContent = restore;
+            if (status) status.textContent = '';
+          }, 1600);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(pageUrl).then(confirmCopied).catch(showFailure);
+        } else {
+          showFailure();
         }
       });
-    }
-
-    function fireBurstNotification(timeIndex) {
-      const e     = library[bpIndex];
-      const title = '★ Canon Burst — ' + BURST_LABELS[timeIndex];
-      const body  = '"' + e.stoic.quote + '" — ' + e.stoic.author;
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({
-          type: 'SHOW_NOTIFICATION', title, body, tag: 'burst-' + timeIndex
-        });
-      } else if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(title, { body, icon: './icon-192.svg', tag: 'burst-' + timeIndex });
-      }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // NOTIFICATION PERMISSION
-    // ═══════════════════════════════════════════════════════════════════════════
-    function requestNotifPermission() {
-      if (!('Notification' in window)) {
-        document.getElementById('notif-btn').textContent = '✗ Not Supported';
-        return;
-      }
-      if (Notification.permission === 'granted') { showNotifStatus('granted'); return; }
-      Notification.requestPermission().then(p => showNotifStatus(p));
-    }
-
-    function showNotifStatus(perm) {
-      const btn = document.getElementById('notif-btn');
-      if (!btn) return;
-      if (perm === 'granted') {
-        btn.textContent = 'Notifications allowed — quote stays manual';
-        btn.className = 'notif-btn';
-      } else if (perm === 'denied') {
-        btn.textContent = '✗ Notifications Blocked';
-        btn.className = 'notif-btn denied';
-      } else {
-        btn.textContent = '🔔 Enable Burst Alerts';
-        btn.className = 'notif-btn';
-      }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SLACK SIGNAL
-    // ═══════════════════════════════════════════════════════════════════════════
-    async function sendSlackSignal() {
-      const btn = document.getElementById('signal-btn');
-      const fb  = document.getElementById('signal-feedback');
-      const e   = library[bpIndex];
-
-      if (!SLACK_WEBHOOK_URL || SLACK_WEBHOOK_URL.includes('REPLACE')) {
-        const entered = (window.prompt('Paste your Slack Incoming Webhook URL (saved on this device only):') || '').trim();
-        if (/^https:\/\/hooks\.slack\.com\/services\//.test(entered)) {
-          localStorage.setItem('bos_slack_webhook', entered);
-          SLACK_WEBHOOK_URL = entered;
-          return sendSlackSignal();
-        }
-        fb.textContent = '⚠ No Slack webhook set on this device yet.';
-        fb.className = 'signal-feedback err';
-        return;
-      }
-
-      btn.disabled = true;
-      fb.textContent = 'Sending…';
-      fb.className = 'signal-feedback';
-
-      const payload = {
-        text: '★ Bailey OS Signal — Canon Burst #' + String(bpIndex + 1).padStart(2, '0') + ' · ' + e.theme,
-        blocks: [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: '*★ Canon Burst #' + String(bpIndex + 1).padStart(2, '0') + '*  ·  _' + e.theme + '_\n\n'
-                + '*⚡ Stoic:*\n>"' + e.stoic.quote + '" — ' + e.stoic.author + '\n\n'
-                + '*✝ Bible:*\n>"' + e.bible.verse + '" — ' + e.bible.ref
-            }
-          },
-          {
-            type: 'context',
-            elements: [{
-              type: 'mrkdwn',
-              text: 'Bailey OS Mission Control v2.0  ·  ' + new Date().toLocaleString()
-            }]
-          }
-        ]
-      };
-
-      try {
-        // mode: 'no-cors' is required — Slack webhooks don't send CORS headers.
-        // The response will be opaque (status 0); verify delivery in Slack itself.
-        await fetch(SLACK_WEBHOOK_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          body: JSON.stringify(payload)
-        });
-        fb.textContent = 'The browser handed the request to Slack. Delivery was not confirmed.';
-        fb.className = 'signal-feedback';
-      } catch (err) {
-        fb.textContent = '✗ Failed: ' + err.message;
-        fb.className = 'signal-feedback err';
-      }
-
-      setTimeout(() => {
-        btn.disabled = false;
-        fb.textContent = '';
-        fb.className = 'signal-feedback';
-      }, 4000);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SUPABASE — ARK LIVE DATA
-    // ═══════════════════════════════════════════════════════════════════════════
-    const TAG_CFG = {
-      arch:   { label: 'Architecture', cls: 'tag-arch'   },
-      signal: { label: 'Signal',       cls: 'tag-signal'  },
-      verify: { label: 'Verified',     cls: 'tag-verify'  },
-      legal:  { label: 'Legal',        cls: 'tag-legal'   },
-      deploy: { label: 'Deployed',     cls: 'tag-deploy'  },
-    };
-
-    async function countExact(table, applyFilter) {
-      if (!db) return null;
-      var q = db.from(table).select('id', { count: 'exact', head: true });
-      if (applyFilter) q = applyFilter(q);
-      var result = await q;
-      if (result.error) return null;
-      return result.count || 0;
-    }
-
-    function formatDate(iso) {
-      if (!iso) return '—';
-      return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    }
-
-    function animateNum(id, target) {
-      var el = document.getElementById(id);
-      if (!el) return;
-      el.classList.remove('loading');
-      var cur = 0, step = Math.max(1, Math.floor(target / 30));
-      var t = setInterval(function() {
-        cur = Math.min(cur + step, target);
-        el.textContent = cur;
-        if (cur >= target) clearInterval(t);
-      }, 40);
-    }
-
-    async function loadArkStats() {
-      try {
-        var total = await countExact('age_gate_public');
-        var entries = await countExact('ark_entries');
-        animateNum('sc-verifications', total || 0);
-        animateNum('sc-entries', entries || 0);
-      } catch (e) {
-        ['sc-verifications', 'sc-entries'].forEach(function (id) {
-          var el = document.getElementById(id);
-          if (el) { el.classList.remove('loading'); el.textContent = '—'; }
-        });
-      }
-    }
-
-    function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
-    async function loadArkEntries() {
-      var wrap = document.getElementById('ark-entries-wrap');
-      try {
-        var result = await db.from('ark_entries').select('*').order('created_at', { ascending: false });
-        if (result.error) throw result.error;
-        var entries = result.data;
-        if (!entries || entries.length === 0) {
-          renderStaticArkFallback(); return;
-        }
-        wrap.innerHTML = entries.map(function(e) {
-          var cfg = TAG_CFG[e.tag] || TAG_CFG.arch;
-          return '<div class="ark-entry">'
-            + '<div class="ark-entry-header">'
-            + '<span class="ark-tag ' + cfg.cls + '">' + cfg.label + '</span>'
-            + '<span class="ark-entry-id">' + escHtml(e.entry_id || '') + '</span>'
-            + '<span class="ark-entry-title">' + escHtml(e.title || '') + '</span>'
-            + '<span class="ark-entry-date">' + formatDate(e.created_at) + '</span>'
-            + '</div>'
-            + '<div class="ark-entry-body">' + escHtml(e.body || e.description || '') + '</div>'
-            + '</div>';
-        }).join('');
-      } catch(e) {
-        renderStaticArkFallback();
-      }
-    }
-
-    function renderStaticArkFallback() {
-      var wrap = document.getElementById('ark-entries-wrap');
-      var sampleNote = '<p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.75rem;">These five lines are samples stored in this page. The read did not return rows, so this is not a live log.</p>';
-      var entries = [
-        { tag:'arch',   id:'ARK-001', title:'First Circuit Complete',                    date:'Feb 27, 2026', body:'Claude, Grok, Gemini, Copilot all present. Multi-agent alignment confirmed across 4 major AI platforms.' },
-        { tag:'verify', id:'ARK-002', title:'13 Platforms Audited',                      date:'Feb 27, 2026', body:'Kimi K2.5 verified. Full-spectrum audit across 13 AI and business platforms completed.' },
-        { tag:'legal',  id:'ARK-003', title:'Legal / Regulatory Packet Published',       date:'Feb 27, 2026', body:'COPPA / CIPA compliance framework documented. Age gate legally required on all swaggconsulting.com public pages.' },
-        { tag:'verify', id:'ARK-004', title:'Position Paper — Kimi K2.5 Audit Passed',  date:'Mar 4, 2026',  body:'"Technically informed, valid policy argument." — Kimi K2.5 independent audit verdict.' },
-        { tag:'deploy', id:'ARK-005', title:'Age Gate Backend Live on Supabase',         date:'Mar 4, 2026',  body:'Edge Function verify-age deployed. Returns 401 (auth-required) — confirmed live. Realtime enabled.' },
-      ];
-      wrap.innerHTML = sampleNote + entries.map(function(e) {
-        var cfg = TAG_CFG[e.tag] || TAG_CFG.arch;
-        return '<div class="ark-entry">'
-          + '<div class="ark-entry-header">'
-          + '<span class="ark-tag ' + cfg.cls + '">' + cfg.label + '</span>'
-          + '<span class="ark-entry-id">' + e.id + '</span>'
-          + '<span class="ark-entry-title">' + e.title + '</span>'
-          + '<span class="ark-entry-date">' + e.date + '</span>'
-          + '</div>'
-          + '<div class="ark-entry-body">' + e.body + '</div>'
-          + '</div>';
-      }).join('');
-    }
-
-    function subscribeRealtime() {
-      db.channel('public:ark_entries')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'ark_entries' }, function () {
-          loadArkEntries();
-          loadArkStats();
-        })
-        .subscribe();
-    }
-
-    function startPeriodicRefresh() {
-      setInterval(function () {
-        loadArkStats();
-      }, 30000);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SERVICE WORKER REGISTRATION
-    // ═══════════════════════════════════════════════════════════════════════════
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('./sw.js')
-          .then(function(reg) { console.log('[Bailey OS] SW registered, scope:', reg.scope); })
-          .catch(function(err) { console.warn('[Bailey OS] SW registration failed:', err); });
-      });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // BOOT SEQUENCE
-    // ═══════════════════════════════════════════════════════════════════════════
-    updateClock();
-    setInterval(updateClock, 1000);
-
-    bpRender();
-    updateBurstCountdown();
-    setInterval(updateBurstCountdown, 1000);
-    setInterval(checkBurstFire, 30000);
-
-    function bootArk() {
-      if (!window.supabase) { setTimeout(bootArk, 200); return; }
-      db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      loadArkStats();
-      loadArkEntries();
-      subscribeRealtime();
-      startPeriodicRefresh();
-    }
-    bootArk();
-
-    loadChecklist();
-    showNotifStatus(('Notification' in window) ? Notification.permission : 'unsupported');
+    })();
   </script>
 </body>
 </html>
