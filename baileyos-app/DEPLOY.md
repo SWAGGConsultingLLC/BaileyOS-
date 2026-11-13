@@ -63,3 +63,21 @@ Login and confirmation emails send people back to this address. If it is missing
 ## 4. Point the home screen at the real address
 
 The GitHub Pages home screen links to `https://baileyos-app.vercel.app`.
+
+## 5. Oracle proxy for Signal Ark
+
+`POST /api/oracle` answers Grok, Gemini, and GitHub Models for the public Signal Ark page and for Landing Stone. Visitors do not enter a key. The route reads these three names from the Vercel environment. Paste the values in Vercel only. Do not commit them, log them, or return them.
+
+The map keeps working if these are blank. A provider with a blank value answers that provider with “not configured” and does not affect placement.
+
+| Name | What to enter |
+| --- | --- |
+| `XAI_API_KEY` | xAI API key from [console.x.ai](https://console.x.ai). Used for `provider: "grok"`. |
+| `GEMINI_API_KEY` | Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey). Used for `provider: "gemini"`. |
+| `GITHUB_MODELS_TOKEN` | GitHub personal access token with the `models:read` permission. Used for `provider: "github"`. GitHub retired the Models inference API on July 30, 2026, so this call currently fails upstream until GitHub serves chat completions again. |
+
+Request JSON: `{ "provider": "grok" | "gemini" | "github", "model"?: string, "system"?: string, "messages": [{ "role": "user" | "assistant", "content": string }] }`.
+
+Success JSON: `{ "reply": string, "provider": string, "model": string }`.
+
+The allowed model ids are fixed in `lib/oracle.ts` (`grok-4.7`, `gemini-3.8-flash`, `openai/gpt-4o-mini`). Output is capped at 800 tokens. Each IP address gets 20 requests per 10 minutes. That counter is the in-memory window in `lib/rateLimit.ts` (key `oracle:<ip>`). This app has no Redis or KV, so on Vercel the limit is per server instance, the same way the map limits placements. A request with no `Origin` is accepted for a server caller. Browser calls are limited to `https://os.swaggconsulting.com`, `https://swaggconsultingllc.github.io`, `https://www.swaggconsulting.com`, and localhost.
