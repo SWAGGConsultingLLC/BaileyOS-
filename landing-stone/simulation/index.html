@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>#landingstone — Agent simulation</title>
+<meta name="description" content="Landing Stone agent drill. Slot A is Grok (xAI). Slot B is Gemini (Google). Slot C is optional GitHub Models. Rules, turn order, and a referee run in the browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --gold: #C9943A;
+  --gold-soft: #E4C48A;
+  --line: rgba(201, 148, 58, 0.4);
+  --panel: rgba(201, 148, 58, 0.08);
+  --pass: #9DDBB5;
+  --flag: #FFC46B;
+  --err: #FFB4A2;
+}
+html { scroll-behavior: auto; }
+body {
+  background: #000;
+  color: var(--gold);
+  font-family: "Space Mono", ui-monospace, monospace;
+  font-size: 16px;
+  line-height: 1.5;
+  min-height: 100vh;
+  padding: 1.25rem 1rem 3rem;
+}
+a { color: var(--gold); }
+a:hover { text-decoration: none; }
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+.skip {
+  position: absolute;
+  left: 0.5rem;
+  top: 0.5rem;
+  transform: translateY(-150%);
+  background: #000;
+  min-height: 44px;
+  padding: 0.55rem 0.8rem;
+  z-index: 5;
+}
+.skip:focus { transform: none; }
+.wrap { width: 100%; max-width: 78rem; margin: 0 auto; }
+.crumb { margin-bottom: 1.25rem; }
+.crumb a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.4rem 0.2rem;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+}
+header.top { text-align: center; margin-bottom: 1.5rem; }
+.mark { font-size: 2rem; line-height: 1; margin-bottom: 0.75rem; }
+h1 { font-size: clamp(1.35rem, 4vw, 1.7rem); letter-spacing: 0.18em; font-weight: 700; }
+.sub { margin-top: 0.45rem; font-size: 0.75rem; letter-spacing: 0.14em; color: var(--gold-soft); }
+.lede { max-width: 40rem; margin: 0.9rem auto 0; font-size: 0.95rem; }
+h2 { font-size: 0.85rem; letter-spacing: 0.14em; font-weight: 700; margin-bottom: 0.8rem; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.55rem 0.9rem;
+  background: #000;
+  color: var(--gold);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font: inherit;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+button:hover { background: rgba(201, 148, 58, 0.16); }
+button[aria-pressed="true"] {
+  background: rgba(201, 148, 58, 0.22);
+  border-color: var(--gold);
+}
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+.run-note { min-height: 1.5rem; margin-bottom: 1rem; color: var(--gold-soft); font-size: 0.9rem; }
+label, .field-label { display: block; font-size: 0.8rem; letter-spacing: 0.06em; margin-bottom: 0.35rem; }
+.field { margin-bottom: 0.85rem; }
+input, textarea {
+  width: 100%;
+  min-height: 44px;
+  background: #000;
+  color: var(--gold);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+}
+textarea { min-height: 6.5rem; resize: vertical; }
+.grid-3, .grid-2 { display: grid; gap: 0.75rem; }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.hint { color: var(--gold-soft); font-size: 0.875rem; margin-top: 0.35rem; }
+.rules { list-style: none; }
+.rules li {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 0.6rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid rgba(201, 148, 58, 0.2);
+}
+.rule-id { font-weight: 700; }
+.slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.slot.is-off { border-style: dashed; }
+code { font: inherit; color: var(--gold-soft); }
+.slot h2 { display: flex; justify-content: space-between; gap: 0.75rem; align-items: baseline; }
+.provider { color: var(--gold-soft); font-size: 0.8rem; letter-spacing: 0.08em; font-weight: 400; }
+.status { display: flex; align-items: center; gap: 0.5rem; min-height: 44px; font-size: 0.9rem; }
+.lamp {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--gold);
+  flex: 0 0 auto;
+}
+.status[data-kind="pass"] { color: var(--pass); }
+.status[data-kind="pass"] .lamp { background: var(--pass); }
+.status[data-kind="flag"] { color: var(--flag); }
+.status[data-kind="flag"] .lamp { background: var(--flag); }
+.status[data-kind="error"] { color: var(--err); }
+.status[data-kind="error"] .lamp { background: var(--err); }
+.status[data-kind="busy"] .lamp { box-shadow: 0 0 0 3px rgba(201, 148, 58, 0.25); }
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+.check input { width: 1.25rem; height: 1.25rem; min-height: 0; accent-color: var(--gold); }
+.endpoint { word-break: break-all; }
+details.own-key { margin-top: 0.35rem; border-top: 1px solid rgba(201, 148, 58, 0.25); }
+details.own-key summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.slot-error {
+  border: 1px solid var(--err);
+  color: var(--err);
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+.slot-error .error-title { font-weight: 700; margin-bottom: 0.35rem; }
+.slot-error button { margin-top: 0.7rem; color: var(--err); border-color: var(--err); }
+.state-line { margin-bottom: 0.8rem; }
+.log { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+.turn {
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: 4px;
+  padding: 0.75rem;
+}
+.turn.pass { border-left-color: var(--pass); }
+.turn.flag { border-left-color: var(--flag); }
+.turn header { display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem; font-size: 0.8rem; letter-spacing: 0.04em; margin-bottom: 0.5rem; }
+.turn .verdict { margin-top: 0.55rem; font-size: 0.875rem; }
+.turn.pass .verdict { color: var(--pass); }
+.turn.flag .verdict { color: var(--flag); }
+.turn pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+  color: var(--gold-soft);
+}
+.empty { color: var(--gold-soft); }
+footer { margin-top: 1.5rem; text-align: center; font-size: 0.8rem; }
+footer a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.35rem; }
+@media (max-width: 68rem) {
+  .slots { grid-template-columns: 1fr; }
+}
+@media (max-width: 52rem) {
+  .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  .rules li { grid-template-columns: 1fr; gap: 0.15rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status[data-kind="busy"] .lamp { box-shadow: none; }
+}
+@media (forced-colors: active) {
+  button, input, textarea, .panel, .turn { border: 1px solid ButtonText; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#controls">Skip to controls</a>
+<div class="wrap">
+  <p class="crumb"><a href="../">← Landing Stone</a></p>
+  <header class="top">
+    <div class="mark" aria-hidden="true">◉</div>
+    <h1>#LANDINGSTONE</h1>
+    <p class="sub">AGENT DRILL · OPERATION RED ROBIN</p>
+    <p class="lede">Slot A is Grok (xAI). Slot B is Gemini (Google). Slot C is optional GitHub Models. Start calls the BaileyOS oracle proxy, so a visitor does not enter a key. Included slots share one log. The referee checks every turn.</p>
+  </header>
+  <main>
+    <div id="controls" class="controls" role="group" aria-label="Simulation controls">
+      <button type="button" id="start">Start</button>
+      <button type="button" id="pause" disabled>Pause</button>
+      <button type="button" id="step">Step</button>
+      <button type="button" id="reset">Reset</button>
+      <button type="button" id="demo" aria-pressed="false">Demo mode</button>
+      <button type="button" id="export-json">Export JSON</button>
+      <button type="button" id="export-text">Export text</button>
+    </div>
+    <p id="run-note" class="run-note" aria-live="polite"></p>
+
+    <section class="panel" id="rules" aria-labelledby="rules-title">
+      <h2 id="rules-title">RULES</h2>
+      <div class="field">
+        <label for="scenario">Scenario</label>
+        <textarea id="scenario"></textarea>
+      </div>
+      <div class="field">
+        <label for="objective">Objective</label>
+        <textarea id="objective"></textarea>
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label for="max-rounds">Max rounds</label>
+          <input id="max-rounds" type="number" inputmode="numeric" min="1" max="20">
+        </div>
+        <div class="field">
+          <label for="max-words">Words per turn</label>
+          <input id="max-words" type="number" inputmode="numeric" min="1" max="2000">
+        </div>
+        <div class="field">
+          <label for="max-chars">Characters per turn</label>
+          <input id="max-chars" type="number" inputmode="numeric" min="1" max="20000">
+        </div>
+      </div>
+      <div class="field">
+        <label for="objective-words">Objective words</label>
+        <input id="objective-words" type="text" autocomplete="off" spellcheck="false">
+        <p class="hint">Comma-separated. Each turn must include at least one. A round is one turn from each included slot: A, then B, then C when Slot C is included. The cap is 20 rounds.</p>
+      </div>
+      <ul class="rules" id="rules-list"></ul>
+      <p class="hint" id="demo-script-note"></p>
+    </section>
+
+    <section class="slots" aria-label="Agent slots">
+      <article class="panel slot" id="slot-A" aria-labelledby="slot-A-title">
+        <h2 id="slot-A-title">SLOT A <span class="provider" id="provider-A"></span></h2>
+        <p class="status" id="status-A" data-kind="ready"><span class="lamp" aria-hidden="true"></span><span class="status-text">Ready</span></p>
+        <div class="field">
+          <label for="name-A">Name</label>
+          <input id="name-A" type="text" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="model-A">Model</label>
+          <input id="model-A" type="text" autocomplete="off" spellcheck="false">
+          <p class="hint">Default <span id="default-model-A"></span>. Editable. Source: <a href="https://docs.x.ai/developers/models" target="_blank" rel="noopener noreferrer">docs.x.ai models</a>.</p>
+        </div>
+        <div class="field">
+          <label for="role-A">Role</label>
+          <textarea id="role-A"></textarea>
+        </div>
+        <p class="hint endpoint" id="endpoint-A"></p>
+        <details class="own-key" id="own-A">
+          <summary>Use my own key</summary>
+          <div class="field">
+            <label for="key-A">API key</label>
+            <input id="key-A" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="Paste key">
+          </div>
+          <label class="check" for="remember-A">
+            <input id="remember-A" type="checkbox">
+            <span>Remember on this device</span>
+          </label>
+          <p class="hint">Closed by default. Opening this section sends Slot A from this browser with the key below, instead of the oracle proxy. The key stays in this tab. It is saved in localStorage only when Remember is ticked. Get a key at <a href="https://console.x.ai/" target="_blank" rel="noopener noreferrer">console.x.ai</a>.</p>
+          <p class="hint endpoint" id="direct-A"></p>
+        </details>
+        <div class="slot-error" id="error-A" role="alert" hidden></div>
+      </article>
+
+      <article class="panel slot" id="slot-B" aria-labelledby="slot-B-title">
+        <h2 id="slot-B-title">SLOT B <span class="provider" id="provider-B"></span></h2>
+        <p class="status" id="status-B" data-kind="ready"><span class="lamp" aria-hidden="true"></span><span class="status-text">Ready</span></p>
+        <div class="field">
+          <label for="name-B">Name</label>
+          <input id="name-B" type="text" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="model-B">Model</label>
+          <input id="model-B" type="text" autocomplete="off" spellcheck="false">
+          <p class="hint">Default <span id="default-model-B"></span>. Editable. Same Generative Language <code>generateContent</code> call Signal Ark uses. Source: <a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener noreferrer">Gemini models</a>.</p>
+        </div>
+        <div class="field">
+          <label for="role-B">Role</label>
+          <textarea id="role-B"></textarea>
+        </div>
+        <p class="hint endpoint" id="endpoint-B"></p>
+        <details class="own-key" id="own-B">
+          <summary>Use my own key</summary>
+          <div class="field">
+            <label for="key-B">API key</label>
+            <input id="key-B" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="Paste key">
+          </div>
+          <label class="check" for="remember-B">
+            <input id="remember-B" type="checkbox">
+            <span>Remember on this device</span>
+          </label>
+          <p class="hint">Closed by default. Opening this section sends Slot B from this browser with the key below, instead of the oracle proxy. The key stays in this tab. It is saved in localStorage only when Remember is ticked. Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a>.</p>
+          <p class="hint endpoint" id="direct-B"></p>
+        </details>
+        <div class="slot-error" id="error-B" role="alert" hidden></div>
+      </article>
+
+      <article class="panel slot is-off" id="slot-C" aria-labelledby="slot-C-title">
+        <h2 id="slot-C-title">SLOT C <span class="provider" id="provider-C"></span></h2>
+        <label class="check" for="slot-c">
+          <input id="slot-c" type="checkbox">
+          <span>Include Slot C in the turn order</span>
+        </label>
+        <p class="status" id="status-C" data-kind="off"><span class="lamp" aria-hidden="true"></span><span class="status-text">Off</span></p>
+        <div class="field">
+          <label for="name-C">Name</label>
+          <input id="name-C" type="text" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="model-C">Model</label>
+          <input id="model-C" type="text" autocomplete="off" spellcheck="false">
+          <p class="hint">Default <span id="default-model-C"></span>. Editable. This is the model id in GitHub’s inference sample, from the free rate-limited tier. The catalog was retired on July 30, 2026: <a href="https://docs.github.com/en/github-models" target="_blank" rel="noopener noreferrer">GitHub Models</a>.</p>
+        </div>
+        <div class="field">
+          <label for="role-C">Role</label>
+          <textarea id="role-C"></textarea>
+        </div>
+        <p class="hint endpoint" id="endpoint-C"></p>
+        <details class="own-key" id="own-C">
+          <summary>Use my own key</summary>
+          <div class="field">
+            <label for="key-C">Personal access token</label>
+            <input id="key-C" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="Paste token">
+          </div>
+          <label class="check" for="remember-C">
+            <input id="remember-C" type="checkbox">
+            <span>Remember on this device</span>
+          </label>
+          <p class="hint">Closed by default. Opening this section sends Slot C from this browser with the token below, instead of the oracle proxy. The token stays in this tab. It is saved in localStorage only when Remember is ticked. Use a fine-grained token with models:read. Create one at <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener noreferrer">github.com/settings/personal-access-tokens</a>.</p>
+          <p class="hint endpoint" id="direct-C"></p>
+        </details>
+        <div class="slot-error" id="error-C" role="alert" hidden></div>
+      </article>
+    </section>
+
+    <section class="panel" id="shared" aria-labelledby="shared-title">
+      <h2 id="shared-title">SHARED STATE</h2>
+      <p id="order-line" class="state-line"></p>
+      <p id="stats-line" class="state-line"></p>
+      <ol class="log" id="transcript" aria-live="polite" aria-label="Shared log"></ol>
+    </section>
+  </main>
+  <footer>
+    <p>81 Canon · <a href="../../canon/">Open the Bible</a> · $0.00</p>
+    <p><a href="../">Landing Stone status</a> · <a href="../../">BaileyOS home</a></p>
+  </footer>
+</div>
+<noscript><p>This drill needs JavaScript in the browser. It is a static page and has no build step.</p></noscript>
+<script type="module" src="./simulation.js"></script>
+</body>
+</html>
