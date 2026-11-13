@@ -68,6 +68,19 @@ a:hover { text-decoration:underline; }
   letter-spacing:1px;
 }
 .home:focus-visible { outline:2px solid #C9943A; outline-offset:3px; }
+.sim-entry { width:100%; max-width:34rem; margin-top:1.25rem; }
+.sim-entry a {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:44px;
+  padding:0.65rem 0.9rem;
+  border:1px solid rgba(201,148,58,0.4);
+  border-radius:4px;
+  letter-spacing:0.08em;
+  font-size:0.7rem;
+}
+.sim-entry a:focus-visible { outline:2px solid #C9943A; outline-offset:3px; }
 </style>
 </head>
 <body>
@@ -103,6 +116,9 @@ a:hover { text-decoration:underline; }
     </div>
   </dl>
 </div>
+<nav class="sim-entry" aria-label="Landing Stone modules">
+  <a href="simulation/">Agent simulation</a>
+</nav>
 <div class="footer">
   81 Canon · <a href="../canon/">Open the Bible</a> · $0.00<br>Separated from Signal Finder · <a href="https://signal-beacon-compass.lovable.app/" target="_blank" rel="noopener noreferrer">Open general Signal Finder</a>
 </div>
