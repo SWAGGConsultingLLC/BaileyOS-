@@ -8,6 +8,7 @@ export const BREW_RETURN_KEY = 'baileyos_brew_return';
 export const QUESTION_TITLE = '360° Brewing | Question #001';
 export const QUESTION_DESCRIPTION = 'One verified person, one vote. Results counted in the open. Sign in with LinkedIn and add your voice to Question #001.';
 export const QUESTION_IMAGE = 'https://baileyos-app.vercel.app/brew/question-001.png?v=2';
+export const BREWING_PLACE_LINE = 'This is your place in 360° Brewing. The mission is to show up and keep the record honest.';
 export const MISSION_TITLE = '360° Brewing: Our Mission';
 export const MISSION_BODY = 'We\'re reconnecting people from LinkedIn, and later other platforms, into a like-minded community of active participants. People who want to make a difference, hold each other accountable, and have a real say in what gets seen. Every voice is verified, one per person. Every vote is recorded and counted in the open, and outside reviewers check the results. Built on integrity and efficacy, we decide together what matters, instead of leaving it to the elites and corporate executives.';
 export const QUESTION_PROMPT = 'Before any shared AI answer from 360° Brewing is released publicly, should it first be reviewed by outside auditors, or can the Steward release it as long as every step is permanently logged?';

@@ -3,8 +3,14 @@
 import dynamic from 'next/dynamic';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AccountPanel } from '@/components/AccountPanel';
+import { BrewLockup } from '@/components/BrewLockup';
+import { BrewLogo } from '@/components/BrewLogo';
+import { LinkedInButton } from '@/components/LinkedInButton';
 import { browserSupabase } from '@/lib/supabaseBrowser';
 import { decideSessionExposure } from '@/lib/account';
+import { linkedInProviderState, suiteConfig } from '@/lib/suite/verify';
+import { prepareSuiteHref } from '@/components/SuiteEntrance';
+import { createClient } from '@supabase/supabase-js';
 import { aheadCards, buildScene, corridorDistanceKm, sampleNodes, type SceneFeature } from '@/lib/data-nest/scene';
 import { coarsen, shouldAcceptFix } from '@/lib/data-nest/geo';
 import { chatEnabled, nextAutoMode, type NestMode } from '@/lib/data-nest/mode';
@@ -40,6 +46,8 @@ const LAYERS = ['quakes', 'nws', 'roads', 'amber', 'silver', 'observation', 'cor
 export function DataNestApp() {
   const sb = useMemo(() => browserSupabase(), []);
   const [token, setToken] = useState<string | null>(null);
+  const [linkedInHref, setLinkedInHref] = useState<string | null>(null);
+  const [linkedInSoon, setLinkedInSoon] = useState(false);
   const [mode, setMode] = useState<NestMode>('stationary');
   const [modeLock, setModeLock] = useState<'auto' | 'manual'>('auto');
   const [fix, setFix] = useState<Fix | null>(null);
@@ -70,16 +78,56 @@ export function DataNestApp() {
   const lastFix = useRef<{ t: number; lat: number; lon: number } | null>(null);
 
   useEffect(() => {
-    if (!sb) return;
     let stop = false;
     const apply = (event: string | null, session: Parameters<typeof decideSessionExposure>[0]['session']) => {
+      if (stop) return;
+      if (event === 'SIGNED_OUT') { setToken(null); return; }
       const decision = decideSessionExposure({ event, recoveryPending: false, session, nowSec: Math.floor(Date.now() / 1000) });
-      if (!stop) setToken(decision.exposeToken);
+      if (decision.exposeToken) setToken(decision.exposeToken);
     };
-    sb.auth.getSession().then(({ data }) => apply(null, data.session)).catch(() => setToken(null));
+    const start = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const config = suiteConfig();
+      if (code && config && !window.location.hash.includes('access_token')) {
+        const client = createClient(config.url, config.publishableKey, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: 'pkce' },
+        });
+        const exchanged = await client.auth.exchangeCodeForSession(code);
+        params.delete('code');
+        const query = params.toString();
+        window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+        const session = exchanged.data.session;
+        const linked = session?.user?.identities?.some(item => item.provider === 'linkedin_oidc') === true;
+        if (!stop && session?.access_token && (session.user?.email_confirmed_at || linked)) {
+          setToken(session.access_token);
+        }
+      }
+      if (!sb || stop) return;
+      const { data } = await sb.auth.getSession();
+      if (!stop) apply(null, data.session);
+    };
+    start().catch(() => { if (!stop) setToken(null); });
+    if (!sb) return () => { stop = true; };
     const { data: sub } = sb.auth.onAuthStateChange((event, session) => apply(event, session));
     return () => { stop = true; sub.subscription.unsubscribe(); };
   }, [sb]);
+
+  useEffect(() => {
+    if (token) return;
+    const config = suiteConfig();
+    if (!config) { setLinkedInSoon(true); return; }
+    let cancel = false;
+    linkedInProviderState(config).then(async state => {
+      if (cancel) return;
+      if (state === 'soon') { setLinkedInSoon(true); return; }
+      const result = await prepareSuiteHref(window.location.origin + '/data-nest');
+      if (cancel) return;
+      if ('href' in result) setLinkedInHref(result.href);
+      else setLinkedInSoon(true);
+    }).catch(() => { if (!cancel) setLinkedInSoon(true); });
+    return () => { cancel = true; };
+  }, [token]);
 
   useEffect(() => {
     if (!watching || typeof navigator === 'undefined' || !navigator.geolocation) return;
@@ -287,7 +335,29 @@ export function DataNestApp() {
         <h1 className="mt-2 text-3xl font-semibold text-white">Local overwatch for Grand Junction and I-70</h1>
         <p className="mt-3 text-base leading-7 text-slate-300">Sign in first. After that, the screen follows your location: weather, quakes, and the road alerts we can actually read. The swarm picture is simulated. Live feeds are labeled and linked.</p>
         <p className="mt-3 text-sm leading-6 text-slate-400">Precise location stays on this phone. The server receives only a coarsened area, about 1 km, and does not store it. A separate request log, if the database migration is applied, keeps that coarsened area for 28 days and can be deleted without changing sealed decision records.</p>
-        <AccountPanel client={sb} onAccessToken={setToken} deferProfile />
+        <section className="mt-6 rounded-2xl border border-gray-800 p-4" aria-labelledby="brew-nest-heading">
+          <h2 id="brew-nest-heading" className="text-lg font-semibold text-white">360° Brewing: sign in to Data Nest</h2>
+          <div className="mt-3">
+            <BrewLockup>
+              {linkedInHref ? (
+                <LinkedInButton href={linkedInHref} label="Sign in with LinkedIn" />
+              ) : linkedInSoon ? (
+                <p className="text-sm text-gray-100" role="status">LinkedIn sign-in coming soon, use email</p>
+              ) : (
+                <p className="text-sm text-gray-300" role="status">Preparing LinkedIn sign-in…</p>
+              )}
+            </BrewLockup>
+          </div>
+          <p className="mt-2 text-xs text-gray-400">
+            <a className="underline" href="https://www.linkedin.com/company/swagg-consulting/">360° Brewing on LinkedIn</a>
+            {' · '}
+            <a className="underline" href="https://www.swaggconsulting.com/privacy">Privacy policy</a>
+          </p>
+          <a className="inline-flex min-h-11 items-center text-sm text-gray-300 underline" href="#member-account">Use email instead</a>
+        </section>
+        <div id="member-account">
+          <AccountPanel client={sb} onAccessToken={setToken} deferProfile />
+        </div>
         <p className="mt-6 text-sm"><a className="text-cyan-300 underline" href="/data-nest/verify">Check a decision record</a> · <a className="text-cyan-300 underline" href="/">Map</a></p>
       </main>
     );
@@ -296,9 +366,12 @@ export function DataNestApp() {
   return (
     <main className="mx-auto min-h-screen max-w-lg px-4 py-4 pb-16">
       <header className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold tracking-[0.2em] text-cyan-300">DATA NEST</p>
-          <h1 className="text-2xl font-semibold text-white">{mode === 'traveling' ? 'Traveling' : 'Stationary'}</h1>
+        <div className="flex items-center gap-3">
+          <BrewLogo size={56} />
+          <div>
+            <p className="text-xs font-bold tracking-[0.2em] text-cyan-300">DATA NEST</p>
+            <h1 className="text-2xl font-semibold text-white">{mode === 'traveling' ? 'Traveling' : 'Stationary'}</h1>
+          </div>
         </div>
         <button type="button" className="min-h-12 rounded-full border border-slate-600 px-3 text-sm" onClick={() => sb?.auth.signOut()}>Sign out</button>
       </header>

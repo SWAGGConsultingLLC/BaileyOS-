@@ -3,12 +3,14 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserSupabase } from '@/lib/supabaseBrowser';
 import { AccountPanel } from '@/components/AccountPanel';
+import { BrewLockup } from '@/components/BrewLockup';
 import { BrewLogo } from '@/components/BrewLogo';
+import { LinkedInButton } from '@/components/LinkedInButton';
 import { SuiteEntrance } from '@/components/SuiteEntrance';
 import { SuiteIdentity } from '@/components/SuiteIdentity';
 import { BREW_RETURN_KEY, CHECKIN_RETURN, MAP_RETURN, QUESTION_PROMPT } from '@/lib/brew/question001';
 import { linkedInReturnInProgress, prepareSuiteHref } from '@/components/SuiteEntrance';
-import { suiteReturnTarget } from '@/lib/suite/verify';
+import { linkedInProviderState, suiteConfig, suiteReturnTarget } from '@/lib/suite/verify';
 import { legacyNeighborhoodHex, type MapViewBox } from '@/lib/neighborhood';
 import type { NeighborhoodPin } from '@/components/MapView';
 
@@ -48,6 +50,7 @@ export default function Home() {
   const [suiteSignedIn, setSuiteSignedIn] = useState(false);
   const [showLinkedIn, setShowLinkedIn] = useState(false);
   const [checkinHref, setCheckinHref] = useState<string | null>(null);
+  const [linkedInSoon, setLinkedInSoon] = useState(false);
   const resumed = useRef(false);
   const onAccessToken = useCallback((token: string | null) => setSession(token), []);
   const onSuiteStatus = useCallback((status: { recorded: boolean } | null) => {
@@ -82,10 +85,17 @@ export default function Home() {
 
   useEffect(() => {
     if (suiteSignedIn || linkedInReturnInProgress(window.location.href)) return;
+    const config = suiteConfig();
+    if (!config) { setLinkedInSoon(true); return; }
     let cancel = false;
-    prepareSuiteHref(window.location.origin + '/suite').then(result => {
-      if (!cancel && 'href' in result) setCheckinHref(result.href);
-    }).catch(() => undefined);
+    linkedInProviderState(config).then(async state => {
+      if (cancel) return;
+      if (state === 'soon') { setLinkedInSoon(true); return; }
+      const result = await prepareSuiteHref(window.location.origin + '/suite');
+      if (cancel) return;
+      if ('href' in result) setCheckinHref(result.href);
+      else setLinkedInSoon(true);
+    }).catch(() => { if (!cancel) setLinkedInSoon(true); });
     return () => { cancel = true; };
   }, [suiteSignedIn]);
 
@@ -174,7 +184,19 @@ export default function Home() {
     <main className="mx-auto max-w-xl">
       <div className="sticky top-0 z-30 border-b border-gray-800 bg-black px-4 py-3">
         {suiteSignedIn ? <SuiteIdentity onStatus={onSuiteStatus} /> : (
-          <a href={checkinHref ?? undefined} onClick={() => sessionStorage.setItem(BREW_RETURN_KEY, MAP_RETURN)} className={`flex min-h-12 w-full items-center justify-center rounded-lg bg-white px-4 text-center text-base font-semibold text-black ${checkinHref ? '' : 'pointer-events-none opacity-60'}`}>Sign in with 360° Brewing</a>
+          <div>
+            <BrewLockup>
+              {checkinHref ? (
+                <LinkedInButton href={checkinHref} label="Check in with LinkedIn" onClick={() => sessionStorage.setItem(BREW_RETURN_KEY, MAP_RETURN)} />
+              ) : linkedInSoon ? (
+                <p className="text-sm text-gray-100" role="status">LinkedIn sign-in coming soon, use email</p>
+              ) : (
+                <p className="text-sm text-gray-300" role="status">Preparing LinkedIn sign-in…</p>
+              )}
+            </BrewLockup>
+            <p className="mt-1 text-sm text-gray-200">Sign in to drop your pin</p>
+            <a className="inline-flex min-h-11 items-center text-sm text-gray-300 underline" href="#member-account">Use email instead</a>
+          </div>
         )}
       </div>
       <div className="px-4 pb-8 pt-4">
@@ -202,7 +224,11 @@ export default function Home() {
         <button onClick={share} disabled={busy} className="mt-5 w-full rounded-full bg-cyanx py-4 text-lg font-bold text-black disabled:opacity-60">Share my place</button>
       ) : (
         <>
-          <a href={checkinHref ?? undefined} onClick={() => sessionStorage.setItem(BREW_RETURN_KEY, CHECKIN_RETURN)} className={`mt-5 flex min-h-12 w-full items-center justify-center rounded-full bg-cyanx py-4 text-lg font-bold text-black ${checkinHref ? '' : 'pointer-events-none opacity-60'}`}>Share my place</a>
+          {checkinHref ? (
+            <a href={checkinHref} aria-label="Check in with LinkedIn" onClick={() => sessionStorage.setItem(BREW_RETURN_KEY, CHECKIN_RETURN)} className="mt-5 flex min-h-12 w-full items-center justify-center gap-3 rounded-full bg-[#0A66C2] px-4 py-4 text-lg font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Check in with LinkedIn</a>
+          ) : (
+            <p className="mt-5 text-sm text-gray-200" role="status">LinkedIn sign-in coming soon, use email</p>
+          )}
           <p className="mt-2 text-center text-sm text-gray-300">This signs you in with LinkedIn, then asks for your location.</p>
           <button type="button" onClick={share} disabled={busy} className="mt-1 min-h-11 w-full text-sm text-gray-400 underline">Continue without signing in</button>
         </>
@@ -218,7 +244,9 @@ export default function Home() {
       )}
       <p className="mt-2 text-xs text-gray-500">A neighborhood appears after 3 different phones check in there in the last 7 days. The same phone counts once. Exact coordinates are not saved. A name and photo appear only when that person turns them on and the neighborhood meets that crowd.</p>
       <SuiteEntrance onSignedIn={setSuiteSignedIn} />
-      <AccountPanel client={sb} onAccessToken={onAccessToken} deferProfile={suiteSignedIn} />
+      <div id="member-account">
+        <AccountPanel client={sb} onAccessToken={onAccessToken} deferProfile={suiteSignedIn} />
+      </div>
       {session && mine && (
         <div className="mt-3">
           <button onClick={() => linkCall(mine.linked ? 'DELETE' : 'POST')} className="w-full rounded-full border border-goldx/60 py-3 font-semibold text-goldx">

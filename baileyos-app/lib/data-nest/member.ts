@@ -11,7 +11,8 @@ export async function memberId(req: Request): Promise<{ ok: true; id: string } |
   try {
     const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data, error } = await client.auth.getUser(token);
-    if (error || !data.user?.id || !data.user.email_confirmed_at) {
+    const linkedIn = data.user?.identities?.some(item => item.provider === 'linkedin_oidc') === true;
+    if (error || !data.user?.id || (!data.user.email_confirmed_at && !linkedIn)) {
       return { ok: false, response: Response.json({ error: 'Sign in is required.', code: 'auth' }, { status: 401 }) };
     }
     return { ok: true, id: data.user.id };
