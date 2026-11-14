@@ -85,7 +85,7 @@ def parse_reviewer_reply(raw: str) -> dict:
     return {"verdict": "uncertain", "reason": "reply was not valid JSON"}
 
 
-def _normalise_vote(name: str, vote, report_sha: str) -> dict:
+def _normalise_vote(name: str, vote, report_sha: str, expected_input: str | None = None) -> dict:
     """Return {"reviewer", "state", "verdict", "reason", ...}. state: voted | pending | unavailable."""
     if vote is None:
         return {"reviewer": name, "state": "pending", "verdict": None, "reason": f"awaiting {name.capitalize()}"}
@@ -104,9 +104,17 @@ def _normalise_vote(name: str, vote, report_sha: str) -> dict:
         else:
             parsed = {"verdict": "uncertain", "reason": "verdict missing or not one of agree/disagree/uncertain"}
     reviewed = vote.get("reviewed_report_sha256")
+    reviewed_input = vote.get("reviewed_input_sha256")
+    hash_mismatch = False
     if reviewed != report_sha:
-        parsed = {"verdict": "uncertain", "reason": "reviewed a different report (hash mismatch or missing)"}
+        parsed = {"verdict": "uncertain", "reason": "hash mismatch"}
+        hash_mismatch = True
+    elif isinstance(reviewed_input, str) and reviewed_input != expected_input:
+        parsed = {"verdict": "uncertain", "reason": "hash mismatch"}
+        hash_mismatch = True
     out = {"reviewer": name, "state": "voted", **parsed, "reviewed_report_sha256": reviewed}
+    if hash_mismatch:
+        out["hash_mismatch"] = True
     for k in ("model", "reviewed_at"):
         if isinstance(vote.get(k), str):
             out[k] = vote[k][:100]
@@ -124,7 +132,54 @@ def _bad(reason: str, now: datetime) -> dict:
     return ruling
 
 
-def convene(report_canonical_json, report_sha256, gemini=None, kimi=None, now: datetime | None = None) -> dict:
+def _parse_z(value):
+    if not isinstance(value, str) or not value.endswith("Z"):
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def feed_blocks_consensus(report: dict, now: datetime) -> bool:
+    """Recompute fetch age at convene time. A stale or failed layer blocks CONSENSUS."""
+    fresh = report.get("freshness") if isinstance(report, dict) else None
+    if not isinstance(fresh, dict):
+        return True
+    sources = fresh.get("sources")
+    limits = fresh.get("limits")
+    if not isinstance(sources, list) or not isinstance(limits, dict) or not limits:
+        return True
+    by_id = {src.get("id"): src for src in sources if isinstance(src, dict) and isinstance(src.get("id"), str)}
+    for key, cfg in limits.items():
+        src = by_id.get(key)
+        if not isinstance(src, dict) or src.get("status") == "fail":
+            return True
+        fetched = _parse_z(src.get("fetched_at"))
+        max_age = src.get("max_age_seconds")
+        if not isinstance(max_age, (int, float)) or isinstance(max_age, bool):
+            max_age = cfg.get("max_age_seconds") if isinstance(cfg, dict) else None
+        if fetched is None or not isinstance(max_age, (int, float)) or isinstance(max_age, bool):
+            return True
+        age = (now - fetched).total_seconds()
+        if age < -120 or age > float(max_age):
+            return True
+    return False
+
+
+def _flag_hash_mismatch(vote: dict) -> dict:
+    if vote.get("state") in ("pending", "unavailable"):
+        return vote
+    flagged = dict(vote)
+    flagged["state"] = "voted"
+    flagged["verdict"] = "uncertain"
+    flagged["reason"] = "hash mismatch"
+    flagged["hash_mismatch"] = True
+    return flagged
+
+
+def convene(report_canonical_json, report_sha256, gemini=None, kimi=None, now: datetime | None = None,
+            input_canonical_json=None) -> dict:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     if not isinstance(report_canonical_json, str) or not isinstance(report_sha256, str):
         return _bad("report or hash missing", now)
@@ -133,12 +188,19 @@ def convene(report_canonical_json, report_sha256, gemini=None, kimi=None, now: d
     try:
         report = json.loads(report_canonical_json)
         overall = report["summary"]["overall"]
-        if overall not in ("PASS", "FAIL"):
+        if overall not in ("PASS", "FAIL", "WARN"):
             raise ValueError
     except (ValueError, KeyError, TypeError):
         return _bad("report is malformed", now)
 
-    votes = [_normalise_vote("gemini", gemini, report_sha256), _normalise_vote("kimi", kimi, report_sha256)]
+    expected_input = report.get("input_sha256") if isinstance(report.get("input_sha256"), str) else None
+    votes = [
+        _normalise_vote("gemini", gemini, report_sha256, expected_input),
+        _normalise_vote("kimi", kimi, report_sha256, expected_input),
+    ]
+    input_ok = isinstance(input_canonical_json, str) and isinstance(expected_input, str) and sha256_hex(input_canonical_json) == expected_input
+    if not input_ok:
+        votes = [_flag_hash_mismatch(v) for v in votes]
     agreeing = 1 + sum(1 for v in votes if v["state"] == "voted" and v["verdict"] == "agree")
     dissent = [{"reviewer": v["reviewer"], "reason": v["reason"]} for v in votes if v["verdict"] == "disagree"]
     unresolved = [v for v in votes if v["state"] == "unavailable" or v["verdict"] == "uncertain"]
@@ -158,10 +220,17 @@ def convene(report_canonical_json, report_sha256, gemini=None, kimi=None, now: d
         ruling = "PROVISIONAL"
         label = f"PROVISIONAL ({agreeing} of {SEATS_TOTAL}, awaiting {', '.join(p.capitalize() for p in pending)})"
 
+    blocks = feed_blocks_consensus(report, now)
+    if ruling == "CONSENSUS" and blocks:
+        ruling = "PROVISIONAL"
+        label = "PROVISIONAL — stale or failed feed; consensus is not available"
+
     out = {
         "schema_version": SCHEMA_VERSION, "engine": {"name": ENGINE_NAME, "version": ENGINE_VERSION},
         "convened_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "ruling": ruling, "label": label,
         "report_sha256": report_sha256, "python_overall": overall,
+        "input_hash_ok": input_ok,
+        "freshness_blocks_consensus": blocks,
         "seats": {"total": SEATS_TOTAL, "agreeing": agreeing},
         "votes": votes, "dissent": dissent,
     }
@@ -180,7 +249,8 @@ def main(argv) -> int:
     except (OSError, ValueError) as exc:
         print(json.dumps({"error": f"cannot read input: {exc}"}), file=sys.stderr)
         return 2
-    r = convene(data.get("report_canonical_json"), data.get("report_sha256"), data.get("gemini"), data.get("kimi"))
+    r = convene(data.get("report_canonical_json"), data.get("report_sha256"), data.get("gemini"), data.get("kimi"),
+                input_canonical_json=data.get("input_canonical_json"))
     print(json.dumps(r, indent=2 if "--pretty" in argv else None, ensure_ascii=False))
     return 0 if r["ruling"] in ("CONSENSUS", "PROVISIONAL", "PENDING") else 1
 

@@ -48,4 +48,5 @@ class handler(BaseHTTPRequestHandler):
         if not isinstance(data, dict):
             return self._send(400, {"error": "Body must be a JSON object.", "code": "bad_request"})
         self._send(200, convene(data.get("report_canonical_json"), data.get("report_sha256"),
-                                data.get("gemini"), data.get("kimi")))
+                                data.get("gemini"), data.get("kimi"),
+                                input_canonical_json=data.get("input_canonical_json")))

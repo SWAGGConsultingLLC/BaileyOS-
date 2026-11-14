@@ -15,7 +15,7 @@ Checks
   C6 nodes_near_corridor   each node is within the corridor buffer (km) of the corridor line
 
 Hashes (so a reviewer can prove which bytes were checked)
-  input_sha256   = SHA-256 of canonical_json({"corridor":..., "nodes":...})
+  input_sha256   = SHA-256 of canonical_json({"corridor":..., "nodes":..., "freshness":...})
   report_sha256  = SHA-256 of the UTF-8 bytes of canonical_json(report)   (report has no hash field inside it)
   canonical_json = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
   All floats in the report are rounded to 6 decimals.
@@ -30,6 +30,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import sys
 from datetime import datetime, timezone
 
@@ -45,6 +46,165 @@ KM_PER_MILE = 1.609344
 EARTH_RADIUS_KM = 6371.0088
 MAX_INPUT_NODES = 200
 MAX_INPUT_POINTS = 5000
+
+# Embedded in every Kimi package. These words name the exact bytes that are hashed.
+CANONICALIZATION = {
+    "rule": "JSON with sorted keys, separators ',' and ':' (no whitespace), UTF-8, no trailing newline.",
+    "function": "json.dumps(obj, sort_keys=True, separators=(',', ':'), ensure_ascii=False)",
+    "encoding": "UTF-8",
+    "trailing_newline": False,
+    "input_sha256_bytes": "SHA-256 of the UTF-8 bytes of canonical JSON for the object with exactly the keys corridor, nodes, and freshness, in sorted-key form, with no surrounding whitespace and no trailing newline. The Kimi package, this rule, and the report are not part of those bytes.",
+    "report_sha256_bytes": "SHA-256 of the UTF-8 bytes of canonical JSON for the report object only, with no surrounding whitespace and no trailing newline. The report object does not contain report_sha256, input_canonical_json, input_sha256's twin fields, or this rule.",
+}
+
+RESPONSE_SCHEMA = {
+    "verdict": "agree | disagree | uncertain",
+    "reason": "one or two sentences",
+    "reviewed_report_sha256": "the report_sha256 string from this package",
+    "reviewed_input_sha256": "the input_sha256 string from this package",
+}
+
+_LIMITS_CACHE = None
+
+
+def load_freshness_limits() -> dict:
+    """One config file. The report repeats these per-layer max ages. There is no global threshold."""
+    global _LIMITS_CACHE
+    if _LIMITS_CACHE is not None:
+        return _LIMITS_CACHE
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "validation", "freshness_limits.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        _LIMITS_CACHE = {}
+        return _LIMITS_CACHE
+    if not isinstance(data, dict):
+        _LIMITS_CACHE = {}
+        return _LIMITS_CACHE
+    _LIMITS_CACHE = data
+    return data
+
+
+def input_document(data) -> dict:
+    """The only object whose canonical bytes are input_sha256."""
+    if not isinstance(data, dict):
+        return {"corridor": None, "nodes": [], "freshness": None}
+    nodes = data.get("nodes")
+    nodes = nodes if isinstance(nodes, list) else []
+    if len(nodes) > MAX_INPUT_NODES:
+        nodes = nodes[:MAX_INPUT_NODES]
+    return {"corridor": data.get("corridor"), "nodes": nodes, "freshness": data.get("freshness")}
+
+
+def parse_utc_z(value):
+    if not isinstance(value, str) or not value.endswith("Z"):
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _source_row(key: str, cfg: dict, raw, now: datetime) -> dict:
+    label = cfg.get("label") if isinstance(cfg, dict) else key
+    max_age = cfg.get("max_age_seconds") if isinstance(cfg, dict) else None
+    note = cfg.get("note") if isinstance(cfg, dict) else None
+    base = {
+        "id": key,
+        "label": label,
+        "note": note,
+        "max_age_seconds": max_age,
+        "fetched_at": None,
+        "source_timestamp": None,
+        "fetch_age_seconds": None,
+        "source_age_seconds": None,
+        "record_count": None,
+        "status": "fail",
+        "detail": "",
+    }
+    if not isinstance(max_age, (int, float)) or isinstance(max_age, bool) or max_age <= 0:
+        base["detail"] = "max age missing from config"
+        return base
+    if not isinstance(raw, dict):
+        base["detail"] = "missing freshness record"
+        return base
+    if raw.get("available") is False:
+        base["detail"] = str(raw.get("error") or "not configured")[:240]
+        base["record_count"] = raw.get("record_count") if isinstance(raw.get("record_count"), int) else 0
+        return base
+    if isinstance(raw.get("error"), str) and raw.get("error").strip():
+        base["detail"] = raw["error"].strip()[:240]
+        base["fetched_at"] = raw.get("fetched_at") if isinstance(raw.get("fetched_at"), str) else None
+        base["record_count"] = raw.get("record_count") if isinstance(raw.get("record_count"), int) else 0
+        return base
+    fetched = parse_utc_z(raw.get("fetched_at"))
+    if fetched is None:
+        base["detail"] = "fetched_at is missing or not UTC Zulu YYYY-MM-DDTHH:MM:SSZ"
+        return base
+    age = int(round((now - fetched).total_seconds()))
+    source_at = parse_utc_z(raw.get("source_timestamp")) if raw.get("source_timestamp") else None
+    source_age = int(round((now - source_at).total_seconds())) if source_at else None
+    count = raw.get("record_count")
+    base.update({
+        "fetched_at": raw.get("fetched_at"),
+        "source_timestamp": raw.get("source_timestamp") if isinstance(raw.get("source_timestamp"), str) else None,
+        "fetch_age_seconds": age,
+        "source_age_seconds": source_age,
+        "record_count": count if isinstance(count, int) and not isinstance(count, bool) else None,
+    })
+    if age < -120:
+        base["detail"] = "fetch time is in the future"
+        return base
+    if age > max_age:
+        base["detail"] = f"stale: fetched {age}s ago, max {int(max_age)}s"
+        return base
+    if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+        base["detail"] = "record_count missing"
+        return base
+    if count == 0:
+        base["status"] = "warn"
+        base["detail"] = "fresh fetch, empty feed"
+        return base
+    base["status"] = "pass"
+    base["detail"] = f"{count} records, fetched {age}s ago (max {int(max_age)}s)"
+    return base
+
+
+def evaluate_freshness(raw, now: datetime) -> dict:
+    limits = load_freshness_limits()
+    if not limits:
+        return {
+            "limits": {},
+            "sources": [],
+            "blocks_consensus": True,
+            "check_status": False,
+            "detail": "freshness limits config is missing",
+        }
+    table = raw if isinstance(raw, dict) else {}
+    sources = []
+    for key, cfg in limits.items():
+        src = table.get(key)
+        row = _source_row(key, cfg, src, now)
+        fp = src.get("payload_sha256") if isinstance(src, dict) else None
+        if isinstance(fp, str) and len(fp) == 64 and all(ch in "0123456789abcdef" for ch in fp):
+            row["payload_sha256"] = fp
+        sources.append(row)
+    failed = [s["id"] for s in sources if s["status"] == "fail"]
+    warned = [s["id"] for s in sources if s["status"] == "warn"]
+    if failed:
+        status, detail = False, "stale, failed, or not configured: " + ", ".join(failed)
+    elif warned:
+        status, detail = "WARN", "fresh but empty: " + ", ".join(warned)
+    else:
+        status, detail = True, "every layer was fetched within its own max age and has records"
+    return {
+        "limits": limits,
+        "sources": sources,
+        "blocks_consensus": bool(failed),
+        "check_status": status,
+        "detail": detail,
+    }
 
 
 def canonical_json(obj) -> str:
@@ -106,7 +266,13 @@ def _is_num(v) -> bool:
 
 
 def _check(cid, title, status, value, detail):
-    return {"id": cid, "title": title, "status": "PASS" if status else "FAIL", "value": value, "detail": detail}
+    if status is True:
+        label = "PASS"
+    elif status == "WARN":
+        label = "WARN"
+    else:
+        label = "FAIL"
+    return {"id": cid, "title": title, "status": label, "value": value, "detail": detail}
 
 
 def _extract_line(corridor):
@@ -145,13 +311,11 @@ def _extract_line(corridor):
 
 
 def build_report(data: dict, now: datetime | None = None) -> dict:
-    corridor = data.get("corridor") if isinstance(data, dict) else None
-    nodes = data.get("nodes") if isinstance(data, dict) else None
-    nodes = nodes if isinstance(nodes, list) else []
-    if len(nodes) > MAX_INPUT_NODES:
-        nodes = nodes[:MAX_INPUT_NODES]
-
-    input_sha = sha256_hex(canonical_json({"corridor": corridor, "nodes": nodes}))
+    doc = input_document(data if isinstance(data, dict) else {})
+    corridor = doc["corridor"]
+    nodes = doc["nodes"]
+    when = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    input_sha = sha256_hex(canonical_json(doc))
     coords, buffer_miles, problems = _extract_line(corridor)
     buffer_km = buffer_miles * KM_PER_MILE
     checks = []
@@ -219,8 +383,19 @@ def build_report(data: dict, now: datetime | None = None) -> dict:
                          f"every node within {buffer_km:.2f} km of the corridor line" if ok6
                          else ("outside the buffer or unmeasurable: " + ", ".join(far) if per_node else "no nodes measured")))
 
+    fresh = evaluate_freshness(doc.get("freshness"), when)
+    freshness = {"limits": fresh["limits"], "sources": fresh["sources"], "blocks_consensus": fresh["blocks_consensus"]}
+    checks.append(_check("C7", "data_freshness", fresh["check_status"], freshness, fresh["detail"]))
+
     passed = sum(1 for c in checks if c["status"] == "PASS")
-    when = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    failed = sum(1 for c in checks if c["status"] == "FAIL")
+    warned = sum(1 for c in checks if c["status"] == "WARN")
+    if failed:
+        overall = "FAIL"
+    elif warned:
+        overall = "WARN"
+    else:
+        overall = "PASS"
     report = {
         "schema_version": SCHEMA_VERSION,
         "validator": {"name": VALIDATOR_NAME, "version": VALIDATOR_VERSION, "language": "python",
@@ -229,17 +404,37 @@ def build_report(data: dict, now: datetime | None = None) -> dict:
         "input_sha256": input_sha,
         "parameters": {"bbox": BBOX, "expected_keypoints": EXPECTED_KEYPOINTS, "buffer_miles": buffer_miles,
                        "buffer_km": buffer_km, "earth_radius_km": EARTH_RADIUS_KM},
+        "freshness": freshness,
         "checks": checks,
-        "summary": {"total": len(checks), "passed": passed, "failed": len(checks) - passed,
-                    "overall": "PASS" if passed == len(checks) else "FAIL"},
+        "summary": {"total": len(checks), "passed": passed, "failed": failed, "warned": warned, "overall": overall},
     }
     return _r(report)
 
 
-def seal(report: dict) -> dict:
-    """Return {report, report_sha256, report_canonical_json}. The hash covers the canonical string exactly."""
+def seal(data, now: datetime | None = None) -> dict:
+    """Seal a corridor document. Hashes cover the canonical strings exactly, with no trailing newline."""
+    report = build_report(data, now=now)
     canon = canonical_json(report)
-    return {"report": report, "report_sha256": sha256_hex(canon), "report_canonical_json": canon}
+    payload = canonical_json(input_document(data if isinstance(data, dict) else {}))
+    report_sha = sha256_hex(canon)
+    input_sha = sha256_hex(payload)
+    kimi_package = {
+        "canonicalization": CANONICALIZATION,
+        "input_canonical_json": payload,
+        "input_sha256": input_sha,
+        "report_canonical_json": canon,
+        "report_sha256": report_sha,
+        "response_schema": RESPONSE_SCHEMA,
+    }
+    return {
+        "report": report,
+        "report_sha256": report_sha,
+        "report_canonical_json": canon,
+        "input_sha256": input_sha,
+        "input_canonical_json": payload,
+        "canonicalization": CANONICALIZATION,
+        "kimi_package": kimi_package,
+    }
 
 
 def main(argv) -> int:
@@ -253,7 +448,7 @@ def main(argv) -> int:
     except (OSError, ValueError) as exc:
         print(json.dumps({"error": f"cannot read input: {exc}"}), file=sys.stderr)
         return 2
-    sealed = seal(build_report(data))
+    sealed = seal(data)
     print(json.dumps(sealed, indent=2 if "--pretty" in argv else None, ensure_ascii=False))
     return 0 if sealed["report"]["summary"]["overall"] == "PASS" else 1
 

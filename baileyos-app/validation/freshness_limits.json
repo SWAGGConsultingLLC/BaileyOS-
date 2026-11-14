@@ -1,0 +1,42 @@
+{
+  "usgs": {
+    "max_age_seconds": 10800,
+    "label": "USGS earthquakes",
+    "note": "hours"
+  },
+  "nws_alerts": {
+    "max_age_seconds": 600,
+    "label": "NWS alerts",
+    "note": "minutes"
+  },
+  "nws_observation": {
+    "max_age_seconds": 7200,
+    "label": "NWS station observation",
+    "note": "hours"
+  },
+  "cdot": {
+    "max_age_seconds": 900,
+    "label": "CDOT closures, incidents, and chain laws",
+    "note": "minutes"
+  },
+  "udot": {
+    "max_age_seconds": 900,
+    "label": "UDOT road events",
+    "note": "minutes"
+  },
+  "amber": {
+    "max_age_seconds": 600,
+    "label": "AMBER alerts from NWS CAP",
+    "note": "minutes"
+  },
+  "silver": {
+    "max_age_seconds": 600,
+    "label": "Silver and missing-person alerts from NWS CAP",
+    "note": "minutes"
+  },
+  "crime": {
+    "max_age_seconds": 1209600,
+    "label": "FBI crime aggregates",
+    "note": "14 days"
+  }
+}

@@ -34,7 +34,18 @@ Run locally (from `baileyos-app/`):
 | `checks[]` | array | `{id, title, status: "PASS"\|"FAIL", value: <object with the real computed numbers>, detail: string}` |
 | `summary` | object | `{total, passed, failed, overall: "PASS"\|"FAIL"}` |
 
-Checks: **C1** geojson_structure, **C2** keypoint_count (found vs 9), **C3** keypoints_in_bbox, **C4** corridor_length (km, per segment), **C5** nodes_valid, **C6** nodes_near_corridor (distance in km per node vs the buffer, default 5 miles = 8.047 km). Distances use haversine for length and a local equirectangular point-to-segment projection for node distance (error well under 1% at this scale).
+Checks: **C1** geojson_structure, **C2** keypoint_count (found vs 9), **C3** keypoints_in_bbox, **C4** corridor_length (km, per segment), **C5** nodes_valid, **C6** nodes_near_corridor (distance in km per node vs the buffer, default 5 miles = 8.047 km), **C7** data_freshness. Distances use haversine for length and a local equirectangular point-to-segment projection for node distance (error well under 1% at this scale).
+
+**C7** reads `validation/freshness_limits.json`. There is no single global max age. Each layer has its own `max_age_seconds` (chain laws and closures, AMBER, Silver, and NWS alerts at minutes; earthquakes and the station observation at hours; crime in days). The report repeats those limits. A layer **fails** when the fetch is older than its own limit, the fetch errored, or the source is not configured. A fresh fetch with zero records is a **warning**, not an all-clear. `summary.overall` is `PASS` only when every check is `PASS`.
+
+## Canonical bytes
+`canonical_json` is `json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)`: sorted keys, no insignificant whitespace, UTF-8, no trailing newline.
+
+- `input_sha256` hashes the UTF-8 bytes of `canonical_json({"corridor", "nodes", "freshness"})` only.
+- `report_sha256` hashes the UTF-8 bytes of `canonical_json(report)` only. The report object does not contain `report_sha256` or the Kimi package.
+- The Kimi package wrapper, including the rule text, is not hashed. Every package embeds this rule in `canonicalization`.
+
+The Queen recomputes both hashes before it accepts a verdict. A mismatch is `uncertain` and flagged `hash_mismatch`. A stale or failed feed blocks `CONSENSUS` even when all 7 checks passed at report time and both reviewers agree. The best ruling is then `PROVISIONAL`. `DISSENT` still wins when a reviewer disagrees.
 
 ## Reviewer verdict (Gemini and Kimi use the same shape)
 The reviewer is given the exact `report_canonical_json` and must answer with only:
@@ -48,8 +59,8 @@ Three seats: Python (always agrees with itself), Gemini, Kimi. Rules, checked in
 1. **NO_RULING**: report missing, hash does not match, or malformed.
 2. **DISSENT**: any reviewer says `disagree`. The ruling lists who and why.
 3. **UNRESOLVED**: nobody disagrees but a reviewer is `uncertain` or unavailable. Never shown as consensus.
-4. **CONSENSUS**: both reviewers have voted and agree (3 of 3).
-5. **PROVISIONAL**: voted reviewers all agree but one is pending, for example `PROVISIONAL (2 of 3, awaiting Kimi)`.
+4. **CONSENSUS**: both reviewers have voted and agree (3 of 3), and no feed is stale or failed at convene time.
+5. **PROVISIONAL**: voted reviewers all agree but one is pending, for example `PROVISIONAL (2 of 3, awaiting Kimi)`, or everyone agrees but a feed is stale or failed (`PROVISIONAL — stale or failed feed; consensus is not available`).
 6. **PENDING**: no reviewer has voted (1 of 3).
 
 `POST /api/consensus` takes `{"report_canonical_json", "report_sha256", "gemini": <verdict>|null, "kimi": <verdict>|null}` and returns
@@ -57,4 +68,14 @@ Three seats: Python (always agrees with itself), Gemini, Kimi. Rules, checked in
 A consensus on a FAIL report means the reviewers agree the data failed; `python_overall` always shows which.
 
 ## For Kimi
-Re-run the checks in your own code on the same input, compare `input_sha256` and each check `status`/`value`, then submit a verdict with `reviewed_report_sha256`. Until then the HUD shows "awaiting Kimi validator" and the Queen can only be PROVISIONAL.
+The HUD button **Copy package for Kimi** copies `kimi_package`: the canonicalization rule, `input_canonical_json`, `input_sha256`, `report_canonical_json`, `report_sha256`, and `response_schema`. Paste that package to Kimi. Paste Kimi's reply back into the slot. The reply should be:
+
+`{"verdict":"agree|disagree|uncertain","reason":"...","reviewed_report_sha256":"<report_sha256>","reviewed_input_sha256":"<input_sha256>"}`
+
+The server recomputes both hashes before the Queen accepts the reply. A mismatch is `uncertain` with `hash_mismatch`. Until a reply is tied to the current report, the HUD shows "awaiting Kimi validator".
+
+## Decision records
+Every Queen ruling can be sealed as a tamper-evident decision record (`api/_ruling.py`). The seal shows the record was not altered after sealing. It does not show the decision was correct or that the data was accurate. See [RULING_RECORD.md](RULING_RECORD.md). This repository does not connect the record to `landing-stone/` yet.
+
+## Where this runs
+Vercel’s Next.js preset does not publish `api/*.py` as separate Python functions. The HUD calls `POST /api/data-nest/validate`, `POST /api/data-nest/consensus`, and `POST /api/data-nest/verify`, which run these modules with `python3`. On Vercel the build downloads a standalone CPython into `vendor/python` (not committed) so the same files execute there.

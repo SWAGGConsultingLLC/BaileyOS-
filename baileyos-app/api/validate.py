@@ -15,7 +15,7 @@ import sys
 from http.server import BaseHTTPRequestHandler
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _validate_corridor import build_report, seal  # noqa: E402
+from _validate_corridor import seal  # noqa: E402
 
 MAX_BODY_BYTES = 64 * 1024
 
@@ -48,4 +48,4 @@ class handler(BaseHTTPRequestHandler):  # Vercel's Python runtime looks for this
             return self._send(400, {"error": "Body must be JSON.", "code": "bad_request"})
         if not isinstance(data, dict) or "corridor" not in data or "nodes" not in data:
             return self._send(400, {"error": "Need both 'corridor' and 'nodes'.", "code": "bad_request"})
-        self._send(200, seal(build_report(data)))
+        self._send(200, seal(data))

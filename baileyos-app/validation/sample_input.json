@@ -84,5 +84,15 @@
       "lat": 39.1589,
       "lon": -108.7306
     }
-  ]
+  ],
+  "freshness": {
+    "usgs": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:40:00Z", "record_count": 2},
+    "nws_alerts": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:50:00Z", "record_count": 2},
+    "nws_observation": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:00:00Z", "record_count": 1},
+    "cdot": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:55:00Z", "record_count": 2},
+    "udot": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:55:00Z", "record_count": 2},
+    "amber": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:50:00Z", "record_count": 1},
+    "silver": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:50:00Z", "record_count": 1},
+    "crime": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2025-12-31T00:00:00Z", "record_count": 1}
+  }
 }
