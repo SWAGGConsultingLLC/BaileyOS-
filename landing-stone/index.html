@@ -33,8 +33,7 @@ body {
 }
 .status .kicker { font-size:0.75rem; letter-spacing:1.5px; opacity:0.85; }
 .status .lock { color:#C9943A; font-weight:700; letter-spacing:2px; margin:0.5rem 0; font-size:1.35rem; }
-.status .lock.lock-LOCKED { color:#0c8; }
-.status .lock.lock-RED { color:#ff8f8f; }
+.status .lock.lock-ANCHORED { color:#0c8; }
 .compass { font-size:3rem; margin:1.25rem 0 1rem; line-height:1; }
 .lights { text-align:left; width:100%; display:flex; flex-direction:column; gap:0.9rem; }
 .light { border-top:1px solid rgba(201,148,58,0.28); padding-top:0.7rem; }
@@ -84,7 +83,7 @@ a:hover { text-decoration:underline; }
   <div class="sub">OPERATION RED ROBIN · BAILEYOS Ω</div>
 </div>
 <div class="status" aria-live="polite">
-  <div class="kicker">CONTINUITY LOCK</div>
+  <div class="kicker">CONTINUITY</div>
   <div class="lock" id="lock">PENDING</div>
   <p class="light-line" id="lock-line">PENDING — anchor not published</p>
   <div class="compass" aria-hidden="true">◉</div>
@@ -109,6 +108,10 @@ a:hover { text-decoration:underline; }
     <div>Head <span id="head">not available</span></div>
     <div>Computed <span id="computed">not available</span></div>
   </div>
+  <section id="notice" hidden>
+    <p class="light-line" id="notice-line"></p>
+    <p class="light-line" id="notice-sources"></p>
+  </section>
 </div>
 <nav class="sim-entry" aria-label="Landing Stone modules">
   <a href="simulation/">Agent simulation</a>
@@ -118,7 +121,7 @@ a:hover { text-decoration:underline; }
 </div>
 <script>
 (function () {
-  var states = { GREEN: 'state-GREEN', RED: 'state-RED', PENDING: 'state-PENDING' };
+  var states = { GREEN: 'state-GREEN', RED: 'state-RED', PENDING: 'state-PENDING', 'RECORD INTACT': 'state-GREEN' };
   function text(id, value) {
     var node = document.getElementById(id);
     if (node) node.textContent = value;
@@ -143,10 +146,10 @@ a:hover { text-decoration:underline; }
   }
   function apply(data) {
     if (!data || typeof data !== 'object') { pending('The ruling log could not be read.'); return; }
-    var lock = data.continuity_lock === 'LOCKED' ? 'LOCKED' : 'PENDING';
+    var lock = data.continuity_lock === 'ANCHORED' ? 'ANCHORED' : 'PENDING';
     text('lock', lock);
     document.getElementById('lock').className = 'lock lock-' + lock;
-    text('lock-line', typeof data.lock_line === 'string' ? data.lock_line : 'PENDING — anchor not published');
+    text('lock-line', typeof data.lock_line === 'string' ? data.lock_line : 'PENDING — an independent anchor is not published');
     var consensus = data.consensus || {};
     var feed = data.feed_health || {};
     var chain = data.chain_integrity || {};
@@ -158,6 +161,25 @@ a:hover { text-decoration:underline; }
     text('chain-line', chain.line || 'Waiting for the ruling log.');
     text('head', typeof data.head_sha256 === 'string' ? data.head_sha256 : 'not available');
     text('computed', typeof data.computed_at === 'string' ? data.computed_at : 'not available');
+    var notice = document.getElementById('notice');
+    if (data.notice && data.notice.advisory) {
+      notice.hidden = false;
+      text('notice-line', data.notice.advisory);
+      var sources = Array.isArray(data.notice.sources) ? data.notice.sources : [];
+      var box = document.getElementById('notice-sources');
+      box.textContent = '';
+      sources.forEach(function (source, index) {
+        var url = String(source.url || '');
+        if (!/^https:\/\//.test(url)) return;
+        if (index) box.appendChild(document.createTextNode(' · '));
+        var link = document.createElement('a');
+        link.href = url;
+        link.textContent = String(source.name || 'source');
+        box.appendChild(link);
+      });
+    } else {
+      notice.hidden = true;
+    }
   }
   fetch('/api/data-nest/continuity', { cache: 'no-store' })
     .then(function (response) { if (!response.ok) throw new Error('unreachable'); return response.json(); })

@@ -52,6 +52,12 @@ MAX_REASON_CHARS = 500
 
 
 def canonical_json(obj) -> str:
+    """Sorted-key JSON, separators ',' and ':', UTF-8, no trailing newline.
+
+    These are the bytes existing records verify against. RFC 8785 (JCS) is the
+    documented target for number and escape rules. This function is not swapped
+    for a second serializer, because that would change seals already issued.
+    """
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
@@ -195,6 +201,27 @@ def sanity_blocks_consensus(report: dict) -> bool:
     return False
 
 
+def feed_empty_or_missing(report: dict) -> bool:
+    """A missing layer or a fresh empty layer. Crime is not a feasibility feed. This is not an all-clear."""
+    fresh = report.get("freshness") if isinstance(report, dict) else None
+    sources = fresh.get("sources") if isinstance(fresh, dict) else None
+    if not isinstance(sources, list) or not sources:
+        return True
+    relevant = [src for src in sources if isinstance(src, dict) and src.get("id") != "crime"]
+    if not relevant:
+        return True
+    for src in relevant:
+        status = src.get("status")
+        count = src.get("record_count")
+        if status == "warn":
+            return True
+        if status == "pass" and (not isinstance(count, int) or isinstance(count, bool) or count <= 0):
+            return True
+        if status not in ("pass", "fail"):
+            return True
+    return False
+
+
 def fingerprint_blocks_consensus(report: dict, payloads) -> bool:
     """Recompute feed fingerprints when a source claims one. A claimed hash with no payload blocks CONSENSUS."""
     fresh = report.get("freshness") if isinstance(report, dict) else None
@@ -255,11 +282,7 @@ def convene(report_canonical_json, report_sha256, gemini=None, kimi=None, now: d
         ruling, label = "UNRESOLVED", f"UNRESOLVED — {who} uncertain or unavailable ({agreeing} of {SEATS_TOTAL} agree)"
     elif agree_count >= 2:
         ruling = "CONSENSUS"
-        if pending:
-            missing = ", ".join(name.capitalize() for name in pending)
-            label = f"CONSENSUS — {agree_count} of {SEATS_TOTAL} identical agree verdicts; missing: {missing}"
-        else:
-            label = f"CONSENSUS — all {SEATS_TOTAL} seats agree with the Python result ({overall})"
+        label = f"CONSENSUS ({agree_count} of {SEATS_TOTAL})"
     elif len(pending) == len(votes):
         ruling, label = "PENDING", f"PENDING — 1 of {SEATS_TOTAL} seats (Python only); no reviewer has voted"
     else:
@@ -269,7 +292,9 @@ def convene(report_canonical_json, report_sha256, gemini=None, kimi=None, now: d
     fresh_blocks = feed_blocks_consensus(report, now)
     value_blocks = sanity_blocks_consensus(report)
     hash_blocks = fingerprint_blocks_consensus(report, payloads)
-    if ruling == "CONSENSUS" and (fresh_blocks or value_blocks or hash_blocks):
+    empty_feed = feed_empty_or_missing(report)
+    blocks = bool(fresh_blocks or value_blocks or hash_blocks)
+    if ruling == "CONSENSUS" and blocks:
         ruling = "PROVISIONAL"
         reasons = []
         if fresh_blocks:
@@ -279,6 +304,22 @@ def convene(report_canonical_json, report_sha256, gemini=None, kimi=None, now: d
         if hash_blocks:
             reasons.append("a feed fingerprint did not recompute")
         label = "PROVISIONAL — " + "; ".join(reasons) + "; consensus is not available"
+    elif ruling == "CONSENSUS" and empty_feed:
+        ruling = "PENDING"
+        label = "PENDING — a feed is missing or empty. Hazards may still be present. Check COtrip, 511, and the National Weather Service."
+
+    unresolved_dissent = bool(dissent or unresolved or pending)
+    failed_check = blocks or overall == "FAIL"
+    if failed_check or dissent or ruling in ("DISSENT", "UNRESOLVED", "PROVISIONAL"):
+        clearance = "NOT_SAFE"
+    elif empty_feed or ruling == "PENDING":
+        clearance = "PENDING"
+    elif ruling == "CONSENSUS" and agree_count == SEATS_TOTAL and not unresolved_dissent and overall == "PASS":
+        clearance = "SAFE"
+    elif ruling == "CONSENSUS" and agree_count >= 2:
+        clearance = "WARN"
+    else:
+        clearance = "PENDING"
 
     out = {
         "schema_version": SCHEMA_VERSION, "engine": {"name": ENGINE_NAME, "version": ENGINE_VERSION},
@@ -290,6 +331,9 @@ def convene(report_canonical_json, report_sha256, gemini=None, kimi=None, now: d
         "fingerprint_blocks_consensus": hash_blocks,
         "missing_voters": pending,
         "verdict_payloads": payloads_by_seat,
+        "empty_feed": empty_feed,
+        "clearance": clearance,
+        "python_voter": "deterministic validator; a model agree does not override a failed check",
         "seats": {"total": SEATS_TOTAL, "agreeing": agreeing},
         "votes": votes, "dissent": dissent,
     }

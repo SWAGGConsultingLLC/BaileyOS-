@@ -10,6 +10,10 @@ Say "tamper-evident decision records." Do not say the seal is proof, tamper-proo
 
 Canonical form is sorted-key JSON, separators `,` and `:`, UTF-8, no trailing newline.
 
+Schema 1.1 records also carry `chain_epoch` 1. A later epoch would be a new chain, not a rewrite of this one. Verify accepts 1.0 records with the old flat hash and does not require an epoch on them.
+
+Canonical JSON is sorted keys, separators `,` and `:`, UTF-8, no trailing newline. [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) (JCS) is the documented target for number and escape rules. Existing seals stay on the current encoding. They are not re-hashed with a second serializer.
+
 For 1.1 the chain formula is:
 
 `R_n = H(canonical{ruling_n, F, R_prev})`
@@ -31,9 +35,17 @@ Records are written one at a time so two of them cannot claim the same parent.
 
 Direct inserts are revoked from the service role. The app calls the function.
 
+`20261114051000_ruling_epoch_idempotency.sql` adds `idempotency_key` and `chain_epoch`. The same key with the same seal returns the existing row. The same key with a different seal is rejected. Sequence numbers stay contiguous. A gap turns Chain Integrity red.
+
+Personal constraints are not in the row. A hard constraint (mobility, medical, or a vehicle limit) stays on the device as a commitment hash. The only shared result is `infeasible_for_someone` with plan ids. Not who. Not why. Those values are not scores in [0, 1].
+
 ## The 2-of-3 rule
 
 The ruling names stay `NO_RULING`, `DISSENT`, `UNRESOLVED`, `CONSENSUS`, `PROVISIONAL`, and `PENDING`. No new name was added.
+
+`CONSENSUS (2 of 3)` is a warning, not a clearance. `CONSENSUS (3 of 3)` can be a clearance only when there is no unresolved dissent and no failed hard check. The Python validator is one voter. It fails by deterministic checks. A model agree does not override a failed check. FeasibleFacts is computed by that plain code, not by the voters. FBI crime data is never a feasibility fact.
+
+A missing feed, or a feed that answered and was empty, is `PENDING`. That is not a statement that there are no hazards.
 
 `CONSENSUS` needs all of these:
 
@@ -58,8 +70,9 @@ A disagreeing voter is sealed by name in `dissent`. A seat that has not voted is
 4. If a unique index fails, two existing rows already share a parent. Stop. Do not delete rows from the app. Inspect `prev_record_sha256` and ask before any repair.
 5. Check `select sequence_number, prev_record_sha256, ruling from public.ruling_records order by sequence_number;`
 6. Leave the table empty if it is empty. The next convene writes the genesis record through the function. Do not paste a genesis row by hand.
+7. Run `baileyos-app/supabase/migrations/20261114051000_ruling_epoch_idempotency.sql` after the sequencer file.
 
-Until both files are applied, the HUD still returns the record and says the log is not configured. The Landing Stone lights stay PENDING.
+Until these files are applied, the HUD still returns the record and says the log is not configured. The Landing Stone lights stay PENDING.
 
 ## Check a record
 
@@ -71,11 +84,11 @@ Until both files are applied, the HUD still returns the record and says the log 
 
 - Consensus: a count such as `1 of 1 CONSENSUS over 30 days`. GREEN when at least two thirds of the rulings in the window are CONSENSUS. RED when the window is below that. PENDING when there is nothing to count.
 - Feed Health: fresh and sane across those rulings. PENDING when a ruling has no sanity check.
-- Chain Integrity: every seal recomputes, each parent matches the previous record, and no two records share a parent.
+- Chain Integrity: every seal recomputes, each parent matches the previous record, sequence numbers have no gap, and no two records share a parent. When that holds, the light reads `RECORD INTACT`. That label is not a verdict and it does not say the road is safe.
 
-Each light is GREEN, RED, or PENDING, with one plain sentence.
+Each light is GREEN, RED, PENDING, or `RECORD INTACT`, with one plain sentence.
 
-The continuity lock is `LOCKED` only when all three are green and today's head is anchored outside this system. Anchoring is not built, so the lock stays `PENDING — anchor not published`. If the endpoint cannot be read, or the database is not configured, every light is PENDING. The page does not invent a count.
+The overall line stays `PENDING` until an independent witness has today's head. A Git repository this project controls is not that witness. OpenTimestamps or Sigstore Rekor would be. Until one of those is published, the line stays pending even if all three lights are clear. The page does not invent a count. A `NO_SAFE_PLAN` or hazard result includes an advisory-only line and links to COtrip, 511, and the National Weather Service.
 
 The response includes the head hash, `computed_at`, and the pairwise rates. Those rates do not change the lock.
 
@@ -93,7 +106,7 @@ The response includes the head hash, `computed_at`, and the pairwise rates. Thos
 - `approval` must be a fresh `{ "owner_approved": true, "day": "<that same UTC day>" }`. One approval does not cover the next day.
 - The function returns `published: false` and `implemented: false`. It does not commit, push, or open a network connection.
 - Nothing calls it on a timer. `auto_post` is false.
-- A second witness such as Sigstore Rekor can come after Git. It is not this step.
+- `sufficient_alone` is false. An owner-controlled Git repo is not an independent anchor. The independent witness to plan is OpenTimestamps or Sigstore Rekor. The overall line stays PENDING until that witness exists.
 
 ## Step 5 — QR and SAS trip handshake (not built)
 
@@ -106,6 +119,16 @@ The response includes the head hash, `computed_at`, and the pairwise rates. Thos
 - Trip genesis is `G = H(canonical{pub_A, pub_B, nonce})`.
 
 Two people on the same trip can share a route and the public feeds. Each phone still orders and phrases results from its own on-device profile. Profiles are not shared, and they are not written into these records.
+
+## Hard constraints and a later fit()
+
+Three categories sit side by side:
+
+- FeasibleFacts, from the deterministic validator. Crime is excluded.
+- Preferences, a later `fit()` that only ranks inside that set. Scores stay in [0, 1] and are rank-based, with one published tie-break, so two phones with the same facts and the same ranks pick the same plan.
+- Hard personal constraints: mobility, medical, and vehicle limits. They are not scores. They filter FeasibleFacts on the device. The shared result is only `infeasible_for_someone`. The chain stores hashes and commitments, not the statement, the person, or the reason.
+
+`api/_facts.py` is the interface. There is no settings screen for it yet.
 
 ## How the simulation would use a record later
 

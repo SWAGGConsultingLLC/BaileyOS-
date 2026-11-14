@@ -26,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 from _consensus import canonical_json, sha256_hex
 
 SCHEMA_VERSION = "1.1"
+CHAIN_EPOCH = 1
 CHAIN_FORMULA = "R_n = H(canonical{ruling_n, F, R_prev})"
 RECORD_KIND = "baileyos.ruling_record"
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -133,8 +134,10 @@ def chain_preimage(record: dict) -> dict:
         },
         "R_prev": record.get("prev_record_sha256"),
         "ruling_n": {
+            "chain_epoch": record.get("chain_epoch"),
             "chain_formula": CHAIN_FORMULA,
             "created_at": record.get("created_at"),
+            "idempotency_key": record.get("idempotency_key"),
             "dissent": record.get("dissent") or [],
             "fingerprints_ok": record.get("fingerprints_ok"),
             "freshness": record.get("freshness"),
@@ -185,9 +188,11 @@ def build_genesis_record(now: datetime | None = None) -> dict:
     }
     record = {
         "schema_version": SCHEMA_VERSION,
+        "chain_epoch": CHAIN_EPOCH,
         "kind": RECORD_KIND,
         "created_at": stamp,
         "sequence_number": 1,
+        "idempotency_key": None,
         "prev_record_sha256": None,
         "input_sha256": sha256_hex(canonical_json({"genesis": True, "part": "input"})),
         "report_sha256": sha256_hex(canonical_json({"genesis": True, "part": "report"})),
@@ -206,7 +211,7 @@ def build_genesis_record(now: datetime | None = None) -> dict:
     return _seal_v11(record)
 
 
-def build_ruling_record(sealed: dict, queen: dict, prev_record_sha256=None, sequence_number=None, now: datetime | None = None) -> dict:
+def build_ruling_record(sealed: dict, queen: dict, prev_record_sha256=None, sequence_number=None, idempotency_key=None, now: datetime | None = None) -> dict:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     report = sealed.get("report") if isinstance(sealed.get("report"), dict) else {}
     verdicts = [_verdict("python", "agree", "Python produced this report and agrees with its own checks.")]
@@ -226,6 +231,7 @@ def build_ruling_record(sealed: dict, queen: dict, prev_record_sha256=None, sequ
         if _hex64(src.get("payload_sha256")):
             feeds[src["id"]] = src["payload_sha256"]
     queen_view = {
+        "clearance": queen.get("clearance"),
         "convened_at": queen.get("convened_at"),
         "label": queen.get("label"),
         "python_overall": queen.get("python_overall"),
@@ -245,9 +251,11 @@ def build_ruling_record(sealed: dict, queen: dict, prev_record_sha256=None, sequ
             dissent.append({"reason": str(row.get("reason") or "")[:500], "reviewer": row["reviewer"]})
     record = {
         "schema_version": SCHEMA_VERSION,
+        "chain_epoch": CHAIN_EPOCH,
         "kind": RECORD_KIND,
         "created_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "sequence_number": seq,
+        "idempotency_key": idempotency_key if isinstance(idempotency_key, str) and _hex64(idempotency_key) else None,
         "prev_record_sha256": parent,
         "input_sha256": sealed.get("input_sha256"),
         "report_sha256": sealed.get("report_sha256"),
@@ -309,6 +317,8 @@ def verify_ruling_record(record) -> dict:
             problems.append("missing_voters is not a list of names")
         if record.get("chain_formula") != CHAIN_FORMULA:
             problems.append("chain formula mismatch")
+        if record.get("chain_epoch") != CHAIN_EPOCH:
+            problems.append("chain epoch mismatch")
     else:
         return {"ok": False, "problems": ["unknown schema_version"], "note": SEAL_NOTE, "record_sha256": None}
     if claimed != recomputed:
@@ -373,6 +383,23 @@ def publish_anchor(anchor: dict) -> dict:
 
 class ChainConflict(Exception):
     """The head moved between the read and the write. The caller retries."""
+
+
+def accept_sequenced(rows: list, record: dict):
+    """One in-memory append. Same idempotency key and same seal replays. A gap is not written here; verify_chain reports it."""
+    key = record.get("idempotency_key")
+    if isinstance(key, str) and key:
+        for row in rows:
+            if isinstance(row, dict) and row.get("idempotency_key") == key:
+                if row.get("record_sha256") == record.get("record_sha256"):
+                    return row
+                raise ChainConflict("idempotency key reused")
+    prev = rows[-1].get("record_sha256") if rows else None
+    seq = rows[-1].get("sequence_number") + 1 if rows else 1
+    if record.get("prev_record_sha256") != prev or record.get("sequence_number") != seq:
+        raise ChainConflict("chain head moved")
+    rows.append(record)
+    return record
 
 
 def append_with_retry(read_head, write, build, attempts: int = 5):
@@ -501,16 +528,23 @@ def _light(state: str, line: str, **extra) -> dict:
     return {"line": line, "state": state, **extra}
 
 
-def continuity_lights(records, configured: bool = True, anchored_today: bool = False, now: datetime | None = None, error: str | None = None) -> dict:
-    """Three lights plus the continuity lock. The lock is LOCKED only when all three are green and today's head is anchored outside this system."""
+def continuity_lights(records, configured: bool = True, anchored_today: bool = False, independent_anchor: bool = False, now: datetime | None = None, error: str | None = None) -> dict:
+    """Three lights. Chain Integrity says RECORD INTACT, which is not a road clearance. The overall line stays PENDING until an independent witness has the head."""
+    from _facts import hazard_notice
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     computed = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-    anchor_line = "today's head is anchored outside this system" if anchored_today else "anchor not published"
+    if independent_anchor:
+        anchor_line = "an independent witness has today's head"
+    elif anchored_today:
+        anchor_line = "a Git repo we control has a copy. That is not an independent anchor."
+    else:
+        anchor_line = "an independent anchor is not published"
 
     def pending(reason: str) -> dict:
         return {
             "anchor_line": anchor_line,
-            "anchored_today": False,
+            "anchored_today": bool(anchored_today),
+            "independent_anchor": False,
             "chain_integrity": _light("PENDING", reason),
             "computed_at": computed,
             "consensus": _light("PENDING", reason, consensus_count=None, total=None),
@@ -518,6 +552,7 @@ def continuity_lights(records, configured: bool = True, anchored_today: bool = F
             "feed_health": _light("PENDING", reason),
             "head_sha256": None,
             "lock_line": "PENDING — " + reason,
+            "notice": None,
             "pairwise": pairwise_agreement([], now, 30),
         }
 
@@ -547,7 +582,14 @@ def continuity_lights(records, configured: bool = True, anchored_today: bool = F
         consensus = _light("PENDING", "No rulings in the last 30 days.", consensus_count=0, total=0)
     else:
         state = "GREEN" if consensus_count * 3 >= total * 2 else "RED"
-        consensus = _light(state, f"{consensus_count} of {total} CONSENSUS over 30 days.", consensus_count=consensus_count, total=total)
+        labels = [record.get("queen", {}).get("label") for record in recent if isinstance(record.get("queen"), dict) and record["queen"].get("ruling") == "CONSENSUS"]
+        if labels and all(label == "CONSENSUS (2 of 3)" for label in labels):
+            line = f"{consensus_count} of {total} CONSENSUS (2 of 3) over 30 days."
+        elif labels and all(label == "CONSENSUS (3 of 3)" for label in labels):
+            line = f"{consensus_count} of {total} CONSENSUS (3 of 3) over 30 days."
+        else:
+            line = f"{consensus_count} of {total} CONSENSUS over 30 days."
+        consensus = _light(state, line, consensus_count=consensus_count, total=total)
 
     def feed_bad(record) -> str | None:
         fresh = record.get("freshness") if isinstance(record.get("freshness"), dict) else {}
@@ -576,29 +618,42 @@ def continuity_lights(records, configured: bool = True, anchored_today: bool = F
         else:
             feed = _light("GREEN", "Recent rulings were fresh and inside the sanity ranges.")
 
+    gap = any("sequence numbers are not contiguous" in str(item) for item in chain["problems"])
     if not records:
         chain_light = _light("PENDING", "No records to recompute yet.")
     elif chain["ok"]:
-        chain_light = _light("GREEN", "Every record recomputes, the links match, and there is no fork.")
+        chain_light = _light("RECORD INTACT", "The records recompute and the links match. This does not say the road is safe.")
+    elif gap:
+        chain_light = _light("RED", "A sequence number is missing.")
     elif chain["fork"]:
         chain_light = _light("RED", "A record claims the same parent as another record.")
     else:
         chain_light = _light("RED", "A record seal does not recompute.")
 
-    states = (consensus["state"], feed["state"], chain_light["state"])
-    if states == ("GREEN", "GREEN", "GREEN") and anchored_today:
-        lock = "LOCKED"
-        lock_line = "LOCKED — all three lights are green and today's head is anchored outside this system."
-    elif "RED" in states:
+    ready = consensus["state"] == "GREEN" and feed["state"] == "GREEN" and chain_light["state"] == "RECORD INTACT"
+    if ready and independent_anchor:
+        lock = "ANCHORED"
+        lock_line = "ANCHORED — an independent witness has today's head. This does not say the road is safe."
+    elif "RED" in (consensus["state"], feed["state"], chain_light["state"]):
         lock = "PENDING"
-        lock_line = "PENDING — a light is red, and the anchor is not published." if not anchored_today else "PENDING — a light is red."
+        lock_line = "PENDING — a light is red, and an independent anchor is not published."
     else:
         lock = "PENDING"
-        lock_line = "PENDING — anchor not published" if not anchored_today else "PENDING — a light is not green."
+        lock_line = "PENDING — an independent anchor is not published. A Git repo we control is not enough."
+
+    notice = None
+    if recent:
+        latest = recent[-1]
+        queen = latest.get("queen") if isinstance(latest.get("queen"), dict) else {}
+        if queen.get("clearance") == "NOT_SAFE" or queen.get("ruling") in ("DISSENT", "PROVISIONAL", "UNRESOLVED"):
+            notice = hazard_notice("HAZARD")
+        elif queen.get("clearance") == "PENDING":
+            notice = hazard_notice("NO_SAFE_PLAN")
 
     return {
         "anchor_line": anchor_line,
         "anchored_today": bool(anchored_today),
+        "independent_anchor": bool(independent_anchor),
         "chain_integrity": chain_light,
         "computed_at": computed,
         "consensus": consensus,
@@ -606,5 +661,6 @@ def continuity_lights(records, configured: bool = True, anchored_today: bool = F
         "feed_health": feed,
         "head_sha256": chain.get("head") if chain.get("ok") else None,
         "lock_line": lock_line,
+        "notice": notice,
         "pairwise": pairwise_agreement(records, now, 30),
     }

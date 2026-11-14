@@ -22,7 +22,8 @@ def publish_git_anchor(anchor, approval=None) -> dict:
         "needs_owner_approval": True,
         "published": False,
         "reason": "Git anchoring is not built. Nothing was committed or pushed.",
-        "second_witness_later": "A transparency log such as Sigstore Rekor can be a later witness. It is not this step.",
+        "sufficient_alone": False,
+        "independent_witness": "OpenTimestamps or Sigstore Rekor. A Git repository we control is not an independent anchor.",
     }
 
 

@@ -18,13 +18,17 @@ test('the sequencer migration is new and locks the chain', () => {
   assert.match(next, /GENESIS/);
   assert.match(next, /chain head moved/);
   assert.match(next, /for update/);
+  const epoch = fs.readFileSync(path.join(app, 'supabase/migrations/20261114051000_ruling_epoch_idempotency.sql'), 'utf8');
+  assert.match(epoch, /idempotency_key/);
+  assert.match(epoch, /chain_epoch/);
+  assert.match(epoch, /idempotency key reused/);
 });
 
 test('the Landing Stone page starts pending and the two copies match', () => {
   const repo = fs.readFileSync(path.join(root, 'landing-stone/index.html'), 'utf8');
   const served = fs.readFileSync(path.join(app, 'public/landing-stone/index.html'), 'utf8');
   assert.equal(repo, served);
-  for (const banned of ['97%', 'TARGET LOCKED', 'Grak', 'STABLE ACROSS']) {
+  for (const banned of ['97%', 'TARGET LOCKED', 'Grak', 'STABLE ACROSS', 'LOCKED']) {
     assert.equal(repo.includes(banned), false, banned);
   }
   assert.match(repo, /Consensus/);

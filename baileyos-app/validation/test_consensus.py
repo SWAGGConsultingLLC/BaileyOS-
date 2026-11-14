@@ -11,6 +11,9 @@ from _ruling import (  # noqa: E402
     delete_linkage_for_user, purge_linkage, daily_anchor, publish_anchor, canonical_json as ruling_canonical,
 )
 from _roadmap import publish_git_anchor, trip_handshake_interface  # noqa: E402
+from _facts import (  # noqa: E402
+    FIT_RANK_NOTE, apply_hard_filter, feasible_facts, hard_constraint_commitment, hazard_notice, shared_infeasible,
+)
 
 with open(os.path.join(HERE, "sample_input.json"), encoding="utf-8") as fh:
     SAMPLE = json.load(fh)
@@ -33,13 +36,15 @@ class QueenTests(unittest.TestCase):
     def test_gemini_agree_kimi_pending_is_consensus_and_names_kimi(self):
         r = queen(g=vote("agree"))
         self.assertEqual(r["ruling"], "CONSENSUS")
+        self.assertEqual(r["label"], "CONSENSUS (2 of 3)")
+        self.assertEqual(r["clearance"], "WARN")
         self.assertEqual(r["missing_voters"], ["kimi"])
-        self.assertIn("missing: Kimi", r["label"])
     def test_kimi_agree_gemini_pending_names_gemini(self):
         r = queen(k=vote("agree"))
         self.assertEqual(r["ruling"], "CONSENSUS")
+        self.assertEqual(r["label"], "CONSENSUS (2 of 3)")
+        self.assertEqual(r["clearance"], "WARN")
         self.assertEqual(r["missing_voters"], ["gemini"])
-        self.assertIn("missing: Gemini", r["label"])
     def test_all_agree_is_consensus(self):             self.assertEqual(run(vote("agree"), vote("agree")), "CONSENSUS")
     def test_any_disagree_is_dissent_with_who_and_why(self):
         r = queen(g=vote("agree"), k=vote("disagree", "node 3 looks wrong"))
@@ -304,18 +309,28 @@ class QueenTests(unittest.TestCase):
         genesis = build_genesis_record(now=NOW)
         record = build_ruling_record(S, ruling, prev_record_sha256=genesis["record_sha256"], sequence_number=2, now=NOW)
         lights = continuity_lights([genesis, record], configured=True, anchored_today=False, now=NOW)
-        self.assertEqual(lights["consensus"]["line"], "1 of 1 CONSENSUS over 30 days.")
+        self.assertEqual(lights["consensus"]["line"], "1 of 1 CONSENSUS (3 of 3) over 30 days.")
         self.assertEqual(lights["consensus"]["state"], "GREEN")
         self.assertEqual(lights["feed_health"]["state"], "GREEN")
-        self.assertEqual(lights["chain_integrity"]["state"], "GREEN")
+        self.assertEqual(lights["chain_integrity"]["state"], "RECORD INTACT")
+        self.assertNotIn("road is safe", lights["chain_integrity"]["line"].split("does not")[0])
         self.assertEqual(lights["continuity_lock"], "PENDING")
-        self.assertIn("anchor not published", lights["lock_line"])
+        self.assertIn("independent anchor", lights["lock_line"])
         self.assertFalse(lights["pairwise"]["used_for_quorum"])
-        locked = continuity_lights([genesis, record], configured=True, anchored_today=True, now=NOW)
-        self.assertEqual(locked["continuity_lock"], "LOCKED")
+        git_only = continuity_lights([genesis, record], configured=True, anchored_today=True, independent_anchor=False, now=NOW)
+        self.assertEqual(git_only["continuity_lock"], "PENDING")
+        self.assertNotIn("LOCKED", git_only["lock_line"])
+        witnessed = continuity_lights([genesis, record], configured=True, independent_anchor=True, now=NOW)
+        self.assertEqual(witnessed["continuity_lock"], "ANCHORED")
         forked = continuity_lights([genesis, record, build_ruling_record(S, ruling, prev_record_sha256=genesis["record_sha256"], sequence_number=3, now=NOW)], configured=True, now=NOW)
         self.assertEqual(forked["chain_integrity"]["state"], "RED")
-        self.assertNotEqual(forked["continuity_lock"], "LOCKED")
+        self.assertNotEqual(forked["continuity_lock"], "ANCHORED")
+        gapped = continuity_lights([
+            genesis,
+            build_ruling_record(S, ruling, prev_record_sha256=genesis["record_sha256"], sequence_number=3, now=NOW),
+        ], configured=True, now=NOW)
+        self.assertEqual(gapped["chain_integrity"]["state"], "RED")
+        self.assertIn("sequence number is missing", gapped["chain_integrity"]["line"])
         tampered = json.loads(json.dumps(record))
         tampered["record_sha256"] = "0" * 64
         broken = continuity_lights([genesis, tampered], configured=True, now=NOW)
@@ -337,6 +352,92 @@ class QueenTests(unittest.TestCase):
         self.assertFalse(trip["live"])
         self.assertEqual(trip["trip_genesis"], "G = H(canonical{pub_A, pub_B, nonce})")
         self.assertIn("X25519", trip["key_agreement"])
+        self.assertFalse(posted["sufficient_alone"])
+        self.assertIn("Rekor", posted["independent_witness"])
+
+    def test_three_agree_can_clear_and_two_agree_only_warns(self):
+        full = queen(g=vote("agree"), k=vote("agree"))
+        self.assertEqual(full["label"], "CONSENSUS (3 of 3)")
+        self.assertEqual(full["clearance"], "SAFE")
+        self.assertIn("deterministic", full["python_voter"])
+        warned = queen(g=vote("agree"))
+        self.assertEqual(warned["clearance"], "WARN")
+        self.assertNotEqual(warned["clearance"], "SAFE")
+
+    def test_empty_feed_is_pending_and_not_an_all_clear(self):
+        bad = copy.deepcopy(SAMPLE)
+        bad["freshness"]["amber"]["record_count"] = 0
+        sealed = seal(bad, now=NOW)
+        r = queen(sealed["report_canonical_json"], sealed["report_sha256"],
+                  vote("agree", h=sealed["report_sha256"], inp=sealed["input_sha256"]),
+                  vote("agree", h=sealed["report_sha256"], inp=sealed["input_sha256"]),
+                  sealed["input_canonical_json"])
+        self.assertEqual(r["ruling"], "PENDING")
+        self.assertEqual(r["clearance"], "PENDING")
+        self.assertNotIn("no hazards", r["label"].lower())
+        self.assertIn("Hazards may still be present", r["label"])
+
+    def test_failed_check_is_not_a_safe_clearance(self):
+        bad = copy.deepcopy(SAMPLE)
+        bad["nodes"][0]["lat"] = 40.5
+        sealed = seal(bad, now=NOW)
+        r = queen(sealed["report_canonical_json"], sealed["report_sha256"],
+                  vote("agree", h=sealed["report_sha256"], inp=sealed["input_sha256"]),
+                  vote("agree", h=sealed["report_sha256"], inp=sealed["input_sha256"]),
+                  sealed["input_canonical_json"])
+        self.assertEqual(r["python_overall"], "FAIL")
+        self.assertNotEqual(r["clearance"], "SAFE")
+
+    def test_hard_constraints_stay_on_device_and_crime_is_not_a_fact(self):
+        statement = "needs a ramp and a refrigerated medicine bag"
+        local = hard_constraint_commitment("mobility", statement)
+        self.assertNotIn("statement", local)
+        self.assertNotIn(statement, json.dumps(local))
+        filtered = apply_hard_filter(
+            ["stay", "detour"],
+            [{"kind": "mobility", "commitment": local["commitment"], "blocks": ["detour"]}],
+        )
+        shared = shared_infeasible(filtered)
+        self.assertEqual(shared, {"infeasible_for_someone": ["detour"]})
+        blob = json.dumps(shared)
+        self.assertNotIn(statement, blob)
+        self.assertNotIn("mobility", blob)
+        self.assertNotIn(local["commitment"], blob)
+        report = {
+            "checks": [{"id": "C1", "title": "shape", "status": "PASS"}],
+            "freshness": {"sources": [
+                {"id": "crime", "status": "pass", "record_count": 4},
+                {"id": "nws_alerts", "status": "pass", "record_count": 1},
+            ]},
+        }
+        facts = feasible_facts(report)
+        self.assertEqual(facts["computed_by"], "deterministic")
+        self.assertNotIn("crime", facts["feeds"])
+        self.assertIn("nws_alerts", facts["feeds"])
+        self.assertIn("rank-based", FIT_RANK_NOTE)
+        notice = hazard_notice("NO_SAFE_PLAN")
+        self.assertFalse(notice["official_alert"])
+        self.assertIn("COtrip", notice["advisory"])
+        self.assertTrue(any(source["name"] == "NWS" for source in notice["sources"]))
+        self.assertNotIn("no hazards", notice["advisory"].lower())
+        ruling = queen(g=vote("agree"), k=vote("agree"))
+        record = build_ruling_record(S, ruling, sequence_number=1, now=NOW)
+        self.assertNotIn(statement, json.dumps(record))
+
+    def test_idempotency_key_replays_and_rejects_a_reuse(self):
+        ruling = queen(g=vote("agree"), k=vote("agree"))
+        genesis = build_genesis_record(now=NOW)
+        key = sha256_hex("same-attempt")
+        record = build_ruling_record(S, ruling, prev_record_sha256=genesis["record_sha256"], sequence_number=2, idempotency_key=key, now=NOW)
+        rows = [genesis]
+        from _ruling import accept_sequenced
+        first = accept_sequenced(rows, record)
+        again = accept_sequenced(rows, record)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(first["record_sha256"], again["record_sha256"])
+        other = build_ruling_record(S, ruling, prev_record_sha256=genesis["record_sha256"], sequence_number=2, idempotency_key=key, now=NOW + timedelta(seconds=5))
+        with self.assertRaises(ChainConflict):
+            accept_sequenced(rows, other)
 
 if __name__ == "__main__":
     unittest.main()

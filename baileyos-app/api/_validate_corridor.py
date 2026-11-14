@@ -57,6 +57,7 @@ CANONICALIZATION = {
     "trailing_newline": False,
     "input_sha256_bytes": "SHA-256 of the UTF-8 bytes of canonical JSON for the object with exactly the keys corridor, nodes, and freshness, in sorted-key form, with no surrounding whitespace and no trailing newline. The Kimi package, this rule, and the report are not part of those bytes.",
     "report_sha256_bytes": "SHA-256 of the UTF-8 bytes of canonical JSON for the report object only, with no surrounding whitespace and no trailing newline. The report object does not contain report_sha256, input_canonical_json, input_sha256's twin fields, or this rule.",
+    "rfc8785": "RFC 8785 (JSON Canonicalization Scheme) is the documented target for numbers and escapes. Existing seals keep this sorted-key encoding. A second serializer is not applied to old records.",
 }
 
 RESPONSE_SCHEMA = {
