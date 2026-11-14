@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { orderedSlots, publicSlot } from "./slots.js";
 import {
   SIM_CONFIG,
+  fingerprintAnswer,
   PROXY_BASE,
   DEMO_BANNER,
   activeSlots,
@@ -34,6 +36,31 @@ function session(overrides = {}) {
     ...overrides,
   });
 }
+
+test("free slots run before paid placeholders and a missing key is not configured", () => {
+  const order = orderedSlots().map((slot) => slot.id);
+  assert.deepEqual(order, ["A", "B", "C", "D", "E"]);
+  const views = orderedSlots().map((slot) => publicSlot(slot, false));
+  assert.equal(views.find((slot) => slot.id === "D").status, "disabled");
+  assert.equal(views.find((slot) => slot.id === "E").status, "disabled");
+  assert.equal(views.find((slot) => slot.id === "A").status, "not configured");
+  const paid = session();
+  paid.agents.D.enabled = true;
+  paid.agents.D.configured = true;
+  assert.deepEqual(activeSlots(paid), ["A", "B", "D"]);
+  assert.equal(paid.agents.A.role, paid.agents.E.role.replace("Claude", "Grok"));
+  assert.equal(paid.sharedDocumentId, "landing-stone.shared-document");
+});
+
+test("each recorded answer carries a SHA-256 fingerprint", async () => {
+  const drill = session();
+  const transcript = await playDrill(drill, async ({ cursor, previousName }) => {
+    return demoTurnText({ round: cursor.round, slot: cursor.slot, previousName });
+  });
+  assert.equal(transcript[0].tier, "free");
+  assert.equal(transcript[0].answer_sha256, await fingerprintAnswer(transcript[0].text));
+  assert.equal(transcript.every((turn) => turn.sharedDocumentId === "landing-stone.shared-document"), true);
+});
 
 test("default session is A then B, with Slot C available and off", () => {
   const two = session();

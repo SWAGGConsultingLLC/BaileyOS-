@@ -24,6 +24,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from _consensus import canonical_json, sha256_hex
+from _slots import answers_from_queen, voter_roster
 
 SCHEMA_VERSION = "1.1"
 CHAIN_EPOCH = 1
@@ -150,6 +151,7 @@ def chain_preimage(record: dict) -> dict:
             "schema_version": record.get("schema_version"),
             "sequence_number": record.get("sequence_number"),
             "verdicts": record.get("verdicts"),
+            "voter_slots": record.get("voter_slots") or [],
         },
     }
 
@@ -207,11 +209,12 @@ def build_genesis_record(now: datetime | None = None) -> dict:
         "queen_sha256": sha256_hex(canonical_json(queen_view)),
         "note": SEAL_NOTE,
         "chain_formula": CHAIN_FORMULA,
+        "voter_slots": [],
     }
     return _seal_v11(record)
 
 
-def build_ruling_record(sealed: dict, queen: dict, prev_record_sha256=None, sequence_number=None, idempotency_key=None, now: datetime | None = None) -> dict:
+def build_ruling_record(sealed: dict, queen: dict, prev_record_sha256=None, sequence_number=None, idempotency_key=None, env_flags=None, now: datetime | None = None) -> dict:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     report = sealed.get("report") if isinstance(sealed.get("report"), dict) else {}
     verdicts = [_verdict("python", "agree", "Python produced this report and agrees with its own checks.")]
@@ -270,6 +273,7 @@ def build_ruling_record(sealed: dict, queen: dict, prev_record_sha256=None, sequ
         "queen_sha256": sha256_hex(canonical_json(queen_view)),
         "note": SEAL_NOTE,
         "chain_formula": CHAIN_FORMULA,
+        "voter_slots": voter_roster(env_flags, answers_from_queen(queen), sealed.get("report_sha256")),
     }
     return _seal_v11(record)
 

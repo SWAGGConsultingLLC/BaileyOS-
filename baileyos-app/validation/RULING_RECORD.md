@@ -56,6 +56,8 @@ A missing feed, or a feed that answered and was empty, is `PENDING`. That is not
 
 A disagreeing voter is sealed by name in `dissent`. A seat that has not voted is sealed by name in `missing_voters`. One missing voter does not block `CONSENSUS` when the other two payloads match. Uncertain and unavailable still do. A stale feed, a failed sanity check, or a fingerprint that does not recompute turns that `CONSENSUS` into `PROVISIONAL`. `DISSENT` still wins.
 
+Each ruling also lists `voter_slots` in free-tier order, then paid slots. The tier word is copied from the registry. A slot with no key is `not configured` and has no answer hash. Paid slots stay disabled until `enabled` is true and the owner sets that slot's env key. Kimi uses `MOONSHOT_API_KEY`. Claude uses `ANTHROPIC_API_KEY`. Free slots fill the quorum before any paid slot. The comparison of free and paid answers can be made later from those hashes. Every slot reads `landing-stone/simulation/shared-document.json`. The answer fingerprint is SHA-256 of that slot's answer text.
+
 `pairwise_agreement` is a read-only 30-day rate for each pair of seats. It is returned with the lights and `used_for_quorum` is false. A high rate does not merge two voters. Per-voter `verdict_sha256` stays on the record so a later correlation matrix can be computed without changing the sealed fields.
 
 ## What is outside the chain
