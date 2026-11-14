@@ -1,0 +1,42 @@
+{
+  "id": "landing-stone.shared-document",
+  "scenario": "Operation Red Robin continuity. Every included slot reads this document and proposes the next heading from the same log.",
+  "objective": "Agree one shared heading for Landing Stone continuity and name one risk before the round limit.",
+  "requiredLabels": ["HEADING", "RISK"],
+  "objectiveWords": ["continuity", "landing", "shared"],
+  "firstTurnPhrase": "opening turn",
+  "rules": [
+    {
+      "id": "turn-order",
+      "text": "Strict order follows the slot registry: free-tier slots first, then paid slots that are enabled. A round is one turn from each included slot. The engine never skips an included slot."
+    },
+    {
+      "id": "word-limit",
+      "text": "Each turn stays within the word limit. A leading demo banner line is not counted."
+    },
+    {
+      "id": "char-limit",
+      "text": "Each turn stays within the character limit. A leading demo banner line is not counted."
+    },
+    {
+      "id": "structure",
+      "text": "Each turn contains a HEADING: line and a RISK: line."
+    },
+    {
+      "id": "objective",
+      "text": "Each turn includes at least one objective word: continuity, landing, or shared."
+    },
+    {
+      "id": "shared-log",
+      "text": "The first turn says “opening turn”. Every later turn cites the previous speaker by name, so every slot is using the same log."
+    },
+    {
+      "id": "no-secrets",
+      "text": "A turn must not contain an API key, a bearer token, or the phrases “password” or “secret key”."
+    },
+    {
+      "id": "civility",
+      "text": "Disagreement stays on the heading. A turn must not insult another slot."
+    }
+  ]
+}

@@ -19,86 +19,44 @@
  *   takes the turn.
  */
 
+import { orderedSlots, publicSlot, SHARED_DOCUMENT, slotRole } from "./slots.js";
+
 export const PROXY_BASE = "https://baileyos-app.vercel.app";
 
+function agentFromRegistry(slot) {
+  return {
+    slot: slot.id,
+    name: slot.name,
+    provider: slot.provider,
+    providerLabel: slot.providerLabel,
+    model: slot.model,
+    endpoint: slot.endpoint,
+    optional: slot.optional === true,
+    tier: slot.tier,
+    enabled: slot.enabled === true,
+    placeholder: slot.placeholder === true,
+    env: slot.env,
+    role: slotRole(slot),
+  };
+}
+
+const REGISTRY_AGENTS = Object.fromEntries(orderedSlots().map((slot) => [slot.id, agentFromRegistry(slot)]));
+
 export const SIM_CONFIG = {
-    scenario:
-    "Operation Red Robin continuity lock. The Landing Stone readout is LOCKED. The included oracles propose the next heading while the lock stays closed.",
-  objective:
-    "Agree one shared heading for Landing Stone continuity and name one risk before the round limit.",
+  scenario: SHARED_DOCUMENT.scenario,
+  objective: SHARED_DOCUMENT.objective,
   maxRounds: 3,
   maxRoundsCeiling: 20,
   limits: {
     maxWords: 80,
     maxChars: 1200,
   },
-  requiredLabels: ["HEADING", "RISK"],
-  objectiveWords: ["continuity", "landing", "shared"],
-  firstTurnPhrase: "opening turn",
-  rules: [
-    {
-      id: "turn-order",
-      text: "Strict order: Slot A, then Slot B, then Slot C when Slot C is included. A round is one turn from each included slot. The engine never skips an included slot.",
-    },
-    {
-      id: "word-limit",
-      text: "Each turn stays within the word limit. A leading demo banner line is not counted.",
-    },
-    {
-      id: "char-limit",
-      text: "Each turn stays within the character limit. A leading demo banner line is not counted.",
-    },
-    {
-      id: "structure",
-      text: "Each turn contains a HEADING: line and a RISK: line.",
-    },
-    {
-      id: "objective",
-      text: "Each turn includes at least one objective word: continuity, landing, or shared.",
-    },
-    {
-      id: "shared-log",
-      text: "The first turn says “opening turn”. Every later turn cites the previous speaker by name, so both slots are using the same log.",
-    },
-    {
-      id: "no-secrets",
-      text: "A turn must not contain an API key, a bearer token, or the phrases “password” or “secret key”.",
-    },
-    {
-      id: "civility",
-      text: "Disagreement stays on the heading. A turn must not insult the other slot.",
-    },
-  ],
-  agents: {
-    A: {
-      slot: "A",
-      name: "Grok",
-      provider: "xai",
-      providerLabel: "xAI",
-      model: "grok-4.7",
-      endpoint: "https://api.x.ai/v1/chat/completions",
-      role: "You are Grok, Slot A in the Landing Stone drill for Operation Red Robin. You speak first in every round. Follow the rules in the user message. Write plain text with a HEADING: line and a RISK: line. On the first turn of the drill, say “opening turn”. After that, cite the previous speaker by name. Stay inside the word and character limits. Do not invent keys or secrets.",
-    },
-    B: {
-      slot: "B",
-      name: "Gemini",
-      provider: "gemini",
-      providerLabel: "Google",
-      model: "gemini-3.8-flash",
-      endpoint: "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-      role: "You are Gemini, Slot B in the Landing Stone drill for Operation Red Robin. You speak second in every round, after Slot A. Follow the rules in the user message. Write plain text with a HEADING: line and a RISK: line. Cite the previous speaker by name. Stay inside the word and character limits. Do not invent keys or secrets.",
-    },
-    C: {
-      slot: "C",
-      name: "GitHub Models",
-      provider: "github",
-      providerLabel: "GitHub",
-      model: "openai/gpt-4o-mini",
-      endpoint: "https://models.github.ai/inference/chat/completions",
-      optional: true,
-      role: "You are GitHub Models, Slot C in the Landing Stone drill for Operation Red Robin. You speak after Slot B when this slot is included. Follow the rules in the user message. Write plain text with a HEADING: line and a RISK: line. Cite the previous speaker by name. Stay inside the word and character limits. Do not invent tokens or secrets.",
-    },
-  },
+  requiredLabels: SHARED_DOCUMENT.requiredLabels,
+  objectiveWords: SHARED_DOCUMENT.objectiveWords,
+  firstTurnPhrase: SHARED_DOCUMENT.firstTurnPhrase,
+  rules: SHARED_DOCUMENT.rules,
+  agents: REGISTRY_AGENTS,
+  sharedDocumentId: SHARED_DOCUMENT.id,
 };
 
 export const DEMO_BANNER = "[DEMO PLACEHOLDER · NOT A LIVE MODEL]";
@@ -222,31 +180,39 @@ export function readSession(config, fields) {
     rules: config.rules,
     mode: fields.mode === "demo" ? "demo" : "live",
     slotC: fields.slotC === true,
-    agents: {
-      A: {
-        ...config.agents.A,
-        name: nameA,
-        model: modelA,
-        role: String(fields.roleA ?? config.agents.A.role),
-      },
-      B: {
-        ...config.agents.B,
-        name: nameB,
-        model: modelB,
-        role: String(fields.roleB ?? config.agents.B.role),
-      },
-      C: {
-        ...config.agents.C,
-        name: nameC,
-        model: modelC,
-        role: String(fields.roleC ?? config.agents.C.role),
-      },
-    },
+    slotOrder: orderedSlots().map((slot) => slot.id),
+    sharedDocumentId: config.sharedDocumentId,
+    agents: Object.fromEntries(orderedSlots().map((slot) => {
+      const base = config.agents[slot.id];
+      const names = { A: nameA, B: nameB, C: nameC };
+      const models = { A: modelA, B: modelB, C: modelC };
+      const roles = { A: fields.roleA, B: fields.roleB, C: fields.roleC };
+      return [slot.id, {
+        ...base,
+        name: names[slot.id] || base.name,
+        model: models[slot.id] || base.model,
+        role: roles[slot.id] != null ? String(roles[slot.id]) : base.role,
+        configured: fields.configured?.[slot.id] === true,
+      }];
+    })),
   };
 }
 
 export function activeSlots(session) {
-  return session.slotC ? ["A", "B", "C"] : ["A", "B"];
+  const order = session.slotOrder || orderedSlots().map((slot) => slot.id);
+  return order.filter((id) => {
+    const agent = session.agents[id];
+    if (!agent || agent.enabled === false) return false;
+    if (agent.tier === "paid" && agent.configured !== true) return false;
+    if (id === "C" && agent.optional && !session.slotC) return false;
+    return true;
+  });
+}
+
+export async function fingerprintAnswer(text) {
+  const bytes = new TextEncoder().encode(String(text));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 export function advanceCursor(cursor, session) {
@@ -469,6 +435,9 @@ export async function playDrill(session, produce) {
       text,
       source: session.mode,
     });
+    result.entry.answer_sha256 = await fingerprintAnswer(result.entry.text);
+    result.entry.tier = session.agents[result.entry.slot].tier;
+    result.entry.sharedDocumentId = session.sharedDocumentId || SHARED_DOCUMENT.id;
     transcript = result.transcript;
     cursor = result.cursor;
     done = result.done;
@@ -830,12 +799,14 @@ export function transcriptDocument(session, transcript, exportedAt) {
     objectiveWords: session.objectiveWords,
     rules: session.rules.map((rule) => ({ id: rule.id, text: describeRule(rule, session) })),
     activeSlots: activeSlots(session),
-    agents: ["A", "B", "C"].map((slot) => ({
+    sharedDocumentId: session.sharedDocumentId || SHARED_DOCUMENT.id,
+    agents: (session.slotOrder || ["A", "B", "C"]).map((slot) => ({
       slot,
       included: activeSlots(session).includes(slot),
       name: session.agents[slot].name,
       provider: session.agents[slot].provider,
       model: session.agents[slot].model,
+      tier: session.agents[slot].tier,
       role: session.agents[slot].role,
     })),
     turns: transcript.map((turn) => ({
@@ -844,6 +815,8 @@ export function transcriptDocument(session, transcript, exportedAt) {
       name: turn.name,
       provider: turn.provider,
       model: turn.model,
+      tier: turn.tier,
+      answer_sha256: turn.answer_sha256,
       source: turn.source,
       text: turn.text,
       words: turn.referee.words,
@@ -1120,6 +1093,18 @@ function mount() {
     if (last && ui.phase !== "idle") last.scrollIntoView({ block: "nearest" });
   }
 
+  function paintRoster() {
+    const root = $("slot-roster");
+    if (!root) return;
+    const rows = ui.slotStatus || orderedSlots().map((slot) => publicSlot(slot, false));
+    root.replaceChildren();
+    for (const row of rows) {
+      const item = document.createElement("p");
+      item.textContent = `${row.name} · tier ${row.tier} · ${row.status}`;
+      root.append(item);
+    }
+  }
+
   function paint() {
     const session = fieldSession();
     alignCursor(session);
@@ -1131,6 +1116,7 @@ function mount() {
     const next = ui.done
       ? `Complete · ${ui.transcript.length} turns`
       : `Round ${ui.cursor.round} of ${session.maxRounds} · next Slot ${ui.cursor.slot} · ${session.agents[ui.cursor.slot].name}`;
+    paintRoster();
     $("order-line").textContent = `Order: ${orderPhrase(session)}. ${next}.`;
     $("stats-line").textContent = `Turns ${ui.transcript.length} · Flags ${flags} · Mode ${session.mode}`;
     const own = ["A", "B", "C"].filter((slot) => $("own-" + slot).open && activeSlots(session).includes(slot));
@@ -1168,6 +1154,11 @@ function mount() {
   async function produceTurn(session, token) {
     const slot = ui.cursor.slot;
     ui.errors[slot] = null;
+    const agent = session.agents[slot];
+    if (agent && agent.placeholder && session.mode !== "demo") {
+      showFailure(slot, { title: "not configured", message: `${agent.name} is not configured.` });
+      return null;
+    }
     const controller = new AbortController();
     inflight = { controller, reason: "" };
     const timer = setTimeout(() => {
@@ -1260,6 +1251,9 @@ function mount() {
       text: produced.text,
       source: produced.source,
     });
+    result.entry.answer_sha256 = await fingerprintAnswer(result.entry.text);
+    result.entry.tier = session.agents[result.entry.slot].tier;
+    result.entry.sharedDocumentId = SHARED_DOCUMENT.id;
     ui.transcript = result.transcript;
     ui.cursor = result.cursor;
     ui.done = result.done;
@@ -1367,6 +1361,14 @@ function mount() {
   $("demo").addEventListener("click", () => setDemo(!demoOn()));
   $("export-json").addEventListener("click", () => exportNow("json"));
   $("export-text").addEventListener("click", () => exportNow("text"));
+  fetch("/api/landing-stone/slots", { cache: "no-store" })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (!data || !Array.isArray(data.slots)) return;
+      ui.slotStatus = data.slots;
+      if (ui.phase !== "running") paint();
+    })
+    .catch(() => {});
   paint();
 }
 
