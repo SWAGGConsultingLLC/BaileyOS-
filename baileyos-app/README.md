@@ -21,6 +21,10 @@ An account is optional. Without `NEXT_PUBLIC_SUPABASE_ANON_KEY`, the account for
 5. A trigger on `placements` increments `placed_count`. No client path writes the count.
 6. The map draws each record at a random point inside its cell, re-jittered on every render.
 
+## Data Nest profiles stay on the phone
+
+Two people on the same trip share the same route and the same public feeds. Each phone orders and phrases those results from the profile stored on that phone. Profiles are not shared between devices. Birth year, a self-identified generation label, and home region are not sent to the server or to an AI, and they are not written into decision records.
+
 ## Privacy: what is and isn't guaranteed
 - Raw coordinates are never written to the database or logged by this code. They exist in the API route's memory during the request. Your host or proxy may log request bodies; turn that off.
 - Cells are 5 km by 30°. Sparse cells can still single someone out; raise `NEXT_PUBLIC_BAND_KM` to 10 while data is thin.

@@ -3,7 +3,7 @@ import { DataNestApp } from '@/components/data-nest/DataNestApp';
 
 export const metadata: Metadata = {
   title: 'Data Nest',
-  description: 'Local overwatch for Grand Junction and the I-70 corridor. Sign in to use location, live feeds, and the Queen.',
+  description: 'Live weather, road and safety alerts for where you are.',
 };
 
 export default function DataNestPage() {
