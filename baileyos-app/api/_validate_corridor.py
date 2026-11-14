@@ -13,8 +13,10 @@ Checks
   C4 corridor_length       great-circle length of the corridor (informational, must be finite and > 0)
   C5 nodes_valid           node ids unique, coordinates valid and inside the CO/UT bbox
   C6 nodes_near_corridor   each node is within the corridor buffer (km) of the corridor line
+  C7 data_freshness        each layer was fetched inside its own max age
+  C8 value_sanity          when a layer includes item values, magnitude, region, and time are in range
 
-Hashes (so a reviewer can prove which bytes were checked)
+Hashes (so a reviewer can see which bytes were checked)
   input_sha256   = SHA-256 of canonical_json({"corridor":..., "nodes":..., "freshness":...})
   report_sha256  = SHA-256 of the UTF-8 bytes of canonical_json(report)   (report has no hash field inside it)
   canonical_json = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
@@ -207,6 +209,87 @@ def evaluate_freshness(raw, now: datetime) -> dict:
     }
 
 
+def _item_number(item: dict, *names):
+    for name in names:
+        if name in item and item[name] is not None:
+            return item[name]
+    return None
+
+
+def _item_coords(item: dict):
+    lat = _item_number(item, "lat", "latitude")
+    lon = _item_number(item, "lon", "longitude")
+    coords = item.get("coordinates")
+    if lat is None and lon is None and isinstance(coords, list) and len(coords) >= 2:
+        lon, lat = coords[0], coords[1]
+    return lat, lon
+
+
+def _item_timestamp(item: dict):
+    for name in ("time", "issued_at", "issuedAt", "source_timestamp", "sent"):
+        if item.get(name) is not None:
+            return name, item.get(name)
+    return None, None
+
+
+def evaluate_sanity(raw, now: datetime) -> dict:
+    """Check #8. A layer with no item values is not failed. A value outside the range fails and blocks CONSENSUS."""
+    limits = load_freshness_limits()
+    table = raw if isinstance(raw, dict) else {}
+    problems = []
+    checked = 0
+    for key in limits:
+        src = table.get(key)
+        if not isinstance(src, dict) or "items" not in src:
+            continue
+        items = src.get("items")
+        if not isinstance(items, list):
+            problems.append(f"{key}: items is not a list")
+            continue
+        count = src.get("record_count")
+        if isinstance(count, int) and not isinstance(count, bool) and count != len(items):
+            problems.append(f"{key}: record_count {count} does not match {len(items)} items")
+        for index, item in enumerate(items):
+            checked += 1
+            if not isinstance(item, dict):
+                problems.append(f"{key}[{index}] is not an object")
+                continue
+            mag = _item_number(item, "mag", "magnitude")
+            if key == "usgs" or mag is not None:
+                if mag is None:
+                    problems.append(f"{key}[{index}] magnitude missing")
+                elif not _is_num(mag) or not (0 <= float(mag) <= 10):
+                    problems.append(f"{key}[{index}] magnitude outside 0 to 10")
+            lat, lon = _item_coords(item)
+            needs_point = key == "usgs"
+            if needs_point and (lat is None or lon is None):
+                problems.append(f"{key}[{index}] coordinates missing")
+            elif lat is not None or lon is not None:
+                if not (_is_num(lat) and _is_num(lon) and _in_bbox(float(lon), float(lat))):
+                    problems.append(f"{key}[{index}] coordinates outside the Colorado and Utah region")
+            _name, stamp = _item_timestamp(item)
+            if stamp is not None:
+                parsed = parse_utc_z(stamp) if isinstance(stamp, str) else None
+                if parsed is None:
+                    problems.append(f"{key}[{index}] timestamp is not UTC Zulu YYYY-MM-DDTHH:MM:SSZ")
+                elif (parsed - now).total_seconds() > 120:
+                    problems.append(f"{key}[{index}] timestamp is in the future")
+    blocked = bool(problems)
+    if problems:
+        detail = "; ".join(problems[:8])
+    elif checked:
+        detail = f"{checked} item values are inside the published ranges"
+    else:
+        detail = "no item values were supplied, so no value was outside the published ranges"
+    return {
+        "checked_items": checked,
+        "problems": problems[:40],
+        "blocks_consensus": blocked,
+        "check_status": not blocked,
+        "detail": detail,
+    }
+
+
 def canonical_json(obj) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
@@ -386,6 +469,11 @@ def build_report(data: dict, now: datetime | None = None) -> dict:
     fresh = evaluate_freshness(doc.get("freshness"), when)
     freshness = {"limits": fresh["limits"], "sources": fresh["sources"], "blocks_consensus": fresh["blocks_consensus"]}
     checks.append(_check("C7", "data_freshness", fresh["check_status"], freshness, fresh["detail"]))
+
+    sane = evaluate_sanity(doc.get("freshness"), when)
+    checks.append(_check("C8", "value_sanity", sane["check_status"],
+                         {"checked_items": sane["checked_items"], "problems": sane["problems"], "blocks_consensus": sane["blocks_consensus"]},
+                         sane["detail"]))
 
     passed = sum(1 for c in checks if c["status"] == "PASS")
     failed = sum(1 for c in checks if c["status"] == "FAIL")
