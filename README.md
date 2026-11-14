@@ -15,7 +15,7 @@ Expected home URL: [https://swaggconsultingllc.github.io/BaileyOS-/](https://swa
 
 ## Landing Stone agent simulation
 
-[`landing-stone/simulation/`](landing-stone/simulation/) is a static drill linked from the Landing Stone status page. The continuity-lock readout stays on [`landing-stone/`](landing-stone/). **Slot A is Grok (xAI)** and **Slot B is Gemini (Google)**. **Slot C is optional GitHub Models.** The turn order is A, then B, then C when Slot C is included.
+[`landing-stone/simulation/`](landing-stone/simulation/) is a static drill linked from the Landing Stone status page. The continuity readout stays on [`landing-stone/`](landing-stone/). It shows three lights from `GET /api/data-nest/continuity` when that endpoint answers. If it does not, the lights stay PENDING. Chain Integrity reads RECORD INTACT when the seals recompute. That is not a road clearance. The overall line stays PENDING until an independent witness has the head. A Git repository we control is not enough. **Slot A is Grok (xAI)** and **Slot B is Gemini (Google)**. **Slot C is optional GitHub Models.** The turn order is A, then B, then C when Slot C is included.
 
 The written ruleset is `SIM_CONFIG` at the top of [`landing-stone/simulation/simulation.js`](landing-stone/simulation/simulation.js). The page shows those rules and enforces them: scenario and objective, strict turn order through the included slots, a round limit, per-turn word and character limits, a referee check after every turn, and one shared log that every included slot sees. Start, pause, step, and reset control the run. Export writes the transcript as JSON and as text, without API keys or tokens.
 

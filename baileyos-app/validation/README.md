@@ -34,9 +34,11 @@ Run locally (from `baileyos-app/`):
 | `checks[]` | array | `{id, title, status: "PASS"\|"FAIL", value: <object with the real computed numbers>, detail: string}` |
 | `summary` | object | `{total, passed, failed, overall: "PASS"\|"FAIL"}` |
 
-Checks: **C1** geojson_structure, **C2** keypoint_count (found vs 9), **C3** keypoints_in_bbox, **C4** corridor_length (km, per segment), **C5** nodes_valid, **C6** nodes_near_corridor (distance in km per node vs the buffer, default 5 miles = 8.047 km), **C7** data_freshness. Distances use haversine for length and a local equirectangular point-to-segment projection for node distance (error well under 1% at this scale).
+Checks: **C1** geojson_structure, **C2** keypoint_count (found vs 9), **C3** keypoints_in_bbox, **C4** corridor_length (km, per segment), **C5** nodes_valid, **C6** nodes_near_corridor (distance in km per node vs the buffer, default 5 miles = 8.047 km), **C7** data_freshness, **C8** value_sanity. Distances use haversine for length and a local equirectangular point-to-segment projection for node distance (error well under 1% at this scale).
 
 **C7** reads `validation/freshness_limits.json`. There is no single global max age. Each layer has its own `max_age_seconds` (chain laws and closures, AMBER, Silver, and NWS alerts at minutes; earthquakes and the station observation at hours; crime in days). The report repeats those limits. A layer **fails** when the fetch is older than its own limit, the fetch errored, or the source is not configured. A fresh fetch with zero records is a **warning**, not an all-clear. `summary.overall` is `PASS` only when every check is `PASS`.
+
+**C8** checks item values when a layer includes them. A quake magnitude must be from 0 through 10. Coordinates must sit in the Colorado and Utah box. Timestamps must be UTC Zulu and cannot be in the future. A layer that only reports a count is not failed. A failing C8 blocks CONSENSUS.
 
 ## Canonical bytes
 `canonical_json` is `json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)`: sorted keys, no insignificant whitespace, UTF-8, no trailing newline.
@@ -75,7 +77,7 @@ The HUD button **Copy package for Kimi** copies `kimi_package`: the canonicaliza
 The server recomputes both hashes before the Queen accepts the reply. A mismatch is `uncertain` with `hash_mismatch`. Until a reply is tied to the current report, the HUD shows "awaiting Kimi validator".
 
 ## Decision records
-Every Queen ruling can be sealed as a tamper-evident decision record (`api/_ruling.py`). The seal shows the record was not altered after sealing. It does not show the decision was correct or that the data was accurate. See [RULING_RECORD.md](RULING_RECORD.md). This repository does not connect the record to `landing-stone/` yet.
+Every Queen ruling can be sealed as a tamper-evident decision record (`api/_ruling.py`). The seal shows the record was not altered after sealing. It does not show the decision was correct or that the data was accurate. See [RULING_RECORD.md](RULING_RECORD.md). `landing-stone/index.html` reads only the public continuity lights.
 
 ## Where this runs
 Vercel’s Next.js preset does not publish `api/*.py` as separate Python functions. The HUD calls `POST /api/data-nest/validate`, `POST /api/data-nest/consensus`, and `POST /api/data-nest/verify`, which run these modules with `python3`. On Vercel the build downloads a standalone CPython into `vendor/python` (not committed) so the same files execute there.

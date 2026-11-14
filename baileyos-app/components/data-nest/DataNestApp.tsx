@@ -14,7 +14,7 @@ import { createClient } from '@supabase/supabase-js';
 import { aheadCards, buildScene, corridorDistanceKm, sampleNodes, type SceneFeature } from '@/lib/data-nest/scene';
 import { coarsen, shouldAcceptFix } from '@/lib/data-nest/geo';
 import { chatEnabled, nextAutoMode, type NestMode } from '@/lib/data-nest/mode';
-import type { LiveItem, NeedsSetup } from '@/lib/data-nest/liveFeeds';
+import { feedPayloads, type LiveItem, type NeedsSetup } from '@/lib/data-nest/liveFeeds';
 import { Swarm } from './Swarm';
 import { Radar } from './Radar';
 
@@ -263,6 +263,7 @@ export function DataNestApp() {
       report: seal.report,
       gemini: geminiVote,
       kimi: kimiVote,
+      payloads: feedPayloads(items),
       cell: here,
     });
     setBusy(null);

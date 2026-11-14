@@ -15,7 +15,7 @@ def status(report, cid):
 class ValidatorTests(unittest.TestCase):
     def test_sample_passes_everything(self):
         r = build_report(SAMPLE, now=NOW)
-        self.assertEqual(r["summary"], {"total": 7, "passed": 7, "failed": 0, "warned": 0, "overall": "PASS"})
+        self.assertEqual(r["summary"], {"total": 8, "passed": 8, "failed": 0, "warned": 0, "overall": "PASS"})
 
     def test_deterministic_apart_from_timestamp(self):
         a, b = build_report(SAMPLE, now=NOW), build_report(SAMPLE, now=NOW)
@@ -96,6 +96,15 @@ class ValidatorTests(unittest.TestCase):
         self.assertEqual(status(r, "C7"), "WARN")
         self.assertEqual(r["summary"]["overall"], "WARN")
         self.assertNotEqual(r["summary"]["overall"], "PASS")
+
+    def test_quake_magnitude_outside_range_fails_sanity(self):
+        bad = copy.deepcopy(SAMPLE)
+        bad["freshness"]["usgs"]["items"] = [{"mag": 12, "lat": 39.06, "lon": -108.55, "time": "2026-11-14T11:40:00Z"}]
+        bad["freshness"]["usgs"]["record_count"] = 1
+        r = build_report(bad, now=NOW)
+        self.assertEqual(status(r, "C8"), "FAIL")
+        self.assertNotEqual(r["summary"]["overall"], "PASS")
+        self.assertTrue(next(c for c in r["checks"] if c["id"] == "C8")["value"]["blocks_consensus"])
 
 if __name__ == "__main__":
     unittest.main()
