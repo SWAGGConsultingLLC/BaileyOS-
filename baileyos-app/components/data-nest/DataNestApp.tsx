@@ -11,7 +11,22 @@ import { decideSessionExposure } from '@/lib/account';
 import { linkedInProviderState, suiteConfig } from '@/lib/suite/verify';
 import { prepareSuiteHref } from '@/components/SuiteEntrance';
 import { createClient } from '@supabase/supabase-js';
+import { TuneStep } from '@/components/data-nest/TuneStep';
 import { aheadCards, buildScene, corridorDistanceKm, sampleNodes, type SceneFeature } from '@/lib/data-nest/scene';
+import {
+  VETERAN_LINKS,
+  clearProfile,
+  markTuneSeen,
+  readProfile,
+  sectionRank,
+  shownGeneration,
+  stripProfile,
+  tuneWasSeen,
+  wantsLargerText,
+  wantsVeterans,
+  writeProfile,
+  type NestProfile,
+} from '@/lib/data-nest/profile';
 import { coarsen, shouldAcceptFix } from '@/lib/data-nest/geo';
 import { chatEnabled, nextAutoMode, type NestMode } from '@/lib/data-nest/mode';
 import type { LiveItem, NeedsSetup } from '@/lib/data-nest/liveFeeds';
@@ -48,6 +63,11 @@ export function DataNestApp() {
   const [token, setToken] = useState<string | null>(null);
   const [linkedInHref, setLinkedInHref] = useState<string | null>(null);
   const [linkedInSoon, setLinkedInSoon] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [profile, setProfile] = useState<NestProfile | null>(null);
+  const [showTune, setShowTune] = useState(false);
+  const [tuneReady, setTuneReady] = useState(false);
   const [mode, setMode] = useState<NestMode>('stationary');
   const [modeLock, setModeLock] = useState<'auto' | 'manual'>('auto');
   const [fix, setFix] = useState<Fix | null>(null);
@@ -154,7 +174,12 @@ export function DataNestApp() {
   }, [fix?.speed, modeLock]);
 
   const scene = useMemo(() => buildScene(items, fix ? { lat: fix.lat, lon: fix.lon } : null).filter((feature) => layers[feature.layer] !== false), [items, fix, layers]);
-  const ahead = useMemo(() => aheadCards(scene, fix ? { lat: fix.lat, lon: fix.lon } : null, fix?.heading ?? null, fix?.speed ?? null), [scene, fix]);
+  const interests = profile?.interests ?? [];
+  const ahead = useMemo(() => aheadCards(scene, fix ? { lat: fix.lat, lon: fix.lon } : null, fix?.heading ?? null, fix?.speed ?? null)
+    .slice()
+    .sort((a, b) => sectionRank(a.kind, interests) - sectionRank(b.kind, interests) || (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9)), [scene, fix, interests]);
+  const orderedItems = useMemo(() => items.slice().sort((a, b) => sectionRank(a.kind, interests) - sectionRank(b.kind, interests)), [items, interests]);
+  const largerText = wantsLargerText(interests);
   const distance = fix ? corridorDistanceKm(fix.lon, fix.lat) : null;
   const typing = mode === 'stationary' && chatEnabled(fix?.speed ?? null, passenger);
   const center = fix ? { lat: fix.lat, lon: fix.lon } : { lat: 39.06, lon: -108.55 };
@@ -173,11 +198,19 @@ export function DataNestApp() {
     setLog((lines) => [{ at: new Date().toISOString(), hash, text }, ...lines].slice(0, 40));
   }
 
+  useEffect(() => {
+    const storage = window.localStorage;
+    const previewTune = process.env.NODE_ENV === 'development' && new URLSearchParams(window.location.search).get('tune') === '1';
+    setProfile(readProfile(storage));
+    setShowTune(previewTune || (Boolean(token) && !tuneWasSeen(storage)));
+    setTuneReady(true);
+  }, [token]);
+
   async function authed(path: string, body: unknown) {
     const res = await fetch(path, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: token ? `Bearer ${token}` : '' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(stripProfile(body)),
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok, data };
@@ -328,52 +361,80 @@ export function DataNestApp() {
     setNote('Cleared on this device. Sealed decision records stay in the chain and have no account or location in them.');
   }
 
-  if (!token) {
+  if (tuneReady && showTune) {
     return (
-      <main className="mx-auto min-h-screen max-w-lg px-4 py-6">
-        <p className="text-xs font-bold tracking-[0.2em] text-cyan-300">DATA NEST</p>
-        <h1 className="mt-2 text-3xl font-semibold text-white">Local overwatch for Grand Junction and I-70</h1>
-        <p className="mt-3 text-base leading-7 text-slate-300">Sign in first. After that, the screen follows your location: weather, quakes, and the road alerts we can actually read. The swarm picture is simulated. Live feeds are labeled and linked.</p>
-        <p className="mt-3 text-sm leading-6 text-slate-400">Precise location stays on this phone. The server receives only a coarsened area, about 1 km, and does not store it. A separate request log, if the database migration is applied, keeps that coarsened area for 28 days and can be deleted without changing sealed decision records.</p>
-        <section className="mt-6 rounded-2xl border border-gray-800 p-4" aria-labelledby="brew-nest-heading">
-          <h2 id="brew-nest-heading" className="text-lg font-semibold text-white">360° Brewing: sign in to Data Nest</h2>
-          <div className="mt-3">
-            <BrewLockup>
-              {linkedInHref ? (
-                <LinkedInButton href={linkedInHref} label="Sign in with LinkedIn" />
-              ) : linkedInSoon ? (
-                <p className="text-sm text-gray-100" role="status">LinkedIn sign-in coming soon, use email</p>
-              ) : (
-                <p className="text-sm text-gray-300" role="status">Preparing LinkedIn sign-in…</p>
-              )}
-            </BrewLockup>
-          </div>
-          <p className="mt-2 text-xs text-gray-400">
-            <a className="underline" href="https://www.linkedin.com/company/swagg-consulting/">360° Brewing on LinkedIn</a>
-            {' · '}
-            <a className="underline" href="https://www.swaggconsulting.com/privacy">Privacy policy</a>
-          </p>
-          <a className="inline-flex min-h-11 items-center text-sm text-gray-300 underline" href="#member-account">Use email instead</a>
-        </section>
-        <div id="member-account">
-          <AccountPanel client={sb} onAccessToken={setToken} deferProfile />
-        </div>
-        <p className="mt-6 text-sm"><a className="text-cyan-300 underline" href="/data-nest/verify">Check a decision record</a> · <a className="text-cyan-300 underline" href="/">Map</a></p>
+      <main className="mx-auto min-h-screen max-w-lg bg-[#05080f] px-4 py-6 text-slate-100">
+        <h1 className="text-3xl font-semibold text-white">Data Nest</h1>
+        <TuneStep
+          initial={profile}
+          onSave={(next) => {
+            writeProfile(window.localStorage, next);
+            markTuneSeen(window.localStorage);
+            setProfile(next);
+            setShowTune(false);
+          }}
+          onSkip={token ? () => {
+            markTuneSeen(window.localStorage);
+            setShowTune(false);
+          } : undefined}
+          onDelete={() => {
+            clearProfile(window.localStorage);
+            setProfile(null);
+          }}
+        />
       </main>
     );
   }
 
+  if (!token) {
+    return (
+      <main className="mx-auto min-h-screen max-w-lg bg-[#05080f] px-4 py-8 text-slate-100">
+        <h1 className="text-4xl font-semibold text-white">Data Nest</h1>
+        <p className="mt-3 text-xl leading-8">Live weather, road and safety alerts for where you are.</p>
+        <div className="mt-6">
+          <BrewLockup line="Show up and keep the record honest.">
+            {linkedInHref ? (
+              <LinkedInButton href={linkedInHref} label="Check in with LinkedIn" />
+            ) : linkedInSoon ? (
+              <p className="text-base text-white" role="status">LinkedIn sign-in coming soon, use email</p>
+            ) : (
+              <p className="text-base text-slate-200" role="status">Preparing LinkedIn sign-in…</p>
+            )}
+          </BrewLockup>
+        </div>
+        <p className="mt-4 text-sm leading-6 text-slate-300">Your exact location stays on your phone. You can delete your history anytime.</p>
+        <button type="button" className="mt-3 inline-flex min-h-11 items-center text-base text-cyan-200 underline" onClick={() => setShowEmail(value => !value)} aria-expanded={showEmail}>Use email instead</button>
+        {showEmail && (
+          <div id="member-account" className="mt-2">
+            <AccountPanel client={sb} onAccessToken={setToken} deferProfile />
+          </div>
+        )}
+        <footer className="mt-8 space-y-2 text-sm">
+          <button type="button" className="inline-flex min-h-11 items-center text-cyan-200 underline" aria-expanded={showPrivacy} onClick={() => setShowPrivacy(value => !value)}>Privacy details</button>
+          {showPrivacy && <p className="leading-6 text-slate-300">Precise location stays on this device and is not shown publicly. Feed requests send a coarsened area (2 decimal degrees, about 1 km) and the server does not store that point. If the ruling-request table exists, the link between your account and a decision record, including that coarsened area, is kept at most 28 days. Birth year, a self-identified label, and home region stay on this phone and are not sent.</p>}
+          <p><a className="inline-flex min-h-11 items-center text-cyan-200 underline" href="/data-nest/verify">Check a decision record</a></p>
+        </footer>
+      </main>
+    );
+  }
+
+  const you = profile ? shownGeneration(profile) : null;
+
   return (
-    <main className="mx-auto min-h-screen max-w-lg px-4 py-4 pb-16">
+    <main className="mx-auto min-h-screen max-w-lg px-4 py-4 pb-16" style={{ fontSize: largerText ? '1.25rem' : undefined }}>
       <header className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <BrewLogo size={56} />
           <div>
             <p className="text-xs font-bold tracking-[0.2em] text-cyan-300">DATA NEST</p>
             <h1 className="text-2xl font-semibold text-white">{mode === 'traveling' ? 'Traveling' : 'Stationary'}</h1>
+            {you && <p className="text-sm text-slate-300">{you}</p>}
           </div>
         </div>
-        <button type="button" className="min-h-12 rounded-full border border-slate-600 px-3 text-sm" onClick={() => sb?.auth.signOut()}>Sign out</button>
+        <div className="flex flex-col items-end gap-1">
+          <button type="button" className="min-h-11 text-sm text-cyan-200 underline" onClick={() => setShowTune(true)}>Tune it to you</button>
+          <button type="button" className="min-h-12 rounded-full border border-slate-600 px-3 text-sm" onClick={() => sb?.auth.signOut()}>Sign out</button>
+        </div>
       </header>
       <p className="mt-2 text-sm leading-6 text-amber-100">Don&apos;t interact while driving. This is not a substitute for official alerts.</p>
       <div className="mt-3 grid grid-cols-3 gap-2">
@@ -439,7 +500,8 @@ export function DataNestApp() {
           {tab === 'radar' && <Radar blips={quakeBlips(scene, fix)} />}
           {tab === 'corridor' && <CorridorPanel distance={distance} />}
           {tab === 'log' && <LogPanel lines={log} />}
-          <FeedList items={items} fetchedAt={fetchedAt} offline={offline} />
+          {wantsVeterans(interests) && <VeteranLinks />}
+          <FeedList items={orderedItems} fetchedAt={fetchedAt} offline={offline} />
           <NeedsList needs={needs} />
           <section className="space-y-2 rounded-3xl border border-cyan-400/30 p-3">
             <h2 className="text-sm font-bold tracking-widest text-cyan-200">MANUAL TRANSMISSION</h2>
@@ -520,6 +582,20 @@ function LogPanel({ lines }: { lines: LogLine[] }) {
     <ol className="space-y-2 text-sm">
       {lines.map((line) => <li key={line.at + line.hash} className="rounded-2xl border border-slate-800 p-3"><span className="text-slate-400">{line.at}</span><br />{line.text}<br /><span className="break-all text-xs text-cyan-200">{line.hash}</span></li>)}
     </ol>
+  );
+}
+
+function VeteranLinks() {
+  return (
+    <section className="rounded-2xl border border-slate-700 p-3 text-sm" aria-labelledby="veteran-links">
+      <h2 id="veteran-links" className="font-semibold text-white">Veteran resources</h2>
+      <p className="mt-1 text-slate-300">Official links. This is not live data.</p>
+      <ul className="mt-2 space-y-2">
+        {VETERAN_LINKS.map(link => (
+          <li key={link.href}><a className="inline-flex min-h-11 items-center text-cyan-200 underline" href={link.href}>{link.label}</a></li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
