@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'node:test';
 import { SuiteContinue, beginSuiteHref, linkedInReturnInProgress, suiteContinueLabel } from '../../components/SuiteEntrance.tsx';
-import { SUITE_ISSUER, decideSuiteSubject, suiteAuthorizeHref, suiteCallbackMessage, suiteConfig, suiteEnabled, suiteReturnTarget } from './verify.ts';
+import { SUITE_ISSUER, decideSuiteSubject, linkedInProviderState, linkedInProviderUnavailable, suiteAuthorizeHref, suiteCallbackMessage, suiteConfig, suiteEnabled, suiteReturnTarget } from './verify.ts';
 
 const SUBJECT = '11111111-1111-4111-8111-111111111111';
 
@@ -99,6 +99,15 @@ test('a callback explains a missing verifier, a provider error, and a session th
   assert.equal(ready.kind, 'ready');
 });
 
+test('a disabled LinkedIn provider is coming soon, and a redirect means it is ready', async () => {
+  assert.equal(linkedInProviderUnavailable(400, 'Unsupported provider: provider is not enabled'), true);
+  const config = { url: 'https://rxckxwdvhjszzuqsvxdk.supabase.co', publishableKey: 'publishable' };
+  const soon = await linkedInProviderState(config, async () => new Response('provider is not enabled', { status: 400 }));
+  assert.equal(soon, 'soon');
+  const ready = await linkedInProviderState(config, async () => new Response(null, { status: 302, headers: { location: 'https://www.linkedin.com/oauth' } }));
+  assert.equal(ready, 'ready');
+});
+
 test('a code that lands on the map root is sent to /suite', () => {
   assert.equal(suiteReturnTarget('https://baileyos-app.vercel.app/?code=abc'), '/suite?code=abc');
   assert.equal(suiteReturnTarget('https://baileyos-app.vercel.app/suite?code=abc'), null);
@@ -106,10 +115,12 @@ test('a code that lands on the map root is sent to /suite', () => {
   assert.equal(suiteReturnTarget('https://baileyos-app.vercel.app/?code=abc#access_token=abc'), null);
 });
 
-test('only a map LinkedIn authorize link that returns to /suite is kept', () => {
+test('only a map LinkedIn authorize link that returns to /suite or /data-nest is kept', () => {
   const config = { url: 'https://rxckxwdvhjszzuqsvxdk.supabase.co', publishableKey: 'publishable' };
   const good = 'https://rxckxwdvhjszzuqsvxdk.supabase.co/auth/v1/authorize?provider=linkedin_oidc&scopes=openid+profile+email&redirect_to=https%3A%2F%2Fbaileyos-app.vercel.app%2Fsuite';
+  const nest = 'https://rxckxwdvhjszzuqsvxdk.supabase.co/auth/v1/authorize?provider=linkedin_oidc&redirect_to=https%3A%2F%2Fbaileyos-app.vercel.app%2Fdata-nest';
   assert.equal(suiteAuthorizeHref(good, config), good);
+  assert.equal(suiteAuthorizeHref(nest, config), nest);
   assert.equal(suiteAuthorizeHref('https://rxckxwdvhjszzuqsvxdk.supabase.co/auth/v1/authorize?provider=custom:app-oidc&redirect_to=https://baileyos-app.vercel.app/suite', config), null);
   assert.equal(suiteAuthorizeHref('https://shedpnosbkwkmwgqkefj.supabase.co/auth/v1/authorize?provider=linkedin_oidc&redirect_to=https://baileyos-app.vercel.app/suite', config), null);
   assert.equal(suiteAuthorizeHref('https://rxckxwdvhjszzuqsvxdk.supabase.co/auth/v1/authorize?provider=github&redirect_to=https://baileyos-app.vercel.app/suite', config), null);

@@ -35,6 +35,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Standalone CPython downloaded at build time so the validator can run on Vercel.
+/vendor/python/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

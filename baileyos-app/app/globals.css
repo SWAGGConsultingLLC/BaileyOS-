@@ -6,3 +6,10 @@ html, body { background: #05080f; color: #e5e7eb; }
 
 /* Darken OpenStreetMap tiles to match the theme */
 .osm-dark { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9); }
+@keyframes nest-sweep { to { transform: rotate(360deg); } }
+.nest-sweep {
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, transparent 0 72%, rgba(34, 211, 238, 0.55) 100%);
+  animation: nest-sweep 4.5s linear infinite;
+  opacity: 0.85;
+}

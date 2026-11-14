@@ -111,7 +111,9 @@ export function suiteReturnTarget(href: string): string | null {
   return `/suite${url.search}`;
 }
 
-/** Accept only a LinkedIn (OIDC) authorize URL on the map project that returns to /suite. */
+const LINKEDIN_RETURNS = new Set(['/suite', '/data-nest']);
+
+/** Accept a LinkedIn (OIDC) authorize URL on this project that returns to /suite or /data-nest. */
 export function suiteAuthorizeHref(candidate: string, config: SuiteConfig): string | null {
   try {
     const target = new URL(candidate);
@@ -122,10 +124,31 @@ export function suiteAuthorizeHref(candidate: string, config: SuiteConfig): stri
     const redirectTo = target.searchParams.get('redirect_to');
     if (!redirectTo) return null;
     const back = new URL(redirectTo);
-    if (back.pathname !== '/suite') return null;
+    if (!LINKEDIN_RETURNS.has(back.pathname)) return null;
     return target.toString();
   } catch {
     return null;
+  }
+}
+
+/** A disabled LinkedIn provider should be explained as not ready, not as a failure. */
+export function linkedInProviderUnavailable(status: number, body: string): boolean {
+  if (/not enabled|unsupported provider|provider is not enabled/i.test(body)) return true;
+  return status === 400 || status === 404 || status === 422;
+}
+
+export async function linkedInProviderState(config: SuiteConfig, fetchImpl: typeof fetch = fetch): Promise<'ready' | 'soon'> {
+  const endpoint = new URL(config.url + '/auth/v1/authorize');
+  endpoint.searchParams.set('provider', SUITE_LINKEDIN_PROVIDER);
+  endpoint.searchParams.set('redirect_to', 'https://baileyos-app.vercel.app/data-nest');
+  try {
+    const res = await fetchImpl(endpoint.toString(), { method: 'GET', redirect: 'manual' });
+    if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) return 'ready';
+    const body = await res.text().catch(() => '');
+    if (linkedInProviderUnavailable(res.status, body)) return 'soon';
+    return res.ok ? 'ready' : 'soon';
+  } catch {
+    return 'soon';
   }
 }
 

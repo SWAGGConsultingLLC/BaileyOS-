@@ -1,0 +1,98 @@
+{
+  "corridor": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "corridor-nose-leaf-oct6",
+          "name": "Moab to Glenwood Springs Corridor",
+          "bufferRadiusMiles": 5.0,
+          "frequencyAnchor": "81.0 MHz",
+          "validator": "Kimi (Moonshot AI)"
+        },
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              -109.5498,
+              38.5733
+            ],
+            [
+              -109.8058,
+              38.9639
+            ],
+            [
+              -109.0448,
+              39.1178
+            ],
+            [
+              -108.7306,
+              39.1589
+            ],
+            [
+              -108.5262,
+              39.1224
+            ],
+            [
+              -108.2031,
+              39.3364
+            ],
+            [
+              -108.0538,
+              39.4528
+            ],
+            [
+              -107.8701,
+              39.5501
+            ],
+            [
+              -107.3248,
+              39.5505
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "origin.bear",
+      "name": "ORIGIN.BEAR",
+      "type": "Geographic Anchor",
+      "lat": 39.0639,
+      "lon": -108.5498
+    },
+    {
+      "id": "signal.rooster",
+      "name": "SIGNAL.ROOSTER",
+      "type": "Broadcast Node",
+      "lat": 39.1294,
+      "lon": -108.8058
+    },
+    {
+      "id": "guard.lion",
+      "name": "GUARD.LION",
+      "type": "Security Node",
+      "lat": 39.1178,
+      "lon": -109.0448
+    },
+    {
+      "id": "queen.ant",
+      "name": "QUEEN ANT AGGREGATOR",
+      "type": "Telemetry Worker",
+      "lat": 39.1589,
+      "lon": -108.7306
+    }
+  ],
+  "freshness": {
+    "usgs": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:40:00Z", "record_count": 2},
+    "nws_alerts": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:50:00Z", "record_count": 2},
+    "nws_observation": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:00:00Z", "record_count": 1},
+    "cdot": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:55:00Z", "record_count": 2},
+    "udot": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:55:00Z", "record_count": 2},
+    "amber": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:50:00Z", "record_count": 1},
+    "silver": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2026-11-14T11:50:00Z", "record_count": 1},
+    "crime": {"available": true, "fetched_at": "2026-11-14T12:00:00Z", "source_timestamp": "2025-12-31T00:00:00Z", "record_count": 1}
+  }
+}
