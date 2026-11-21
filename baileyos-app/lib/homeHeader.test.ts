@@ -30,9 +30,11 @@ test('the public map header does not show the steward mark and links to Question
   assert.match(lockup, /BREWING_PLACE_LINE/);
   assert.match(lockup, /href=\{MISSION_PATH\}/);
   const nest = readFileSync(new URL('../components/data-nest/DataNestApp.tsx', import.meta.url), 'utf8');
-  assert.match(nest, /360° Brewing: sign in to Data Nest/);
-  assert.match(nest, /LinkedIn sign-in coming soon, use email/);
-  assert.match(nest, /Sign in with LinkedIn/);
+  assert.match(nest, /Live weather, road and safety alerts for where you are/);
+  assert.match(nest, /Check in with LinkedIn/);
+  assert.match(nest, /Show up and keep the record honest/);
+  assert.match(nest, /Privacy details/);
+  assert.match(nest, /stripProfile\(body\)/);
   assert.match(src, /LinkedIn sign-in coming soon, use email/);
   assert.match(src, /sticky top-0/);
   assert.match(src, /suiteSignedIn \? <SuiteIdentity/);
