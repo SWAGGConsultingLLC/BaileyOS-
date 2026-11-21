@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { QUESTION_PROMPT } from '@/lib/brew/question001';
+import { QUESTION_PROMPT, VOTE_OPTIONS, type VoteOption } from '@/lib/brew/question001';
 import { DEFAULT_CENTER, placeRelative, pointOnRing } from '@/lib/landing-stone/compass';
+import { lightMeaning } from '@/lib/landing-stone/cockpit';
 
 type Light = { state?: string; line?: string };
 type Seat = { id: string; name: string; seat: string; bearing: number; status: string };
@@ -76,7 +77,32 @@ export default function CockpitPage() {
     });
     const body = await res.json().catch(() => ({}));
     setDeck(body);
-    setNote(body.steward ? 'Signed in as steward.' : 'Steward only');
+    if (body.steward) setNote('You are the steward. Everyone else can still look.');
+    else if (bearer) setNote('You can look and vote. Convene, Approve, and Stand down are steward only.');
+    else setNote('Anyone can look. No account is needed. Convene, Approve, and Stand down are steward only.');
+  }
+
+  async function refreshBrew() {
+    const res = await fetch('/api/brew/q/001/results', { cache: 'no-store' });
+    const body = await res.json().catch(() => ({ error: 'The tally could not be read.' }));
+    setBrew(body);
+  }
+
+  async function castVote(option: VoteOption) {
+    if (!token) return;
+    setNote('Sending your vote through Question #001.');
+    const res = await fetch('/api/brew/q/001/vote', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ option }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setNote(typeof body.error === 'string' ? body.error : 'The vote could not be recorded. Open Question #001.');
+      return;
+    }
+    setNote(body.already ? 'Your vote was already recorded.' : 'Your vote is recorded.');
+    refreshBrew();
   }
 
   useEffect(() => {
@@ -95,10 +121,7 @@ export default function CockpitPage() {
       load(next);
     }).catch(() => load(''));
     loadRing(DEFAULT_CENTER);
-    fetch('/api/brew/q/001/results', { cache: 'no-store' })
-      .then((res) => res.json())
-      .then((body) => setBrew(body))
-      .catch(() => setBrew({ error: 'The tally could not be read.' }));
+    refreshBrew().catch(() => setBrew({ error: 'The tally could not be read.' }));
   }, []);
 
   function shareLocation() {
@@ -143,26 +166,30 @@ export default function CockpitPage() {
   return (
     <main className="mx-auto min-h-screen max-w-lg bg-[#05080f] px-4 py-6 text-[#f2e2c4]">
       <p className="font-mono text-xs tracking-[0.16em] text-[#C9943A]">LANDING STONE · COCKPIT</p>
-      <h1 className="mt-2 text-3xl text-white">Steward cockpit</h1>
+      <h1 className="mt-2 text-3xl text-white">Your view</h1>
       <p className="mt-3 text-xl text-white">The lights inform. The steward decides.</p>
-      <nav className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-base" aria-label="Existing pages">
-        <a className="inline-flex min-h-11 items-center text-[#9ad7ff] underline" href="/data-nest">Data Nest</a>
-        <a className="inline-flex min-h-11 items-center text-[#9ad7ff] underline" href="/landing-stone">Landing Stone</a>
-        <a className="inline-flex min-h-11 items-center text-[#9ad7ff] underline" href="/landing-stone/prototype">Prototype</a>
-        <a className="inline-flex min-h-11 items-center text-[#9ad7ff] underline" href="/suite">360° Brewing sign-in</a>
+      <p className="mt-2 text-lg">No account is needed to look. Share your location only if you want. Voting uses Question #001.</p>
+      <nav className="mt-4 grid gap-2" aria-label="Existing pages">
+        <a className="inline-flex min-h-14 items-center rounded border border-[#9ad7ff]/40 px-4 text-lg text-[#9ad7ff]" href="/data-nest">Data Nest</a>
+        <a className="inline-flex min-h-14 items-center rounded border border-[#9ad7ff]/40 px-4 text-lg text-[#9ad7ff]" href="/landing-stone">Landing Stone</a>
+        <a className="inline-flex min-h-14 items-center rounded border border-[#9ad7ff]/40 px-4 text-lg text-[#9ad7ff]" href="/landing-stone/prototype">Prototype</a>
       </nav>
 
       <section className="mt-6 border-t border-[#C9943A]/40 pt-4" aria-label="Lights">
         <p className="font-mono text-2xl text-[#C9943A]">{lock}</p>
-        <p className="mt-1">{lights?.lock_line || 'PENDING — an independent anchor is not published.'}</p>
-        <ul className="mt-3 space-y-3">
+        <p className="mt-1 text-lg">{lights?.lock_line || 'PENDING — an independent anchor is not published.'}</p>
+        <p className="mt-1 text-lg">{lightMeaning('lock', lock)}</p>
+        <ul className="mt-4 space-y-4">
           {LIGHTS.map(([label, key]) => {
             const light = lights?.[key];
+            const state = light?.state || 'PENDING';
+            const kind = key === 'feed_health' ? 'feed' : key === 'chain_integrity' ? 'chain' : 'consensus';
             return (
               <li key={key}>
-                <p className="font-mono text-xs tracking-widest text-[#C9943A]">{label}</p>
-                <p className="text-lg text-white">{light?.state || 'PENDING'}</p>
-                <p>{light?.line || 'Waiting for the ruling log.'}</p>
+                <p className="font-mono text-sm tracking-widest text-[#C9943A]">{label}</p>
+                <p className="text-2xl text-white">{state}</p>
+                <p className="text-lg">{light?.line || 'Waiting for the ruling log.'}</p>
+                <p className="text-lg">{lightMeaning(kind, state)}</p>
               </li>
             );
           })}
@@ -178,7 +205,7 @@ export default function CockpitPage() {
             ? 'Center is Grand Junction, CO, the default. The exact point stays on this phone until you opt in, and it is not written into the chain.'
             : 'Center is your coarsened area. The exact point stays on this phone and is not written into the chain.'}
         </p>
-        <button type="button" onClick={shareLocation} className="mt-2 min-h-11 rounded border border-[#C9943A]/70 px-3">Use my location</button>
+        <button type="button" onClick={shareLocation} className="mt-3 min-h-14 w-full rounded border border-[#C9943A]/70 px-4 text-left text-lg">Use my location</button>
         <div className="relative mx-auto mt-3 w-full max-w-sm">
           {terrainOn && ring?.terrain?.image && (
             <img src={ring.terrain.image} alt="USGS 3DEP shaded relief" className="absolute left-[13%] top-[13%] h-[74%] w-[74%] rounded-full object-cover opacity-80" onError={() => setTerrainFailed(true)} />
@@ -236,11 +263,20 @@ export default function CockpitPage() {
           {' '}
           {brew?.error ? 'The tally could not be read.' : brew?.message || (brewTotal === 0 ? 'No votes are recorded yet.' : `${brewTotal} verified votes, counted in the open.`)}
         </p>
-        <ul className="mt-1 space-y-1 text-sm">
-          {brewOptions.map((option) => (
-            <li key={option.option}>{option.option} {option.label}: {option.count}</li>
+        <div className="mt-3 grid gap-2">
+          {(brewOptions.length ? brewOptions : VOTE_OPTIONS.map((item) => ({ ...item, count: 0, percent: 0 }))).map((option) => (
+            token ? (
+              <button key={option.option} type="button" onClick={() => castVote(option.option as VoteOption)} className="min-h-14 w-full rounded bg-white px-4 text-left text-lg font-semibold text-black">
+                {option.option}. {option.label}{typeof option.count === 'number' ? ` · ${option.count}` : ''}
+              </button>
+            ) : (
+              <a key={option.option} href="/brew/q/001/vote" className="inline-flex min-h-14 w-full items-center rounded bg-white px-4 text-lg font-semibold text-black">
+                {option.option}. {option.label}{typeof option.count === 'number' ? ` · ${option.count}` : ''}
+              </a>
+            )
           ))}
-        </ul>
+        </div>
+        <p className="mt-2 text-lg">Voting uses the existing Question #001 flow. LinkedIn sign-in is required to vote. Looking needs no account.</p>
         <ul className="mt-2 space-y-1 text-sm">
           {(ring?.feeds || []).map((feed) => (
             <li key={feed.id}>{feed.name}: {feed.detail}</li>
@@ -257,7 +293,8 @@ export default function CockpitPage() {
 
       <section className="mt-6 border-t border-[#C9943A]/40 pt-4" aria-label="Steward controls">
         <h2 className="text-lg text-[#C9943A]">South</h2>
-        <p role="status" className="mt-1">{note}</p>
+        <p role="status" className="mt-1 text-lg">{note}</p>
+        {!steward && <p className="mt-1 text-lg">Steward only</p>}
         <div className="mt-3 grid gap-2">
           {(['convene', 'approve', 'stand_down'] as const).map((name) => (
             <button
@@ -265,7 +302,7 @@ export default function CockpitPage() {
               type="button"
               disabled={!steward}
               onClick={() => act(name)}
-              className="min-h-12 rounded border border-[#C9943A]/70 px-3 text-left uppercase tracking-wide disabled:opacity-40"
+              className="min-h-14 w-full rounded border border-[#C9943A]/70 px-4 text-left text-lg uppercase tracking-wide disabled:opacity-40"
             >
               {name === 'stand_down' ? 'Stand down' : name}
             </button>

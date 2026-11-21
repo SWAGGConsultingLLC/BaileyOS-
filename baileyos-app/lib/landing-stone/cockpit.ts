@@ -1,3 +1,20 @@
+export function lightMeaning(kind: 'consensus' | 'feed' | 'chain' | 'lock', state: string): string {
+  const name = state || 'PENDING';
+  if (kind === 'consensus' && name === 'QUORUM INCOMPLETE') return 'What this means: fewer than 3 helpers answered. Two agreeing is not enough.';
+  if (kind === 'consensus' && name === 'NO ACTIVE VETO') return 'What this means: no check blocked this. The steward still decides.';
+  if (kind === 'consensus' && name === 'CONDITIONS SATISFIED') return 'What this means: the checks that ran were met. This is not a travel clearance.';
+  if (kind === 'feed' && name === 'NO ACTIVE VETO') return 'What this means: recent feed checks did not block.';
+  if (kind === 'feed' && name === 'DEGRADED') return 'What this means: a feed is old, or a 200 response had an unexpected shape.';
+  if (kind === 'feed' && name === 'RED') return 'What this means: a stored feed check failed.';
+  if (kind === 'chain' && name === 'RECORD INTACT') return 'What this means: the seals recompute. That does not clear the road.';
+  if (kind === 'chain' && name === 'RED') return 'What this means: a seal or a sequence number does not match.';
+  if (kind === 'lock' && name === 'ANCHORED') return 'What this means: an outside witness has the head. The steward still decides.';
+  if (kind === 'lock') return 'What this means: no outside witness has the head yet.';
+  if (kind === 'feed') return 'What this means: no feed check is stored yet.';
+  if (kind === 'chain') return 'What this means: no records to recompute yet.';
+  return 'What this means: not enough rulings yet. This is not a go-ahead.';
+}
+
 export type CockpitAct = 'convene' | 'approve' | 'stand_down';
 
 export type ActDecision =

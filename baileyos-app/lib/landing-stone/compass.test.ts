@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { compassRecord, decideCockpitAct } from './cockpit';
+import { compassRecord, decideCockpitAct, lightMeaning } from './cockpit';
 import { acceptRingCenter, DEFAULT_CENTER, dissentBearings, feedMarks, LIGHTS_WIN, placeRelative, placeSeats, pointOnRing, STEWARD_BEARING } from './compass';
 
 const slots = [
@@ -85,8 +85,17 @@ test('an empty log gives the compass nothing to draw', () => {
   assert.equal(denied.vetoes.length, 1);
 });
 
+test('each light has a plain meaning and a short board cannot clear', () => {
+  assert.match(lightMeaning('consensus', 'QUORUM INCOMPLETE'), /fewer than 3/);
+  assert.match(lightMeaning('consensus', 'CONDITIONS SATISFIED'), /not a travel clearance/);
+  assert.match(lightMeaning('lock', 'PENDING'), /no outside witness/);
+  assert.equal(lightMeaning('consensus', 'PENDING').toLowerCase().includes('proof'), false);
+  assert.equal(/\bSAFE\b/.test(lightMeaning('feed', 'NO ACTIVE VETO')), false);
+});
+
 test('the cockpit page keeps the lights first and the words honest', () => {
   const page = readFileSync(new URL('../../app/landing-stone/cockpit/page.tsx', import.meta.url), 'utf8');
+  const words = readFileSync(new URL('./cockpit.ts', import.meta.url), 'utf8');
   const migration = readFileSync(new URL('../../supabase/migrations/20261121060000_steward_cockpit_acts.sql', import.meta.url), 'utf8');
   assert.match(page, /The lights inform\. The steward decides\./);
   assert.match(page, /Grand Junction, CO/);
@@ -97,6 +106,10 @@ test('the cockpit page keeps the lights first and the words honest', () => {
   assert.match(page, /href="\/landing-stone"/);
   assert.match(page, /href="\/landing-stone\/prototype"/);
   assert.match(page, /Steward only/);
+  assert.match(page, /No account is needed to look/);
+  assert.match(page, /lightMeaning/);
+  assert.match(words, /What this means/);
+  assert.match(page, /\/brew\/q\/001\/vote/);
   assert.match(page, /disabled=\{!steward\}/);
   assert.equal(/\bSAFE\b/.test(page), false);
   assert.equal(page.toLowerCase().includes('proof'), false);
