@@ -1,0 +1,72 @@
+{
+  "quorum": 3,
+  "slots": [
+    {
+      "id": "A",
+      "name": "Grok",
+      "tier": "free",
+      "enabled": true,
+      "optional": false,
+      "env": "XAI_API_KEY",
+      "provider": "xai",
+      "oracle": "grok",
+      "providerLabel": "xAI",
+      "model": "grok-4.7",
+      "endpoint": "https://api.x.ai/v1/chat/completions"
+    },
+    {
+      "id": "B",
+      "name": "Gemini",
+      "tier": "free",
+      "enabled": true,
+      "optional": false,
+      "env": "GEMINI_API_KEY",
+      "provider": "gemini",
+      "oracle": "gemini",
+      "providerLabel": "Google",
+      "model": "gemini-3.8-flash",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    },
+    {
+      "id": "C",
+      "name": "GitHub Models",
+      "tier": "free",
+      "enabled": true,
+      "optional": true,
+      "env": "GITHUB_MODELS_TOKEN",
+      "provider": "github",
+      "oracle": "github",
+      "providerLabel": "GitHub",
+      "model": "openai/gpt-4o-mini",
+      "endpoint": "https://models.github.ai/inference/chat/completions"
+    },
+    {
+      "id": "D",
+      "name": "Kimi",
+      "tier": "paid",
+      "enabled": false,
+      "optional": true,
+      "placeholder": true,
+      "env": "MOONSHOT_API_KEY",
+      "provider": "moonshot",
+      "oracle": "kimi",
+      "providerLabel": "Moonshot",
+      "model": "moonshot-v1-auto",
+      "endpoint": "https://api.moonshot.ai/v1/chat/completions"
+    },
+    {
+      "id": "E",
+      "name": "Claude",
+      "tier": "paid",
+      "enabled": false,
+      "optional": true,
+      "placeholder": true,
+      "env": "ANTHROPIC_API_KEY",
+      "provider": "anthropic",
+      "oracle": "claude",
+      "providerLabel": "Anthropic",
+      "model": "claude-sonnet-4-5",
+      "endpoint": "https://api.anthropic.com/v1/messages"
+    }
+  ]
+}

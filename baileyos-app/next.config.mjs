@@ -9,6 +9,7 @@ export default {
       '/api/data-nest/anchor': ['./api/**/*', './vendor/python/**/*'],
       '/api/data-nest/continuity': ['./api/**/*', './vendor/python/**/*'],
       '/landing-stone': ['./public/landing-stone/index.html'],
+      '/api/landing-stone/slots': ['./validation/voter_slots.json'],
       '/api/data-nest/gemini': ['./api/**/*', './vendor/python/**/*'],
     },
   },

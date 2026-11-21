@@ -113,6 +113,10 @@ a:hover { text-decoration:underline; }
     <p class="light-line" id="notice-sources"></p>
   </section>
 </div>
+<section class="status" id="voters" aria-label="Voter slots">
+  <div class="kicker">VOTER SLOTS</div>
+  <div class="lights" id="voter-list"><p class="light-line">Waiting for the slot registry.</p></div>
+</section>
 <nav class="sim-entry" aria-label="Landing Stone modules">
   <a href="simulation/">Agent simulation</a>
 </nav>
@@ -181,6 +185,23 @@ a:hover { text-decoration:underline; }
       notice.hidden = true;
     }
   }
+  fetch('/api/landing-stone/slots', { cache: 'no-store' })
+    .then(function (response) { if (!response.ok) throw new Error('unreachable'); return response.json(); })
+    .then(function (data) {
+      var list = document.getElementById('voter-list');
+      var slots = data && Array.isArray(data.slots) ? data.slots : [];
+      list.textContent = '';
+      if (!slots.length) { list.textContent = 'not configured'; return; }
+      slots.forEach(function (slot) {
+        var line = document.createElement('p');
+        line.className = 'light-line';
+        line.textContent = slot.name + ' · tier ' + slot.tier + ' · ' + slot.status;
+        list.appendChild(line);
+      });
+    })
+    .catch(function () {
+      document.getElementById('voter-list').textContent = 'not configured';
+    });
   fetch('/api/data-nest/continuity', { cache: 'no-store' })
     .then(function (response) { if (!response.ok) throw new Error('unreachable'); return response.json(); })
     .then(apply)
