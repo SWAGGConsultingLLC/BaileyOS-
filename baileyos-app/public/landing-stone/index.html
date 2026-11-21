@@ -42,6 +42,7 @@ body {
 .light-state.state-GREEN { color:#0c8; }
 .light-state.state-RED { color:#ff8f8f; }
 .light-state.state-PENDING { color:#C9943A; }
+.steward { margin-top:0.8rem; font-size:0.72rem; line-height:1.45; color:#f2e2c4; }
 .light-line { margin-top:0.25rem; font-size:0.78rem; line-height:1.45; color:#f2e2c4; }
 .meta { margin-top:1rem; text-align:left; font-size:0.68rem; line-height:1.5; color:#f2e2c4; word-break:break-all; }
 .footer { margin-top:2rem; font-size:0.65rem; opacity:0.5; letter-spacing:1px; text-align:center; }
@@ -86,6 +87,7 @@ a:hover { text-decoration:underline; }
   <div class="kicker">CONTINUITY</div>
   <div class="lock" id="lock">PENDING</div>
   <p class="light-line" id="lock-line">PENDING — anchor not published</p>
+  <p class="steward">The lights inform. The steward decides.</p>
   <div class="compass" aria-hidden="true">◉</div>
   <div class="lights">
     <section class="light">
@@ -122,7 +124,7 @@ a:hover { text-decoration:underline; }
 </div>
 <script>
 (function () {
-  var states = { GREEN: 'state-GREEN', RED: 'state-RED', PENDING: 'state-PENDING', 'RECORD INTACT': 'state-GREEN' };
+  var states = { GREEN: 'state-GREEN', RED: 'state-RED', PENDING: 'state-PENDING', 'RECORD INTACT': 'state-GREEN', 'QUORUM INCOMPLETE': 'state-PENDING', 'CONDITIONS SATISFIED': 'state-PENDING', 'NO ACTIVE VETO': 'state-PENDING', DEGRADED: 'state-PENDING' };
   function text(id, value) {
     var node = document.getElementById(id);
     if (node) node.textContent = value;

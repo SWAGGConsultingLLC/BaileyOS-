@@ -111,6 +111,24 @@ class ValidatorTests(unittest.TestCase):
         self.assertIn("crime", sealed["skipped_needs_setup"])
         self.assertEqual(sealed["report"]["validator"]["mode"], "live_feeds")
 
+    def test_source_timestamp_and_unexpected_shape_are_degraded(self):
+        stale = copy.deepcopy(SAMPLE)
+        stale["freshness"]["nws_alerts"]["source_timestamp"] = "2026-11-14T10:00:00Z"
+        stale["freshness"]["nws_alerts"]["http_status"] = 200
+        report = build_report(stale, now=NOW)
+        row = next(src for src in report["freshness"]["sources"] if src["id"] == "nws_alerts")
+        self.assertEqual(row["status"], "degraded")
+        self.assertNotEqual(row["status"], "pass")
+        self.assertTrue(report["freshness"]["blocks_consensus"])
+        shaped = copy.deepcopy(SAMPLE)
+        shaped["freshness"]["usgs"]["schema_status"] = "degraded"
+        shaped["freshness"]["usgs"]["http_status"] = 200
+        shaped_report = build_report(shaped, now=NOW)
+        usgs = next(src for src in shaped_report["freshness"]["sources"] if src["id"] == "usgs")
+        self.assertEqual(usgs["status"], "degraded")
+        self.assertEqual(usgs["http_status"], 200)
+        self.assertIn("unexpected payload shape", usgs["detail"])
+
     def test_quake_magnitude_outside_range_fails_sanity(self):
         bad = copy.deepcopy(SAMPLE)
         bad["freshness"]["usgs"]["items"] = [{"mag": 12, "lat": 39.06, "lon": -108.55, "time": "2026-11-14T11:40:00Z"}]

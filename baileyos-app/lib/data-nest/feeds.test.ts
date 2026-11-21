@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isAmber, isSilver, roadKind } from './liveFeeds.ts';
+import { isAmber, isSilver, roadKind, schemaStatus } from './liveFeeds.ts';
 
 test('AMBER is only the NWS child-abduction event', () => {
   assert.equal(isAmber('Child Abduction Emergency'), true);
@@ -11,6 +11,13 @@ test('Silver needs the alert text, not every local emergency', () => {
   assert.equal(isSilver('Local Area Emergency', 'Silver Alert', ''), true);
   assert.equal(isSilver('Local Area Emergency', 'Wind advisory', 'gusts'), false);
   assert.equal(isSilver('Child Abduction Emergency', 'Silver Alert', ''), false);
+});
+
+test('a 200 with the wrong shape is degraded and a feature list is ok', () => {
+  assert.equal(schemaStatus('usgs', { features: [] }), 'ok');
+  assert.equal(schemaStatus('usgs', { type: 'FeatureCollection' }), 'degraded');
+  assert.equal(schemaStatus('nws-obs', { properties: { timestamp: '2026-11-14T12:00:00Z' } }), 'ok');
+  assert.equal(schemaStatus('cdot', { error: { code: 400 } }), 'degraded');
 });
 
 test('road text is classified without inventing an event', () => {

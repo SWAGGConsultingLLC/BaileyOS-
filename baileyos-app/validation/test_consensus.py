@@ -7,7 +7,7 @@ from _validate_corridor import build_report, seal  # noqa: E402
 from _consensus import convene, parse_reviewer_reply, sha256_hex  # noqa: E402
 from _ruling import (  # noqa: E402
     ChainConflict, append_with_retry, build_genesis_record, build_ruling_record, continuity_lights,
-    feed_fingerprint, pairwise_agreement, verify_chain, verify_ruling_record, make_linkage,
+    feed_payload_sha256, pairwise_agreement, verify_chain, verify_ruling_record, make_linkage,
     delete_linkage_for_user, purge_linkage, daily_anchor, publish_anchor, canonical_json as ruling_canonical,
 )
 from _roadmap import publish_git_anchor, trip_handshake_interface  # noqa: E402
@@ -25,8 +25,15 @@ INPUT_SHA = S["input_sha256"]
 def vote(verdict, reason="ok", h=H, inp=INPUT_SHA):
     return {"verdict": verdict, "reason": reason, "reviewed_report_sha256": h, "reviewed_input_sha256": inp}
 
-def queen(canon=CANON, h=H, g=None, k=None, inp=INP, now=NOW, payloads=None):
-    return convene(canon, h, g, k, now=now, input_canonical_json=inp, payloads=payloads)
+def queen(canon=CANON, h=H, g=None, k=None, inp=INP, now=NOW, payloads=None, ai_seats=None):
+    return convene(canon, h, g, k, now=now, input_canonical_json=inp, payloads=payloads, ai_seats=ai_seats)
+
+def three_seats(verdict="agree", h=H, inp=INPUT_SHA):
+    return [
+        {"configured": True, "reviewer": "gemini", "vote": vote(verdict, h=h, inp=inp)},
+        {"configured": True, "reviewer": "github", "vote": vote(verdict, h=h, inp=inp)},
+        {"configured": True, "reviewer": "grok", "vote": vote(verdict, h=h, inp=inp)},
+    ]
 
 def run(g=None, k=None, canon=CANON, h=H, inp=INP, now=NOW):
     return queen(canon, h, g, k, inp, now)["ruling"]
@@ -36,14 +43,14 @@ class QueenTests(unittest.TestCase):
     def test_gemini_agree_kimi_pending_is_consensus_and_names_kimi(self):
         r = queen(g=vote("agree"))
         self.assertEqual(r["ruling"], "CONSENSUS")
-        self.assertEqual(r["label"], "CONSENSUS (2 of 3)")
-        self.assertEqual(r["clearance"], "WARN")
+        self.assertEqual(r["clearance"], "QUORUM INCOMPLETE")
+        self.assertNotIn("SAFE", r["clearance"])
         self.assertEqual(r["missing_voters"], ["kimi"])
+        self.assertLess(r["ai_responding"], 3)
     def test_kimi_agree_gemini_pending_names_gemini(self):
         r = queen(k=vote("agree"))
         self.assertEqual(r["ruling"], "CONSENSUS")
-        self.assertEqual(r["label"], "CONSENSUS (2 of 3)")
-        self.assertEqual(r["clearance"], "WARN")
+        self.assertEqual(r["clearance"], "QUORUM INCOMPLETE")
         self.assertEqual(r["missing_voters"], ["gemini"])
     def test_all_agree_is_consensus(self):             self.assertEqual(run(vote("agree"), vote("agree")), "CONSENSUS")
     def test_any_disagree_is_dissent_with_who_and_why(self):
@@ -66,6 +73,8 @@ class QueenTests(unittest.TestCase):
         self.assertEqual(r["report_sha256"], H)
     def test_parser_plain_fenced_and_chatty_json(self):
         self.assertEqual(parse_reviewer_reply('{"verdict":"agree","reason":"fine"}')["verdict"], "agree")
+        self.assertEqual(parse_reviewer_reply('{"outcome":"approved","reason":"fine"}')["outcome"], "approved")
+        self.assertEqual(parse_reviewer_reply('{"outcome":"denied","reason":"no"}')["verdict"], "disagree")
         self.assertEqual(parse_reviewer_reply('```json\n{"verdict":"Disagree","reason":"x"}\n```')["verdict"], "disagree")
         self.assertEqual(parse_reviewer_reply('Sure! {"verdict":"agree","reason":"y"} hope that helps')["verdict"], "agree")
     def test_parser_garbage_is_uncertain(self):
@@ -117,7 +126,9 @@ class QueenTests(unittest.TestCase):
         first = build_ruling_record(S, ruling, sequence_number=1, now=NOW)
         checked = verify_ruling_record(first)
         self.assertTrue(checked["ok"], checked)
-        self.assertEqual(first["schema_version"], "1.1")
+        self.assertEqual(first["schema_version"], "1.2")
+        self.assertIn("tamper-evident decision record", first["note"])
+        self.assertNotIn("proof", first["note"].lower())
         second = build_ruling_record(S, ruling, prev_record_sha256=first["record_sha256"], sequence_number=2, now=NOW)
         self.assertEqual(second["prev_record_sha256"], first["record_sha256"])
         self.assertTrue(verify_ruling_record(second)["ok"])
@@ -245,7 +256,7 @@ class QueenTests(unittest.TestCase):
     def test_fingerprint_must_recompute(self):
         items = [{"agency": "USGS", "expires_at": None, "id": "q", "issued_at": None, "kind": "quake", "title": "M 2.1"}]
         bad = copy.deepcopy(SAMPLE)
-        bad["freshness"]["usgs"]["payload_sha256"] = feed_fingerprint(items)
+        bad["freshness"]["usgs"]["payload_sha256"] = feed_payload_sha256(items)
         sealed = seal(bad, now=NOW)
         agreed = (
             vote("agree", h=sealed["report_sha256"], inp=sealed["input_sha256"]),
@@ -309,9 +320,10 @@ class QueenTests(unittest.TestCase):
         genesis = build_genesis_record(now=NOW)
         record = build_ruling_record(S, ruling, prev_record_sha256=genesis["record_sha256"], sequence_number=2, now=NOW)
         lights = continuity_lights([genesis, record], configured=True, anchored_today=False, now=NOW)
-        self.assertEqual(lights["consensus"]["line"], "1 of 1 CONSENSUS (3 of 3) over 30 days.")
-        self.assertEqual(lights["consensus"]["state"], "GREEN")
-        self.assertEqual(lights["feed_health"]["state"], "GREEN")
+        self.assertEqual(lights["consensus"]["state"], "QUORUM INCOMPLETE")
+        self.assertNotEqual(lights["consensus"]["state"], "GREEN")
+        self.assertIn("3 AI seats", lights["consensus"]["line"])
+        self.assertEqual(lights["feed_health"]["state"], "NO ACTIVE VETO")
         self.assertEqual(lights["chain_integrity"]["state"], "RECORD INTACT")
         self.assertNotIn("road is safe", lights["chain_integrity"]["line"].split("does not")[0])
         self.assertEqual(lights["continuity_lock"], "PENDING")
@@ -321,7 +333,13 @@ class QueenTests(unittest.TestCase):
         self.assertEqual(git_only["continuity_lock"], "PENDING")
         self.assertNotIn("LOCKED", git_only["lock_line"])
         witnessed = continuity_lights([genesis, record], configured=True, independent_anchor=True, now=NOW)
-        self.assertEqual(witnessed["continuity_lock"], "ANCHORED")
+        self.assertEqual(witnessed["continuity_lock"], "PENDING")
+        full = queen(ai_seats=three_seats())
+        full_record = build_ruling_record(S, full, prev_record_sha256=genesis["record_sha256"], sequence_number=2, now=NOW)
+        anchored = continuity_lights([genesis, full_record], configured=True, independent_anchor=True, now=NOW)
+        self.assertEqual(anchored["consensus"]["state"], "CONDITIONS SATISFIED")
+        self.assertNotEqual(anchored["consensus"]["state"], "GREEN")
+        self.assertEqual(anchored["continuity_lock"], "ANCHORED")
         forked = continuity_lights([genesis, record, build_ruling_record(S, ruling, prev_record_sha256=genesis["record_sha256"], sequence_number=3, now=NOW)], configured=True, now=NOW)
         self.assertEqual(forked["chain_integrity"]["state"], "RED")
         self.assertNotEqual(forked["continuity_lock"], "ANCHORED")
@@ -356,26 +374,54 @@ class QueenTests(unittest.TestCase):
         self.assertIn("Rekor", posted["independent_witness"])
 
     def test_three_agree_can_clear_and_two_agree_only_warns(self):
-        full = queen(g=vote("agree"), k=vote("agree"))
-        self.assertEqual(full["label"], "CONSENSUS (3 of 3)")
-        self.assertEqual(full["clearance"], "SAFE")
-        self.assertIn("deterministic", full["python_voter"])
-        warned = queen(g=vote("agree"))
-        self.assertEqual(warned["clearance"], "WARN")
-        self.assertNotEqual(warned["clearance"], "SAFE")
+        full = queen(ai_seats=three_seats())
+        self.assertEqual(full["clearance"], "CONDITIONS SATISFIED")
+        self.assertEqual(full["ai_responding"], 3)
+        self.assertEqual(full["outcomes"][0]["outcome"], "approved")
+        self.assertFalse(full["code_vetoes"])
+        self.assertIn("steward decides", full["label"])
+        self.assertNotIn("SAFE", full["clearance"])
+        warned = queen(g=vote("agree"), k=vote("agree"))
+        self.assertEqual(warned["clearance"], "QUORUM INCOMPLETE")
+        self.assertNotEqual(warned["clearance"], "CONDITIONS SATISFIED")
+        self.assertIn("NO ACTIVE VETO", warned["label"])
 
     def test_empty_feed_is_pending_and_not_an_all_clear(self):
         bad = copy.deepcopy(SAMPLE)
         bad["freshness"]["amber"]["record_count"] = 0
         sealed = seal(bad, now=NOW)
         r = queen(sealed["report_canonical_json"], sealed["report_sha256"],
-                  vote("agree", h=sealed["report_sha256"], inp=sealed["input_sha256"]),
-                  vote("agree", h=sealed["report_sha256"], inp=sealed["input_sha256"]),
-                  sealed["input_canonical_json"])
+                  inp=sealed["input_canonical_json"],
+                  ai_seats=three_seats(h=sealed["report_sha256"], inp=sealed["input_sha256"]))
         self.assertEqual(r["ruling"], "PENDING")
         self.assertEqual(r["clearance"], "PENDING")
         self.assertNotIn("no hazards", r["label"].lower())
         self.assertIn("Hazards may still be present", r["label"])
+
+    def test_one_or_two_ai_seats_never_satisfy_the_three_seat_rule(self):
+        one = queen(ai_seats=[{"configured": True, "reviewer": "gemini", "vote": vote("agree")}])
+        self.assertEqual(one["clearance"], "QUORUM INCOMPLETE")
+        self.assertNotEqual(one["clearance"], "CONDITIONS SATISFIED")
+        self.assertEqual(one["ai_responding"], 1)
+        two = queen(g=vote("agree"), k=vote("agree"))
+        self.assertEqual(two["ai_configured"], 2)
+        self.assertNotEqual(two["clearance"], "CONDITIONS SATISFIED")
+
+    def test_stale_source_timestamp_is_a_recorded_veto(self):
+        bad = copy.deepcopy(SAMPLE)
+        bad["freshness"]["nws_alerts"]["source_timestamp"] = "2026-11-14T10:00:00Z"
+        sealed = seal(bad, now=NOW)
+        seats = three_seats(h=sealed["report_sha256"], inp=sealed["input_sha256"])
+        r = queen(sealed["report_canonical_json"], sealed["report_sha256"], inp=sealed["input_canonical_json"], ai_seats=seats)
+        self.assertTrue(any(row["rule_id"] == "SOURCE_FRESHNESS" and row["veto_triggered"] is True and row["feed_status"] == "degraded" for row in r["code_vetoes"]))
+        self.assertNotEqual(r["clearance"], "CONDITIONS SATISFIED")
+        self.assertEqual(r["outcomes"][0]["outcome"], "vetoed")
+        record = build_ruling_record(sealed, r, sequence_number=1, now=NOW)
+        checked = verify_ruling_record(record)
+        self.assertTrue(checked["ok"], checked)
+        self.assertEqual(record["code_vetoes"][0]["rule_id"], "SOURCE_FRESHNESS")
+        evidence = feed_payload_sha256([{"id": "nws"}])
+        self.assertEqual(len(evidence), 64)
 
     def test_failed_check_is_not_a_safe_clearance(self):
         bad = copy.deepcopy(SAMPLE)
@@ -386,7 +432,8 @@ class QueenTests(unittest.TestCase):
                   vote("agree", h=sealed["report_sha256"], inp=sealed["input_sha256"]),
                   sealed["input_canonical_json"])
         self.assertEqual(r["python_overall"], "FAIL")
-        self.assertNotEqual(r["clearance"], "SAFE")
+        self.assertNotEqual(r["clearance"], "CONDITIONS SATISFIED")
+        self.assertNotIn("SAFE", r["clearance"])
 
     def test_hard_constraints_stay_on_device_and_crime_is_not_a_fact(self):
         statement = "needs a ramp and a refrigerated medicine bag"

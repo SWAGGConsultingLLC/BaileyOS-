@@ -61,7 +61,7 @@ Three seats: Python (always agrees with itself), Gemini, Kimi. Rules, checked in
 1. **NO_RULING**: report missing, hash does not match, or malformed.
 2. **DISSENT**: any reviewer says `disagree`. The ruling lists who and why.
 3. **UNRESOLVED**: nobody disagrees but a reviewer is `uncertain` or unavailable. Never shown as consensus.
-4. **CONSENSUS**: both reviewers have voted and agree (3 of 3), and no feed is stale or failed at convene time.
+4. **CONSENSUS**: the responding reviewers agree, and no feed is stale, degraded, or failed at convene time. The factual label `CONDITIONS SATISFIED` still requires 3 AI seats. Fewer than 3 is `QUORUM INCOMPLETE`.
 5. **PROVISIONAL**: voted reviewers all agree but one is pending, for example `PROVISIONAL (2 of 3, awaiting Kimi)`, or everyone agrees but a feed is stale or failed (`PROVISIONAL — stale or failed feed; consensus is not available`).
 6. **PENDING**: no reviewer has voted (1 of 3).
 

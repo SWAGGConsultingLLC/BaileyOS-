@@ -1,5 +1,5 @@
 import { memberId } from '@/lib/data-nest/member';
-import { feedPayloads, loadLive } from '@/lib/data-nest/liveFeeds';
+import { loadLive } from '@/lib/data-nest/liveFeeds';
 import { isCoarsened } from '@/lib/data-nest/geo';
 import { SEAL_CODE, runPythonJson } from '@/lib/data-nest/pythonRun';
 import { allow } from '@/lib/rateLimit';
@@ -26,7 +26,8 @@ export async function POST(req: Request) {
   const sealed = runPythonJson(SEAL_CODE, {
     cell: live.cell,
     freshness: live.freshness,
-    payloads: feedPayloads(live.items),
+    payloads: live.rawPayloads,
+    code_sha: process.env.VERCEL_GIT_COMMIT_SHA || null,
   });
   if (!sealed.ok) {
     return Response.json({ error: sealed.error, code: 'python_unavailable' }, { status: 503 });

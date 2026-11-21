@@ -8,6 +8,8 @@ export type FeedRow = {
   source_timestamp: string | null;
   record_count: number;
   error?: string | null;
+  http_status?: number | null;
+  schema_status?: 'ok' | 'degraded' | 'absent';
 };
 
 export type LiveKind = 'quake' | 'weather' | 'closure' | 'crash' | 'chain' | 'amber' | 'silver' | 'observation' | 'other';
@@ -93,13 +95,31 @@ export function isSilver(event: string, headline: string, description: string): 
 
 type FetchLike = typeof fetch;
 
-async function getJson(url: string, fetchImpl: FetchLike, headers: Record<string, string> = {}): Promise<{ ok: true; json: unknown } | { ok: false; error: string }> {
+export function schemaStatus(kind: string, body: unknown): 'ok' | 'degraded' {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return 'degraded';
+  const obj = body as Record<string, unknown>;
+  if (kind === 'usgs' || kind === 'nws' || kind === 'nws-stations' || kind === 'cdot') {
+    if (kind === 'cdot' && obj.error) return 'degraded';
+    return Array.isArray(obj.features) ? 'ok' : 'degraded';
+  }
+  if (kind === 'nws-points') {
+    const stations = (obj.properties as { observationStations?: unknown } | undefined)?.observationStations;
+    return typeof stations === 'string' && stations.startsWith('https://') ? 'ok' : 'degraded';
+  }
+  if (kind === 'nws-obs') return obj.properties && typeof obj.properties === 'object' ? 'ok' : 'degraded';
+  return 'degraded';
+}
+
+type Got = { ok: true; status: number; json: unknown; schema: 'ok' | 'degraded' } | { ok: false; status: number | null; error: string };
+
+async function getJson(url: string, fetchImpl: FetchLike, kind: string, headers: Record<string, string> = {}): Promise<Got> {
   try {
     const res = await fetchImpl(url, { headers: { 'User-Agent': FEED_UA, Accept: 'application/geo+json, application/json', ...headers }, signal: AbortSignal.timeout(12_000) });
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-    return { ok: true, json: await res.json() };
+    if (!res.ok) return { ok: false, status: res.status, error: `HTTP ${res.status}` };
+    const json = await res.json();
+    return { ok: true, status: res.status, json, schema: schemaStatus(kind, json) };
   } catch {
-    return { ok: false, error: 'fetch failed' };
+    return { ok: false, status: null, error: 'fetch failed' };
   }
 }
 
@@ -110,6 +130,8 @@ function row(partial: Partial<FeedRow> & { available: boolean; record_count: num
     source_timestamp: partial.source_timestamp ?? null,
     record_count: partial.record_count,
     error: partial.error ?? null,
+    http_status: partial.http_status ?? null,
+    schema_status: partial.schema_status ?? 'absent',
   };
 }
 
@@ -141,6 +163,7 @@ export function feedPayloads(items: LiveItem[]): Record<string, LiveItem[]> {
 export async function loadLive(lat: number, lon: number, radiusKm: number, fetchImpl: FetchLike = fetch): Promise<{
   items: LiveItem[];
   freshness: Record<string, FeedRow>;
+  rawPayloads: Record<string, unknown>;
   needsSetup: NeedsSetup[];
   fetchedAt: string;
   cell: { lat: number; lon: number };
@@ -150,12 +173,17 @@ export async function loadLive(lat: number, lon: number, radiusKm: number, fetch
   const radius = Math.max(10, Math.min(200, radiusKm));
   const items: LiveItem[] = [];
   const freshness: Record<string, FeedRow> = {};
+  const rawPayloads: Record<string, unknown> = {};
 
   const usgsUrl = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&latitude=${cell.lat}&longitude=${cell.lon}&maxradiuskm=${radius}&limit=30&orderby=time`;
-  const usgs = await getJson(usgsUrl, fetchImpl);
+  const usgs = await getJson(usgsUrl, fetchImpl, 'usgs');
   if (!usgs.ok) {
-    freshness.usgs = row({ available: false, record_count: 0, error: usgs.error, fetched_at: fetched }, fetched);
+    freshness.usgs = row({ available: false, record_count: 0, error: usgs.error, http_status: usgs.status, schema_status: 'absent', fetched_at: fetched }, fetched);
+  } else if (usgs.schema === 'degraded') {
+    rawPayloads.usgs = usgs.json;
+    freshness.usgs = row({ available: true, record_count: 0, http_status: usgs.status, schema_status: 'degraded', fetched_at: fetched }, fetched);
   } else {
+    rawPayloads.usgs = usgs.json;
     const features = Array.isArray((usgs.json as { features?: unknown }).features) ? (usgs.json as { features: unknown[] }).features : [];
     let newest: string | null = null;
     for (const feature of features) {
@@ -178,16 +206,25 @@ export async function loadLive(lat: number, lon: number, radiusKm: number, fetch
         kind: 'quake',
       });
     }
-    freshness.usgs = row({ available: true, record_count: features.length, source_timestamp: newest, fetched_at: fetched }, fetched);
+    freshness.usgs = row({ available: true, record_count: features.length, source_timestamp: newest, http_status: usgs.status, schema_status: 'ok', fetched_at: fetched }, fetched);
   }
 
-  const areas = await Promise.all(['CO', 'UT'].map((area) => getJson(`https://api.weather.gov/alerts/active?area=${area}`, fetchImpl)));
+  const areas = await Promise.all(['CO', 'UT'].map((area) => getJson(`https://api.weather.gov/alerts/active?area=${area}`, fetchImpl, 'nws')));
   const alertFeatures: unknown[] = [];
   const alertErrors = areas.filter((item) => !item.ok).map((item) => item.ok ? '' : item.error);
+  const alertShape = areas.some((item) => item.ok && item.schema === 'degraded');
+  const alertStatus = areas.find((item) => item.ok)?.status ?? areas.find((item) => !item.ok)?.status ?? null;
   if (alertErrors.length === areas.length) {
     const err = alertErrors[0] || 'fetch failed';
     for (const id of ['nws_alerts', 'amber', 'silver']) {
-      freshness[id] = row({ available: false, record_count: 0, error: err, fetched_at: fetched }, fetched);
+      freshness[id] = row({ available: false, record_count: 0, error: err, http_status: alertStatus, schema_status: 'absent', fetched_at: fetched }, fetched);
+    }
+  } else if (alertShape) {
+    rawPayloads.nws_alerts = areas.filter((item) => item.ok).map((item) => item.ok ? item.json : null);
+    rawPayloads.amber = rawPayloads.nws_alerts;
+    rawPayloads.silver = rawPayloads.nws_alerts;
+    for (const id of ['nws_alerts', 'amber', 'silver']) {
+      freshness[id] = row({ available: true, record_count: 0, http_status: alertStatus, schema_status: 'degraded', fetched_at: fetched }, fetched);
     }
   } else {
     for (const area of areas) if (area.ok) {
@@ -237,27 +274,38 @@ export async function loadLive(lat: number, lon: number, radiusKm: number, fetch
       }
       return best;
     };
-    freshness.nws_alerts = row({ available: true, record_count: weather.length, source_timestamp: newest(weather), fetched_at: fetched }, fetched);
-    freshness.amber = row({ available: true, record_count: amber.length, source_timestamp: newest(amber), fetched_at: fetched }, fetched);
-    freshness.silver = row({ available: true, record_count: silver.length, source_timestamp: newest(silver), fetched_at: fetched }, fetched);
+    const alertBodies = areas.flatMap((item) => item.ok ? [item.json] : []);
+    rawPayloads.nws_alerts = alertBodies;
+    rawPayloads.amber = alertBodies;
+    rawPayloads.silver = alertBodies;
+    freshness.nws_alerts = row({ available: true, record_count: weather.length, source_timestamp: newest(weather), http_status: alertStatus, schema_status: 'ok', fetched_at: fetched }, fetched);
+    freshness.amber = row({ available: true, record_count: amber.length, source_timestamp: newest(amber), http_status: alertStatus, schema_status: 'ok', fetched_at: fetched }, fetched);
+    freshness.silver = row({ available: true, record_count: silver.length, source_timestamp: newest(silver), http_status: alertStatus, schema_status: 'ok', fetched_at: fetched }, fetched);
   }
 
-  const points = await getJson(`https://api.weather.gov/points/${cell.lat},${cell.lon}`, fetchImpl);
+  const points = await getJson(`https://api.weather.gov/points/${cell.lat},${cell.lon}`, fetchImpl, 'nws-points');
   if (!points.ok) {
-    freshness.nws_observation = row({ available: false, record_count: 0, error: points.error, fetched_at: fetched }, fetched);
+    freshness.nws_observation = row({ available: false, record_count: 0, error: points.error, http_status: points.status, schema_status: 'absent', fetched_at: fetched }, fetched);
+  } else if (points.schema === 'degraded') {
+    rawPayloads.nws_observation = points.json;
+    freshness.nws_observation = row({ available: true, record_count: 0, http_status: points.status, schema_status: 'degraded', fetched_at: fetched }, fetched);
   } else {
     const stationsUrl = (points.json as { properties?: { observationStations?: string } }).properties?.observationStations;
-    const stations = stationsUrl ? await getJson(stationsUrl, fetchImpl) : { ok: false as const, error: 'no stations' };
+    const stations = stationsUrl ? await getJson(stationsUrl, fetchImpl, 'nws-stations') : { ok: false as const, status: null, error: 'no stations' };
     const stationId = stations.ok
       ? ((stations.json as { features?: { properties?: { stationIdentifier?: string } }[] }).features || [])[0]?.properties?.stationIdentifier
       : null;
     if (!stationId) {
-      freshness.nws_observation = row({ available: false, record_count: 0, error: 'no station', fetched_at: fetched }, fetched);
+      freshness.nws_observation = row({ available: false, record_count: 0, error: 'no station', http_status: stations.ok ? stations.status : stations.status, schema_status: stations.ok && stations.schema === 'degraded' ? 'degraded' : 'absent', fetched_at: fetched }, fetched);
     } else {
-      const obs = await getJson(`https://api.weather.gov/stations/${stationId}/observations/latest`, fetchImpl);
+      const obs = await getJson(`https://api.weather.gov/stations/${stationId}/observations/latest`, fetchImpl, 'nws-obs');
       if (!obs.ok) {
-        freshness.nws_observation = row({ available: false, record_count: 0, error: obs.error, fetched_at: fetched }, fetched);
+        freshness.nws_observation = row({ available: false, record_count: 0, error: obs.error, http_status: obs.status, schema_status: 'absent', fetched_at: fetched }, fetched);
+      } else if (obs.schema === 'degraded') {
+        rawPayloads.nws_observation = obs.json;
+        freshness.nws_observation = row({ available: true, record_count: 0, http_status: obs.status, schema_status: 'degraded', fetched_at: fetched }, fetched);
       } else {
+        rawPayloads.nws_observation = obs.json;
         const props = (obs.json as { properties?: Record<string, unknown> }).properties || {};
         const temp = (props.temperature as { value?: number } | undefined)?.value;
         const wind = (props.windSpeed as { value?: number } | undefined)?.value;
@@ -278,7 +326,7 @@ export async function loadLive(lat: number, lon: number, radiusKm: number, fetch
           sourceName: 'NWS station observation',
           kind: 'observation',
         });
-        freshness.nws_observation = row({ available: true, record_count: 1, source_timestamp: when, fetched_at: fetched }, fetched);
+        freshness.nws_observation = row({ available: true, record_count: 1, source_timestamp: when, http_status: obs.status, schema_status: 'ok', fetched_at: fetched }, fetched);
       }
     }
   }
@@ -296,10 +344,14 @@ export async function loadLive(lat: number, lon: number, radiusKm: number, fetch
   cdotUrl.searchParams.set('outSR', '4326');
   cdotUrl.searchParams.set('f', 'json');
   cdotUrl.searchParams.set('resultRecordCount', '50');
-  const cdot = await getJson(cdotUrl.toString(), fetchImpl, { Accept: 'application/json' });
-  if (!cdot.ok || (cdot.ok && cdot.json && typeof cdot.json === 'object' && 'error' in (cdot.json as object))) {
-    freshness.cdot = row({ available: false, record_count: 0, error: cdot.ok ? 'CDOT returned an error' : cdot.error, fetched_at: fetched }, fetched);
+  const cdot = await getJson(cdotUrl.toString(), fetchImpl, 'cdot', { Accept: 'application/json' });
+  if (!cdot.ok) {
+    freshness.cdot = row({ available: false, record_count: 0, error: cdot.error, http_status: cdot.status, schema_status: 'absent', fetched_at: fetched }, fetched);
+  } else if (cdot.schema === 'degraded') {
+    rawPayloads.cdot = cdot.json;
+    freshness.cdot = row({ available: true, record_count: 0, http_status: cdot.status, schema_status: 'degraded', fetched_at: fetched }, fetched);
   } else {
+    rawPayloads.cdot = cdot.json;
     const features = Array.isArray((cdot.json as { features?: unknown }).features) ? (cdot.json as { features: unknown[] }).features : [];
     let newest: string | null = null;
     for (const feature of features) {
@@ -324,11 +376,11 @@ export async function loadLive(lat: number, lon: number, radiusKm: number, fetch
         kind: roadKind(text),
       });
     }
-    freshness.cdot = row({ available: true, record_count: features.length, source_timestamp: newest, fetched_at: fetched }, fetched);
+    freshness.cdot = row({ available: true, record_count: features.length, source_timestamp: newest, http_status: cdot.status, schema_status: 'ok', fetched_at: fetched }, fetched);
   }
 
-  freshness.udot = row({ available: false, record_count: 0, error: 'needs setup: UDOT_511_API_KEY', fetched_at: null }, fetched);
-  freshness.crime = row({ available: false, record_count: 0, error: 'needs setup: DATA_GOV_API_KEY', fetched_at: null }, fetched);
+  freshness.udot = row({ available: false, record_count: 0, error: 'needs setup: UDOT_511_API_KEY', fetched_at: null, schema_status: 'absent' }, fetched);
+  freshness.crime = row({ available: false, record_count: 0, error: 'needs setup: DATA_GOV_API_KEY', fetched_at: null, schema_status: 'absent' }, fetched);
 
-  return { items, freshness, needsSetup: NEEDS_SETUP, fetchedAt: fetched, cell };
+  return { items, freshness, rawPayloads, needsSetup: NEEDS_SETUP, fetchedAt: fetched, cell };
 }

@@ -2,7 +2,7 @@ import { clientIp, handleOracle } from '@/lib/oracle';
 import { runPython } from '@/lib/data-nest/pythonRun';
 import { loadSlotConfig, type SlotConfig } from '@/lib/landing-stone/slots';
 
-const SYSTEM = 'You review a BaileyOS live-feed report. Reply with JSON only: {"verdict":"agree"|"disagree"|"uncertain","reason":"one or two sentences"}. agree means the report is a faithful result of its checks, even when the overall result is FAIL or WARN. Do not invent alerts, road conditions, or a precise location. If you cannot tell, use uncertain.';
+const SYSTEM = 'You review a BaileyOS live-feed report. Reply with JSON only: {"outcome":"approved"|"denied"|"abstained"|"deferred","reason":"one or two sentences"}. approved means the report is a faithful result of its checks, even when the overall result is FAIL or WARN. denied means it is not. abstained means you will not take a side. deferred means you cannot tell yet. Do not invent alerts, road conditions, or a precise location.';
 
 export type LiveCall = {
   id: string;
@@ -47,16 +47,24 @@ export function registrySlots(): SlotConfig[] {
   return loadSlotConfig().slots;
 }
 
+export type AiSeat = { reviewer: string; configured: true; vote: unknown };
+
+function reviewerSlug(name: string): string {
+  const first = name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ')[0];
+  return first || 'seat';
+}
+
 export async function askConfiguredVoters(input: {
   report: string;
   reportSha: string;
   inputSha: string;
   req: Request;
-}): Promise<{ gemini: unknown; answers: Record<string, string>; envFlags: Record<string, boolean>; called: string[] }> {
+}): Promise<{ gemini: unknown; answers: Record<string, string>; envFlags: Record<string, boolean>; called: string[]; seats: AiSeat[] }> {
   const slots = registrySlots();
   const calls = votersToCall(slots, process.env);
   const flags = envFlags(slots, process.env);
   const answers: Record<string, string> = {};
+  const seats: AiSeat[] = [];
   let gemini: unknown = null;
   const brief = input.report.slice(0, 3500);
   await Promise.all(calls.map(async (call) => {
@@ -69,32 +77,35 @@ export async function askConfiguredVoters(input: {
         system: SYSTEM,
         messages: [{
           role: 'user',
-          content: `Report sha256 ${input.reportSha}. Input sha256 ${input.inputSha}.\n${brief}\nReply with the JSON verdict only.`,
+          content: `Report sha256 ${input.reportSha}. Input sha256 ${input.inputSha}.\n${brief}\nReply with the JSON outcome only.`,
         }],
       }),
     }));
     const payload = await upstream.json().catch(() => ({})) as { reply?: string };
     const acted = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    const reviewer = reviewerSlug(call.name);
     if (!upstream.ok || !payload.reply) {
-      if (call.id === 'B') {
-        gemini = { unavailable: true, reason: `${call.name} did not answer`, reviewed_report_sha256: input.reportSha, reviewed_input_sha256: input.inputSha };
-      }
+      const missed = { unavailable: true, reason: `${call.name} did not answer`, reviewed_report_sha256: input.reportSha, reviewed_input_sha256: input.inputSha };
+      seats.push({ reviewer, configured: true, vote: missed });
+      if (call.id === 'B') gemini = missed;
       return;
     }
     answers[call.id] = payload.reply;
-    if (call.id === 'B') {
-      const parsed = runPython('import json,sys\nfrom _consensus import parse_reviewer_reply\njson.dump(parse_reviewer_reply(sys.stdin.read()), sys.stdout)\n', payload.reply);
-      const verdict = parsed.ok ? JSON.parse(parsed.stdout) as { verdict: string; reason: string } : { verdict: 'uncertain', reason: 'reply was not checked' };
-      gemini = {
-        raw_reply: payload.reply,
-        verdict: verdict.verdict,
-        reason: verdict.reason,
-        reviewed_report_sha256: input.reportSha,
-        reviewed_input_sha256: input.inputSha,
-        model: call.model,
-        reviewed_at: acted,
-      };
-    }
+    const parsed = runPython('import json,sys\nfrom _consensus import parse_reviewer_reply\njson.dump(parse_reviewer_reply(sys.stdin.read()), sys.stdout)\n', payload.reply);
+    const verdict = parsed.ok ? JSON.parse(parsed.stdout) as { verdict?: string; outcome?: string; reason: string } : { verdict: 'uncertain', outcome: 'abstained', reason: 'reply was not checked' };
+    const vote = {
+      raw_reply: payload.reply,
+      verdict: verdict.verdict,
+      outcome: verdict.outcome,
+      reason: verdict.reason,
+      reviewed_report_sha256: input.reportSha,
+      reviewed_input_sha256: input.inputSha,
+      model: call.model,
+      reviewed_at: acted,
+    };
+    seats.push({ reviewer, configured: true, vote });
+    if (call.id === 'B') gemini = vote;
   }));
-  return { gemini, answers, envFlags: flags, called: calls.map((call) => call.id) };
+  seats.sort((a, b) => a.reviewer.localeCompare(b.reviewer));
+  return { gemini, answers, envFlags: flags, called: calls.map((call) => call.id), seats };
 }

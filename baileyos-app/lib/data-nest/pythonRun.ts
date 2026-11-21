@@ -48,7 +48,7 @@ import json, sys
 from _validate_corridor import seal_live
 from _ruling import attach_feed_fingerprints
 d = json.load(sys.stdin)
-fresh = attach_feed_fingerprints(d.get("freshness") or {}, d.get("payloads") or {})
+fresh = attach_feed_fingerprints(d.get("freshness") or {}, d.get("payloads") or {}, d.get("code_sha"))
 json.dump(seal_live(d.get("cell") or {}, fresh), sys.stdout)
 `;
 
@@ -56,7 +56,7 @@ export const CONVENE_CODE = `
 import json, sys
 from _consensus import convene
 d = json.load(sys.stdin)
-json.dump(convene(d.get("report_canonical_json"), d.get("report_sha256"), d.get("gemini"), d.get("kimi"), input_canonical_json=d.get("input_canonical_json"), payloads=d.get("payloads")), sys.stdout)
+json.dump(convene(d.get("report_canonical_json"), d.get("report_sha256"), d.get("gemini"), d.get("kimi"), input_canonical_json=d.get("input_canonical_json"), payloads=d.get("payloads"), ai_seats=d.get("ai_seats")), sys.stdout)
 `;
 
 export const RECORD_CODE = `
