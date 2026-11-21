@@ -36,4 +36,26 @@ test('the Landing Stone page starts pending and the two copies match', () => {
   assert.match(repo, /Chain Integrity/);
   assert.match(repo, /id="lock">PENDING/);
   assert.match(repo, /\/api\/data-nest\/continuity/);
+  assert.match(repo, /\/landing-stone\/prototype/);
+});
+
+test('the prototype gathers the live record and does not invent a clearance', () => {
+  const repo = fs.readFileSync(path.join(root, 'landing-stone/prototype/index.html'), 'utf8');
+  const served = fs.readFileSync(path.join(app, 'public/landing-stone/prototype.html'), 'utf8');
+  assert.equal(repo, served);
+  assert.match(repo, /The lights inform\. The steward decides\./);
+  assert.match(repo, /Every fold carries the fingerprint of the one before it\. Reality remembers\./);
+  assert.match(repo, /Personal context stays on this device/);
+  assert.match(repo, /\/landing-stone/);
+  assert.match(repo, /\/data-nest/);
+  assert.match(repo, /\/api\/data-nest\/continuity/);
+  assert.match(repo, /\/api\/landing-stone\/slots/);
+  assert.match(repo, /\/api\/data-nest\/validate/);
+  assert.match(repo, /National Weather Service/);
+  assert.match(repo, /USGS/);
+  assert.match(repo, /CoTrip/);
+  assert.match(repo, /QUORUM INCOMPLETE/);
+  assert.equal(repo.toLowerCase().includes('proof'), false);
+  assert.equal(/\bSAFE\b/.test(repo), false);
+  assert.match(served, /not an all-clear/);
 });
