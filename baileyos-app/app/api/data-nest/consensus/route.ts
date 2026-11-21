@@ -25,13 +25,12 @@ export async function POST(req: Request) {
   const inputSha = typeof body.input_sha256 === 'string' ? body.input_sha256 : '';
   const asked = reportText && reportSha
     ? await askConfiguredVoters({ report: reportText, reportSha, inputSha, req })
-    : { gemini: null, answers: {}, envFlags: {}, called: [] as string[] };
+    : { gemini: null, answers: {}, envFlags: {}, called: [] as string[], seats: [] as { reviewer: string; configured: true; vote: unknown }[] };
   const queen = runPythonJson(CONVENE_CODE, {
     report_canonical_json: body.report_canonical_json,
     report_sha256: body.report_sha256,
     input_canonical_json: body.input_canonical_json,
-    gemini: asked.gemini,
-    kimi: null,
+    ai_seats: asked.seats,
     payloads: body.payloads ?? null,
   });
   if (!queen.ok) return Response.json({ error: queen.error, code: 'python_unavailable' }, { status: 503 });

@@ -2,7 +2,7 @@
 
 A Queen ruling can be sealed as a decision record. The seal shows the record was not altered after sealing. It does not show the decision was correct or that the data was accurate.
 
-Say "tamper-evident decision records." Do not say the seal is proof, tamper-proof, or verified true.
+Say "tamper-evident decision records." Do not say the seal is proof, tamper-proof, or verified true. The lights inform. The steward decides.
 
 ## What is in the chain
 
@@ -19,7 +19,7 @@ For 1.1 the chain formula is:
 `R_n = H(canonical{ruling_n, F, R_prev})`
 
 - `ruling_n` holds the Queen view, the verdicts and their `verdict_sha256`, dissent, missing voter names, freshness, the sanity result, the sequence number, and the note.
-- `F` holds `feed_sha256`, `input_sha256`, and `report_sha256`. Those three fingerprints stay. `feed_sha256` is still id, title, agency, times, and kind — not coordinates.
+- `F` holds `feed_sha256`, `input_sha256`, and `report_sha256`. Schema 1.2 also holds `feed_evidence`: a SHA-256 of the canonical raw payload, plus the HTTP status, fetch time, and code version. The raw payload is not stored. Coordinates stay out of the record.
 - `R_prev` is `prev_record_sha256`, the previous record's `record_sha256`.
 - `record_sha256` is `R_n`.
 
@@ -43,7 +43,7 @@ Personal constraints are not in the row. A hard constraint (mobility, medical, o
 
 The ruling names stay `NO_RULING`, `DISSENT`, `UNRESOLVED`, `CONSENSUS`, `PROVISIONAL`, and `PENDING`. No new name was added.
 
-`CONSENSUS (2 of 3)` is a warning, not a clearance. `CONSENSUS (3 of 3)` can be a clearance only when there is no unresolved dissent and no failed hard check. The Python validator is one voter. It fails by deterministic checks. A model agree does not override a failed check. FeasibleFacts is computed by that plain code, not by the voters. FBI crime data is never a feasibility fact.
+A clear label needs 3 configured AI seats that actually respond. One or two seats, even if they agree with each other, is `QUORUM INCOMPLETE` and the Consensus light stays amber. It is never green. `CONDITIONS SATISFIED` means those 3 seats approved and no deterministic veto is triggered. `NO ACTIVE VETO` means the checks that ran did not veto. Neither label tells anyone to go. The Python validator is one voter. It fails by deterministic checks, recorded as `rule_id`, `feed_status`, and `veto_triggered`. A model agree does not override a failed check. FeasibleFacts is computed by that plain code, not by the voters. FBI crime data is never a feasibility fact. Voter outcomes are `approved`, `denied`, `abstained`, `vetoed`, and `deferred`. A missing key stays `not configured` and does not vote.
 
 A missing feed, or a feed that answered and was empty, is `PENDING`. That is not a statement that there are no hazards.
 

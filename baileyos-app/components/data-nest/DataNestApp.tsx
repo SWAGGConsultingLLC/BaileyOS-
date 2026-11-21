@@ -29,7 +29,7 @@ import {
 } from '@/lib/data-nest/profile';
 import { coarsen, shouldAcceptFix } from '@/lib/data-nest/geo';
 import { chatEnabled, nextAutoMode, type NestMode } from '@/lib/data-nest/mode';
-import { feedPayloads, type FeedRow, type LiveItem, type NeedsSetup } from '@/lib/data-nest/liveFeeds';
+import { type FeedRow, type LiveItem, type NeedsSetup } from '@/lib/data-nest/liveFeeds';
 import { Swarm } from './Swarm';
 import { Radar } from './Radar';
 
@@ -289,7 +289,6 @@ export function DataNestApp() {
       input_sha256: seal.input_sha256,
       input_canonical_json: seal.input_canonical_json,
       report: seal.report,
-      payloads: feedPayloads(items),
       cell: here,
     });
     setBusy(null);

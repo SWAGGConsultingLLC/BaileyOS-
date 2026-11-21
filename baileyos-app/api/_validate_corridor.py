@@ -159,11 +159,31 @@ def _source_row(key: str, cfg: dict, raw, now: datetime) -> dict:
     if age < -120:
         base["detail"] = "fetch time is in the future"
         return base
+    if isinstance(raw.get("http_status"), int) and not isinstance(raw.get("http_status"), bool):
+        base["http_status"] = raw.get("http_status")
+    if isinstance(raw.get("schema_status"), str):
+        base["schema_status"] = raw.get("schema_status")
+    if isinstance(raw.get("code_sha"), str):
+        base["code_sha"] = raw.get("code_sha")[:64]
+    if isinstance(raw.get("evidence_sha256"), str):
+        base["evidence_sha256"] = raw.get("evidence_sha256")
     if age > max_age:
         base["detail"] = f"stale: fetched {age}s ago, max {int(max_age)}s"
         return base
     if not isinstance(count, int) or isinstance(count, bool) or count < 0:
         base["detail"] = "record_count missing"
+        return base
+    if raw.get("schema_status") == "degraded":
+        base["status"] = "degraded"
+        base["detail"] = "HTTP 200 with an unexpected payload shape"
+        return base
+    if count > 0 and source_at is None:
+        base["status"] = "degraded"
+        base["detail"] = "the feed did not include its own updated time"
+        return base
+    if source_at is not None and source_age is not None and source_age > max_age:
+        base["status"] = "degraded"
+        base["detail"] = f"degraded: the feed's own timestamp is {source_age}s old, max {int(max_age)}s"
         return base
     if count == 0:
         base["status"] = "warn"
@@ -189,14 +209,21 @@ def evaluate_freshness(raw, now: datetime) -> dict:
     for key, cfg in limits.items():
         src = table.get(key)
         row = _source_row(key, cfg, src, now)
-        fp = src.get("payload_sha256") if isinstance(src, dict) else None
-        if isinstance(fp, str) and len(fp) == 64 and all(ch in "0123456789abcdef" for ch in fp):
-            row["payload_sha256"] = fp
+        if isinstance(src, dict):
+            fp = src.get("payload_sha256")
+            if isinstance(fp, str) and len(fp) == 64 and all(ch in "0123456789abcdef" for ch in fp):
+                row["payload_sha256"] = fp
+            for key in ("http_status", "schema_status", "code_sha", "evidence_sha256"):
+                if src.get(key) is not None and key not in row:
+                    row[key] = src.get(key)
         sources.append(row)
     failed = [s["id"] for s in sources if s["status"] == "fail"]
+    degraded = [s["id"] for s in sources if s["status"] == "degraded"]
     warned = [s["id"] for s in sources if s["status"] == "warn"]
     if failed:
         status, detail = False, "stale, failed, or not configured: " + ", ".join(failed)
+    elif degraded:
+        status, detail = "WARN", "degraded: " + ", ".join(degraded)
     elif warned:
         status, detail = "WARN", "fresh but empty: " + ", ".join(warned)
     else:
@@ -204,7 +231,7 @@ def evaluate_freshness(raw, now: datetime) -> dict:
     return {
         "limits": limits,
         "sources": sources,
-        "blocks_consensus": bool(failed),
+        "blocks_consensus": bool(failed or degraded),
         "check_status": status,
         "detail": detail,
     }

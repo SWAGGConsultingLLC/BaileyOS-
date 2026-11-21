@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tamper-evident decision record  (schema_version 1.1, verify still accepts 1.0)
+Tamper-evident decision record  (schema_version 1.2, verify still accepts 1.1 and 1.0)
 
 The seal shows the record was not altered after sealing.
 It does not show the decision was correct or that the data was accurate.
@@ -20,13 +20,14 @@ reads a birth year, a self-identified label, or a home region.
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
 
 from _consensus import canonical_json, sha256_hex
 from _slots import answers_from_queen, voter_roster
 
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "1.2"
 CHAIN_EPOCH = 1
 CHAIN_FORMULA = "R_n = H(canonical{ruling_n, F, R_prev})"
 RECORD_KIND = "baileyos.ruling_record"
@@ -66,8 +67,38 @@ def banned_keys(record) -> list:
     return found
 
 
+def code_version() -> str:
+    """Git sha of this build when the host provides one. Never invent a sha."""
+    for name in ("VERCEL_GIT_COMMIT_SHA", "BAILEYOS_CODE_SHA"):
+        raw = os.environ.get(name) or ""
+        sha = raw.strip().lower()
+        if len(sha) >= 7 and all(ch in "0123456789abcdef" for ch in sha):
+            return sha[:40]
+    return "unknown"
+
+
+def feed_payload_sha256(payload) -> str:
+    """SHA-256 of the canonical JSON of the raw feed payload. The payload itself is not stored."""
+    return sha256_hex(canonical_json(payload if payload is not None else []))
+
+
+def feed_evidence(payload, http_status, fetched_at, code_sha) -> dict:
+    """Digest of the raw payload, bound to the HTTP status, fetch time, and code version."""
+    status = http_status if isinstance(http_status, int) and not isinstance(http_status, bool) else None
+    fetched = fetched_at if isinstance(fetched_at, str) else None
+    code = code_sha if isinstance(code_sha, str) and code_sha else code_version()
+    body = {
+        "code_sha": code[:64],
+        "fetched_at": fetched,
+        "http_status": status,
+        "payload_sha256": feed_payload_sha256(payload),
+    }
+    body["evidence_sha256"] = sha256_hex(canonical_json(body))
+    return body
+
+
 def feed_fingerprint(items) -> str:
-    """Hash of a feed payload. Coordinates are not part of the fingerprint."""
+    """Older slim hash. Coordinates are not part of this fingerprint. New seals use feed_payload_sha256."""
     slim = []
     for item in items if isinstance(items, list) else []:
         if not isinstance(item, dict):
@@ -84,20 +115,25 @@ def feed_fingerprint(items) -> str:
     return sha256_hex(canonical_json(slim))
 
 
-def attach_feed_fingerprints(freshness, payloads) -> dict:
+def attach_feed_fingerprints(freshness, payloads, code_sha=None) -> dict:
     table = dict(freshness) if isinstance(freshness, dict) else {}
     payloads = payloads if isinstance(payloads, dict) else {}
+    code = code_sha if isinstance(code_sha, str) and code_sha else code_version()
     out = {}
     for key, row in table.items():
         copied = dict(row) if isinstance(row, dict) else {"available": False, "record_count": 0}
+        copied["code_sha"] = code
         if key in payloads:
-            copied["payload_sha256"] = feed_fingerprint(payloads.get(key))
+            evidence = feed_evidence(payloads.get(key), copied.get("http_status"), copied.get("fetched_at"), code)
+            copied["payload_sha256"] = evidence["payload_sha256"]
+            copied["evidence_sha256"] = evidence["evidence_sha256"]
+            copied["code_sha"] = evidence["code_sha"]
         out[key] = copied
     return out
 
 
-def _verdict(reviewer: str, verdict: str, reason: str) -> dict:
-    body = {"reason": (reason or "")[:500], "reviewer": reviewer, "verdict": verdict}
+def _verdict(reviewer: str, verdict: str, reason: str, outcome: str = "deferred") -> dict:
+    body = {"outcome": outcome, "reason": (reason or "")[:500], "reviewer": reviewer, "verdict": verdict}
     body["verdict_sha256"] = sha256_hex(canonical_json({k: v for k, v in body.items() if k != "verdict_sha256"}))
     return body
 
@@ -116,8 +152,12 @@ def _freshness_view(report: dict) -> dict:
             "fetched_at": src.get("fetched_at"),
             "id": src.get("id"),
             "max_age_seconds": src.get("max_age_seconds"),
+            "code_sha": src.get("code_sha"),
+            "evidence_sha256": src.get("evidence_sha256"),
+            "http_status": src.get("http_status"),
             "payload_sha256": src.get("payload_sha256"),
             "record_count": src.get("record_count"),
+            "schema_status": src.get("schema_status"),
             "source_age_seconds": src.get("source_age_seconds"),
             "source_timestamp": src.get("source_timestamp"),
             "status": src.get("status"),
@@ -126,34 +166,41 @@ def _freshness_view(report: dict) -> dict:
 
 
 def chain_preimage(record: dict) -> dict:
-    """The object whose canonical bytes are R_n. record_sha256 is not inside it."""
-    return {
-        "F": {
-            "feed_sha256": record.get("feed_sha256") or {},
-            "input_sha256": record.get("input_sha256"),
-            "report_sha256": record.get("report_sha256"),
-        },
-        "R_prev": record.get("prev_record_sha256"),
-        "ruling_n": {
-            "chain_epoch": record.get("chain_epoch"),
-            "chain_formula": CHAIN_FORMULA,
-            "created_at": record.get("created_at"),
-            "idempotency_key": record.get("idempotency_key"),
-            "dissent": record.get("dissent") or [],
-            "fingerprints_ok": record.get("fingerprints_ok"),
-            "freshness": record.get("freshness"),
-            "kind": record.get("kind"),
-            "missing_voters": record.get("missing_voters") or [],
-            "note": record.get("note"),
-            "queen": record.get("queen"),
-            "queen_sha256": record.get("queen_sha256"),
-            "sanity": record.get("sanity"),
-            "schema_version": record.get("schema_version"),
-            "sequence_number": record.get("sequence_number"),
-            "verdicts": record.get("verdicts"),
-            "voter_slots": record.get("voter_slots") or [],
-        },
+    """The object whose canonical bytes are R_n. record_sha256 is not inside it.
+
+    Schema 1.1 stays on the original keys so an older seal still recomputes.
+    Schema 1.2 adds the feed evidence bundle and the deterministic veto rows.
+    """
+    version = record.get("schema_version")
+    feed = {
+        "feed_sha256": record.get("feed_sha256") or {},
+        "input_sha256": record.get("input_sha256"),
+        "report_sha256": record.get("report_sha256"),
     }
+    ruling_n = {
+        "chain_epoch": record.get("chain_epoch"),
+        "chain_formula": CHAIN_FORMULA,
+        "created_at": record.get("created_at"),
+        "idempotency_key": record.get("idempotency_key"),
+        "dissent": record.get("dissent") or [],
+        "fingerprints_ok": record.get("fingerprints_ok"),
+        "freshness": record.get("freshness"),
+        "kind": record.get("kind"),
+        "missing_voters": record.get("missing_voters") or [],
+        "note": record.get("note"),
+        "queen": record.get("queen"),
+        "queen_sha256": record.get("queen_sha256"),
+        "sanity": record.get("sanity"),
+        "schema_version": record.get("schema_version"),
+        "sequence_number": record.get("sequence_number"),
+        "verdicts": record.get("verdicts"),
+        "voter_slots": record.get("voter_slots") or [],
+    }
+    if version == "1.2":
+        feed["feed_evidence"] = record.get("feed_evidence") or {}
+        ruling_n["code_vetoes"] = record.get("code_vetoes") if isinstance(record.get("code_vetoes"), list) else []
+        ruling_n["outcomes"] = record.get("outcomes") if isinstance(record.get("outcomes"), list) else []
+    return {"F": feed, "R_prev": record.get("prev_record_sha256"), "ruling_n": ruling_n}
 
 
 def _sanity_view(report: dict) -> dict:
@@ -199,7 +246,10 @@ def build_genesis_record(now: datetime | None = None) -> dict:
         "input_sha256": sha256_hex(canonical_json({"genesis": True, "part": "input"})),
         "report_sha256": sha256_hex(canonical_json({"genesis": True, "part": "report"})),
         "feed_sha256": {},
+        "feed_evidence": {},
         "verdicts": [],
+        "outcomes": [],
+        "code_vetoes": [],
         "dissent": [],
         "missing_voters": [],
         "freshness": {"blocks_consensus": False, "limits": {}, "sources": []},
@@ -217,23 +267,53 @@ def build_genesis_record(now: datetime | None = None) -> dict:
 def build_ruling_record(sealed: dict, queen: dict, prev_record_sha256=None, sequence_number=None, idempotency_key=None, env_flags=None, slot_answers=None, now: datetime | None = None) -> dict:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     report = sealed.get("report") if isinstance(sealed.get("report"), dict) else {}
-    verdicts = [_verdict("python", "agree", "Python produced this report and agrees with its own checks.")]
+    python_outcome = "vetoed" if queen.get("code_vetoes") else "approved"
+    verdicts = [_verdict("python", "agree" if python_outcome == "approved" else "vetoed", "Python produced this report. A failed check is a veto.", python_outcome)]
     for vote in queen.get("votes") or []:
         if not isinstance(vote, dict):
             continue
         state = vote.get("state")
+        outcome = vote.get("outcome") if vote.get("outcome") in ("approved", "denied", "abstained", "vetoed", "deferred") else "deferred"
         if state == "pending":
-            verdict = "pending"
+            verdict, outcome = "pending", "deferred"
         elif state == "unavailable":
-            verdict = "unavailable"
+            verdict, outcome = "unavailable", "deferred"
+        elif state == "deferred":
+            verdict, outcome = "deferred", "deferred"
         else:
             verdict = vote.get("verdict") if vote.get("verdict") in ("agree", "disagree", "uncertain") else "uncertain"
-        verdicts.append(_verdict(str(vote.get("reviewer") or "reviewer"), verdict, str(vote.get("reason") or "")))
+        verdicts.append(_verdict(str(vote.get("reviewer") or "reviewer"), verdict, str(vote.get("reason") or ""), outcome))
     feeds = {}
+    evidence = {}
     for src in _freshness_view(report)["sources"]:
         if _hex64(src.get("payload_sha256")):
             feeds[src["id"]] = src["payload_sha256"]
+            evidence[src["id"]] = {
+                "code_sha": src.get("code_sha") or "unknown",
+                "evidence_sha256": src.get("evidence_sha256"),
+                "fetched_at": src.get("fetched_at"),
+                "http_status": src.get("http_status"),
+                "payload_sha256": src.get("payload_sha256"),
+            }
+    code_vetoes = []
+    for row in queen.get("code_vetoes") or []:
+        if isinstance(row, dict) and row.get("veto_triggered") is True and isinstance(row.get("rule_id"), str):
+            code_vetoes.append({
+                "feed_id": str(row.get("feed_id") or "feed")[:80],
+                "feed_status": str(row.get("feed_status") or "fail")[:40],
+                "rule_id": str(row.get("rule_id"))[:40],
+                "veto_triggered": True,
+            })
+    outcomes = []
+    for row in queen.get("outcomes") or []:
+        if isinstance(row, dict) and isinstance(row.get("reviewer"), str):
+            outcome = row.get("outcome") if row.get("outcome") in ("approved", "denied", "abstained", "vetoed", "deferred") else "deferred"
+            outcomes.append({"outcome": outcome, "reviewer": row["reviewer"][:40]})
     queen_view = {
+        "active_veto": queen.get("active_veto") is True,
+        "ai_configured": queen.get("ai_configured") if isinstance(queen.get("ai_configured"), int) else None,
+        "ai_required": 3,
+        "ai_responding": queen.get("ai_responding") if isinstance(queen.get("ai_responding"), int) else None,
         "clearance": queen.get("clearance"),
         "convened_at": queen.get("convened_at"),
         "label": queen.get("label"),
@@ -263,7 +343,10 @@ def build_ruling_record(sealed: dict, queen: dict, prev_record_sha256=None, sequ
         "input_sha256": sealed.get("input_sha256"),
         "report_sha256": sealed.get("report_sha256"),
         "feed_sha256": feeds,
+        "feed_evidence": evidence,
         "verdicts": verdicts,
+        "outcomes": outcomes,
+        "code_vetoes": code_vetoes,
         "dissent": dissent,
         "missing_voters": missing,
         "freshness": _freshness_view(report),
@@ -311,7 +394,7 @@ def verify_ruling_record(record) -> dict:
     if version == "1.0":
         body = {k: v for k, v in record.items() if k != "record_sha256"}
         recomputed = sha256_hex(canonical_json(body))
-    elif version == "1.1":
+    elif version in ("1.1", "1.2"):
         recomputed = sha256_hex(canonical_json(chain_preimage(record)))
         seq = record.get("sequence_number")
         if not isinstance(seq, int) or isinstance(seq, bool) or seq < 1:
@@ -323,6 +406,18 @@ def verify_ruling_record(record) -> dict:
             problems.append("chain formula mismatch")
         if record.get("chain_epoch") != CHAIN_EPOCH:
             problems.append("chain epoch mismatch")
+        if version == "1.2":
+            vetoes = record.get("code_vetoes")
+            if not isinstance(vetoes, list):
+                problems.append("code_vetoes is missing")
+            else:
+                for veto in vetoes:
+                    if not isinstance(veto, dict) or veto.get("veto_triggered") is not True:
+                        problems.append("veto row is not a triggered veto")
+                    elif not isinstance(veto.get("rule_id"), str) or not isinstance(veto.get("feed_status"), str):
+                        problems.append("veto row is missing rule_id or feed_status")
+            if not isinstance(record.get("outcomes"), list):
+                problems.append("outcomes is missing")
     else:
         return {"ok": False, "problems": ["unknown schema_version"], "note": SEAL_NOTE, "record_sha256": None}
     if claimed != recomputed:
@@ -580,26 +675,47 @@ def continuity_lights(records, configured: bool = True, anchored_today: bool = F
         if not verify_ruling_record(record)["ok"]:
             continue
         recent.append(record)
-    consensus_count = sum(1 for record in recent if isinstance(record.get("queen"), dict) and record["queen"].get("ruling") == "CONSENSUS")
+    def quorum_short(record) -> bool:
+        queen = record.get("queen") if isinstance(record.get("queen"), dict) else {}
+        if queen.get("clearance") == "QUORUM INCOMPLETE":
+            return True
+        responding = queen.get("ai_responding")
+        configured = queen.get("ai_configured")
+        if isinstance(responding, int) and responding < 3:
+            return True
+        if isinstance(configured, int) and configured < 3:
+            return True
+        return False
+
     total = len(recent)
+    short = [record for record in recent if quorum_short(record)]
+    satisfied = [record for record in recent if isinstance(record.get("queen"), dict) and record["queen"].get("clearance") == "CONDITIONS SATISFIED"]
     if total == 0:
         consensus = _light("PENDING", "No rulings in the last 30 days.", consensus_count=0, total=0)
+    elif short:
+        consensus = _light(
+            "QUORUM INCOMPLETE",
+            "QUORUM INCOMPLETE — fewer than 3 AI seats are configured or responding. 1-of-1 and 2-of-2 do not meet the 3-seat rule. The lights inform. The steward decides.",
+            consensus_count=len(satisfied),
+            total=total,
+        )
+    elif len(satisfied) == total and total > 0:
+        consensus = _light(
+            "CONDITIONS SATISFIED",
+            f"CONDITIONS SATISFIED — {len(satisfied)} of {total} rulings had 3 AI approvals and no deterministic veto. The lights inform. The steward decides.",
+            consensus_count=len(satisfied),
+            total=total,
+        )
     else:
-        state = "GREEN" if consensus_count * 3 >= total * 2 else "RED"
-        labels = [record.get("queen", {}).get("label") for record in recent if isinstance(record.get("queen"), dict) and record["queen"].get("ruling") == "CONSENSUS"]
-        if labels and all(label == "CONSENSUS (2 of 3)" for label in labels):
-            line = f"{consensus_count} of {total} CONSENSUS (2 of 3) over 30 days."
-        elif labels and all(label == "CONSENSUS (3 of 3)" for label in labels):
-            line = f"{consensus_count} of {total} CONSENSUS (3 of 3) over 30 days."
-        else:
-            line = f"{consensus_count} of {total} CONSENSUS over 30 days."
-        consensus = _light(state, line, consensus_count=consensus_count, total=total)
+        consensus = _light("PENDING", f"{len(satisfied)} of {total} rulings are satisfied. The lights inform. The steward decides.", consensus_count=len(satisfied), total=total)
 
     def feed_bad(record) -> str | None:
         fresh = record.get("freshness") if isinstance(record.get("freshness"), dict) else {}
         if fresh.get("blocks_consensus") is True:
             return "stale"
         for src in fresh.get("sources") or []:
+            if isinstance(src, dict) and src.get("status") == "degraded":
+                return "degraded"
             if isinstance(src, dict) and src.get("status") == "fail":
                 return "stale"
         sanity = record.get("sanity") if isinstance(record.get("sanity"), dict) else {"status": "ABSENT"}
@@ -617,10 +733,12 @@ def continuity_lights(records, configured: bool = True, anchored_today: bool = F
         marks = [feed_bad(record) for record in recent]
         if any(mark in ("stale", "sanity", "fingerprint") for mark in marks):
             feed = _light("RED", "A ruling in the last 30 days has a feed that is stale, failed, or outside the sanity ranges.")
+        elif any(mark == "degraded" for mark in marks):
+            feed = _light("DEGRADED", "A feed's own timestamp is stale, or a 200 response did not have the expected shape. This is not healthy.")
         elif any(mark == "absent" for mark in marks):
             feed = _light("PENDING", "A recent ruling has no value sanity check.")
         else:
-            feed = _light("GREEN", "Recent rulings were fresh and inside the sanity ranges.")
+            feed = _light("NO ACTIVE VETO", "NO ACTIVE VETO — recent feed checks did not trigger a deterministic veto. The steward decides.")
 
     gap = any("sequence numbers are not contiguous" in str(item) for item in chain["problems"])
     if not records:
@@ -634,7 +752,7 @@ def continuity_lights(records, configured: bool = True, anchored_today: bool = F
     else:
         chain_light = _light("RED", "A record seal does not recompute.")
 
-    ready = consensus["state"] == "GREEN" and feed["state"] == "GREEN" and chain_light["state"] == "RECORD INTACT"
+    ready = consensus["state"] == "CONDITIONS SATISFIED" and feed["state"] == "NO ACTIVE VETO" and chain_light["state"] == "RECORD INTACT"
     if ready and independent_anchor:
         lock = "ANCHORED"
         lock_line = "ANCHORED — an independent witness has today's head. This does not say the road is safe."
@@ -649,9 +767,9 @@ def continuity_lights(records, configured: bool = True, anchored_today: bool = F
     if recent:
         latest = recent[-1]
         queen = latest.get("queen") if isinstance(latest.get("queen"), dict) else {}
-        if queen.get("clearance") == "NOT_SAFE" or queen.get("ruling") in ("DISSENT", "PROVISIONAL", "UNRESOLVED"):
+        if queen.get("active_veto") is True or queen.get("ruling") in ("DISSENT", "PROVISIONAL", "UNRESOLVED"):
             notice = hazard_notice("HAZARD")
-        elif queen.get("clearance") == "PENDING":
+        elif queen.get("clearance") in ("PENDING", "QUORUM INCOMPLETE"):
             notice = hazard_notice("NO_SAFE_PLAN")
 
     return {
