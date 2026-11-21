@@ -398,6 +398,7 @@ export function DataNestApp() {
         <footer className="mt-8 space-y-2 text-sm">
           <button type="button" className="inline-flex min-h-11 items-center text-cyan-200 underline" aria-expanded={showPrivacy} onClick={() => setShowPrivacy(value => !value)}>Privacy details</button>
           {showPrivacy && <p className="leading-6 text-slate-300">Precise location stays on this device and is not shown publicly. Feed requests send a coarsened area (2 decimal degrees, about 1 km) and the server does not store that point. If the ruling-request table exists, the link between your account and a decision record, including that coarsened area, is kept at most 28 days. Birth year, a self-identified label, and home region stay on this phone and are not sent.</p>}
+          <p><a className="inline-flex min-h-11 items-center text-cyan-200 underline" href="/data-nest/mine">Your nest</a></p>
           <p><a className="inline-flex min-h-11 items-center text-cyan-200 underline" href="/data-nest/verify">Check a decision record</a></p>
         </footer>
       </main>
@@ -526,6 +527,7 @@ export function DataNestApp() {
       {note && <p className="mt-3 text-sm text-slate-200" role="status">{note}</p>}
       <section className="mt-4 rounded-3xl border border-slate-800 p-3 text-sm leading-6 text-slate-400">
         <p>Precise location stays on this device and is not shown publicly. Feed requests send a coarsened area (2 decimal degrees, about 1 km) and the server does not store that point. If the ruling-request table exists, the link between your account and a decision record, including that coarsened area, is kept at most 28 days.</p>
+        <p className="mt-2"><a className="text-cyan-300 underline" href="/data-nest/mine">Your nest</a></p>
         <button type="button" className="mt-2 min-h-12 w-full rounded-2xl border border-slate-600" onClick={wipe}>Delete my data</button>
         <p className="mt-2">A sealed decision record shows it was not altered after sealing. It does not show the decision was correct or that the data was accurate. <a className="text-cyan-300 underline" href="/data-nest/verify">Check a record</a></p>
       </section>

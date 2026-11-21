@@ -1,5 +1,7 @@
 import { clientIp, handleOracle } from '@/lib/oracle';
 import { runPython } from '@/lib/data-nest/pythonRun';
+import { chooseSeatBrief, type StoredReading } from '@/lib/data-nest/nestPull';
+import { loadUserReadings } from '@/lib/data-nest/nestStore';
 import { loadSlotConfig, type SlotConfig } from '@/lib/landing-stone/slots';
 
 const SYSTEM = 'You review a BaileyOS live-feed report. Reply with JSON only: {"outcome":"approved"|"denied"|"abstained"|"deferred","reason":"one or two sentences"}. approved means the report is a faithful result of its checks, even when the overall result is FAIL or WARN. denied means it is not. abstained means you will not take a side. deferred means you cannot tell yet. Do not invent alerts, road conditions, or a precise location.';
@@ -59,6 +61,8 @@ export async function askConfiguredVoters(input: {
   reportSha: string;
   inputSha: string;
   req: Request;
+  userId?: string;
+  readReadings?: (userId: string) => Promise<StoredReading[]>;
 }): Promise<{ gemini: unknown; answers: Record<string, string>; envFlags: Record<string, boolean>; called: string[]; seats: AiSeat[] }> {
   const slots = registrySlots();
   const calls = votersToCall(slots, process.env);
@@ -66,7 +70,18 @@ export async function askConfiguredVoters(input: {
   const answers: Record<string, string> = {};
   const seats: AiSeat[] = [];
   let gemini: unknown = null;
-  const brief = input.report.slice(0, 3500);
+  let readings: StoredReading[] | 'unread' | null = null;
+  if (input.userId) {
+    try {
+      readings = await (input.readReadings ?? loadUserReadings)(input.userId);
+    } catch {
+      readings = 'unread';
+    }
+  }
+  const brief = chooseSeatBrief(input.report, readings);
+  const intro = readings
+    ? 'The following is this nest\'s stored readings, not a live report string.'
+    : '';
   await Promise.all(calls.map(async (call) => {
     const upstream = await handleOracle(new Request('https://baileyos-app.vercel.app/api/oracle', {
       method: 'POST',
@@ -77,7 +92,7 @@ export async function askConfiguredVoters(input: {
         system: SYSTEM,
         messages: [{
           role: 'user',
-          content: `Report sha256 ${input.reportSha}. Input sha256 ${input.inputSha}.\n${brief}\nReply with the JSON outcome only.`,
+          content: `Report sha256 ${input.reportSha}. Input sha256 ${input.inputSha}.\n${intro ? `${intro}\n` : ''}${brief}\nReply with the JSON outcome only.`,
         }],
       }),
     }));
