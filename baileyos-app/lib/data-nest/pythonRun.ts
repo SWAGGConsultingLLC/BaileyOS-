@@ -56,19 +56,24 @@ export const CONVENE_CODE = `
 import json, sys
 from _consensus import convene
 d = json.load(sys.stdin)
-json.dump(convene(d.get("report_canonical_json"), d.get("report_sha256"), d.get("gemini"), d.get("kimi"), input_canonical_json=d.get("input_canonical_json")), sys.stdout)
+json.dump(convene(d.get("report_canonical_json"), d.get("report_sha256"), d.get("gemini"), d.get("kimi"), input_canonical_json=d.get("input_canonical_json"), payloads=d.get("payloads")), sys.stdout)
 `;
 
 export const RECORD_CODE = `
 import json, sys
 from datetime import datetime, timezone
-from _ruling import build_ruling_record, verify_ruling_record, daily_anchor
+from _ruling import build_genesis_record, build_ruling_record, continuity_lights, verify_ruling_record, daily_anchor
 d = json.load(sys.stdin)
-if d.get("op") == "verify":
+op = d.get("op")
+if op == "verify":
     json.dump(verify_ruling_record(d.get("record")), sys.stdout)
-elif d.get("op") == "anchor":
+elif op == "anchor":
     json.dump(daily_anchor(d.get("day"), d.get("head_sha256"), d.get("record_count") or 0), sys.stdout)
+elif op == "genesis":
+    json.dump(build_genesis_record(), sys.stdout)
+elif op == "lights":
+    json.dump(continuity_lights(d.get("records") or [], configured=bool(d.get("configured")), anchored_today=False, error=d.get("error")), sys.stdout)
 else:
     now = datetime.now(timezone.utc)
-    json.dump(build_ruling_record(d["sealed"], d["queen"], prev_record_sha256=d.get("prev"), now=now), sys.stdout)
+    json.dump(build_ruling_record(d["sealed"], d["queen"], prev_record_sha256=d.get("prev"), sequence_number=d.get("sequence"), now=now), sys.stdout)
 `;

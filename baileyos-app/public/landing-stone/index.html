@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>#landingstone — Operation Red Robin</title>
+<meta name="description" content="Landing Stone continuity module for operation Red Robin. Separated from Signal Finder.">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#000;
+  color:#C9943A;
+  font-family:'Space Mono', monospace;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:2rem 1.25rem;
+}
+.header { text-align:center; margin-bottom:2rem; }
+.header h1 { font-size:1.4rem; letter-spacing:4px; margin-bottom:0.5rem; font-weight:700; }
+.header .sub { font-size:0.7rem; letter-spacing:2px; opacity:0.7; }
+.status {
+  background:rgba(201,148,58,0.1);
+  border:1px solid rgba(201,148,58,0.4);
+  padding:1.5rem 1.75rem;
+  border-radius:4px;
+  text-align:center;
+  width:100%;
+  max-width:34rem;
+}
+.status .kicker { font-size:0.75rem; letter-spacing:1.5px; opacity:0.85; }
+.status .lock { color:#C9943A; font-weight:700; letter-spacing:2px; margin:0.5rem 0; font-size:1.35rem; }
+.status .lock.lock-ANCHORED { color:#0c8; }
+.compass { font-size:3rem; margin:1.25rem 0 1rem; line-height:1; }
+.lights { text-align:left; width:100%; display:flex; flex-direction:column; gap:0.9rem; }
+.light { border-top:1px solid rgba(201,148,58,0.28); padding-top:0.7rem; }
+.light-name { font-size:0.68rem; letter-spacing:0.12em; opacity:0.8; }
+.light-state { margin-top:0.2rem; font-size:1rem; font-weight:700; letter-spacing:0.14em; }
+.light-state.state-GREEN { color:#0c8; }
+.light-state.state-RED { color:#ff8f8f; }
+.light-state.state-PENDING { color:#C9943A; }
+.light-line { margin-top:0.25rem; font-size:0.78rem; line-height:1.45; color:#f2e2c4; }
+.meta { margin-top:1rem; text-align:left; font-size:0.68rem; line-height:1.5; color:#f2e2c4; word-break:break-all; }
+.footer { margin-top:2rem; font-size:0.65rem; opacity:0.5; letter-spacing:1px; text-align:center; }
+a { color:#C9943A; text-decoration:none; }
+a:hover { text-decoration:underline; }
+.home {
+  position:fixed;
+  top:0.5rem;
+  left:0.5rem;
+  z-index:5;
+  display:inline-flex;
+  align-items:center;
+  min-height:44px;
+  min-width:44px;
+  padding:0.45rem 0.65rem;
+  font-size:0.7rem;
+  letter-spacing:1px;
+}
+.home:focus-visible { outline:2px solid #C9943A; outline-offset:3px; }
+.sim-entry { width:100%; max-width:34rem; margin-top:1.25rem; }
+.sim-entry a {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:44px;
+  padding:0.65rem 0.9rem;
+  border:1px solid rgba(201,148,58,0.4);
+  border-radius:4px;
+  letter-spacing:0.08em;
+  font-size:0.7rem;
+}
+.sim-entry a:focus-visible { outline:2px solid #C9943A; outline-offset:3px; }
+</style>
+</head>
+<body>
+<a class="home" href="../">Home</a>
+<div class="header">
+  <h1>#LANDINGSTONE</h1>
+  <div class="sub">OPERATION RED ROBIN · BAILEYOS Ω</div>
+</div>
+<div class="status" aria-live="polite">
+  <div class="kicker">CONTINUITY</div>
+  <div class="lock" id="lock">PENDING</div>
+  <p class="light-line" id="lock-line">PENDING — anchor not published</p>
+  <div class="compass" aria-hidden="true">◉</div>
+  <div class="lights">
+    <section class="light">
+      <div class="light-name">Consensus</div>
+      <div class="light-state state-PENDING" id="consensus-state">PENDING</div>
+      <p class="light-line" id="consensus-line">Waiting for the ruling log.</p>
+    </section>
+    <section class="light">
+      <div class="light-name">Feed Health</div>
+      <div class="light-state state-PENDING" id="feed-state">PENDING</div>
+      <p class="light-line" id="feed-line">Waiting for the ruling log.</p>
+    </section>
+    <section class="light">
+      <div class="light-name">Chain Integrity</div>
+      <div class="light-state state-PENDING" id="chain-state">PENDING</div>
+      <p class="light-line" id="chain-line">Waiting for the ruling log.</p>
+    </section>
+  </div>
+  <div class="meta">
+    <div>Head <span id="head">not available</span></div>
+    <div>Computed <span id="computed">not available</span></div>
+  </div>
+  <section id="notice" hidden>
+    <p class="light-line" id="notice-line"></p>
+    <p class="light-line" id="notice-sources"></p>
+  </section>
+</div>
+<nav class="sim-entry" aria-label="Landing Stone modules">
+  <a href="simulation/">Agent simulation</a>
+</nav>
+<div class="footer">
+  81 Canon · <a href="../canon/">Open the Bible</a> · $0.00<br>Separated from Signal Finder · <a href="https://signal-beacon-compass.lovable.app/" target="_blank" rel="noopener noreferrer">Open general Signal Finder</a>
+</div>
+<script>
+(function () {
+  var states = { GREEN: 'state-GREEN', RED: 'state-RED', PENDING: 'state-PENDING', 'RECORD INTACT': 'state-GREEN' };
+  function text(id, value) {
+    var node = document.getElementById(id);
+    if (node) node.textContent = value;
+  }
+  function paint(id, state) {
+    var node = document.getElementById(id);
+    if (!node) return;
+    var safe = states[state] ? state : 'PENDING';
+    node.textContent = safe;
+    node.className = 'light-state ' + states[safe];
+  }
+  function pending(reason) {
+    text('lock', 'PENDING');
+    document.getElementById('lock').className = 'lock lock-PENDING';
+    text('lock-line', 'PENDING — ' + reason);
+    ['consensus', 'feed', 'chain'].forEach(function (name) {
+      paint(name + '-state', 'PENDING');
+      text(name + '-line', reason);
+    });
+    text('head', 'not available');
+    text('computed', 'not available');
+  }
+  function apply(data) {
+    if (!data || typeof data !== 'object') { pending('The ruling log could not be read.'); return; }
+    var lock = data.continuity_lock === 'ANCHORED' ? 'ANCHORED' : 'PENDING';
+    text('lock', lock);
+    document.getElementById('lock').className = 'lock lock-' + lock;
+    text('lock-line', typeof data.lock_line === 'string' ? data.lock_line : 'PENDING — an independent anchor is not published');
+    var consensus = data.consensus || {};
+    var feed = data.feed_health || {};
+    var chain = data.chain_integrity || {};
+    paint('consensus-state', consensus.state);
+    paint('feed-state', feed.state);
+    paint('chain-state', chain.state);
+    text('consensus-line', consensus.line || 'Waiting for the ruling log.');
+    text('feed-line', feed.line || 'Waiting for the ruling log.');
+    text('chain-line', chain.line || 'Waiting for the ruling log.');
+    text('head', typeof data.head_sha256 === 'string' ? data.head_sha256 : 'not available');
+    text('computed', typeof data.computed_at === 'string' ? data.computed_at : 'not available');
+    var notice = document.getElementById('notice');
+    if (data.notice && data.notice.advisory) {
+      notice.hidden = false;
+      text('notice-line', data.notice.advisory);
+      var sources = Array.isArray(data.notice.sources) ? data.notice.sources : [];
+      var box = document.getElementById('notice-sources');
+      box.textContent = '';
+      sources.forEach(function (source, index) {
+        var url = String(source.url || '');
+        if (!/^https:\/\//.test(url)) return;
+        if (index) box.appendChild(document.createTextNode(' · '));
+        var link = document.createElement('a');
+        link.href = url;
+        link.textContent = String(source.name || 'source');
+        box.appendChild(link);
+      });
+    } else {
+      notice.hidden = true;
+    }
+  }
+  fetch('/api/data-nest/continuity', { cache: 'no-store' })
+    .then(function (response) { if (!response.ok) throw new Error('unreachable'); return response.json(); })
+    .then(apply)
+    .catch(function () { pending('The ruling log could not be read.'); });
+})();
+</script>
+</body>
+</html>

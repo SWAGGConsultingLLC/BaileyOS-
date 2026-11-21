@@ -7,6 +7,8 @@ export default {
       '/api/data-nest/consensus': ['./api/**/*', './validation/freshness_limits.json', './vendor/python/**/*'],
       '/api/data-nest/verify': ['./api/**/*', './vendor/python/**/*'],
       '/api/data-nest/anchor': ['./api/**/*', './vendor/python/**/*'],
+      '/api/data-nest/continuity': ['./api/**/*', './vendor/python/**/*'],
+      '/landing-stone': ['./public/landing-stone/index.html'],
       '/api/data-nest/gemini': ['./api/**/*', './vendor/python/**/*'],
     },
   },

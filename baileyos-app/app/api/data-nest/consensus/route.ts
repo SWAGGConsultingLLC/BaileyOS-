@@ -1,6 +1,6 @@
 import { memberId } from '@/lib/data-nest/member';
 import { CONVENE_CODE, RECORD_CODE, runPythonJson } from '@/lib/data-nest/pythonRun';
-import { appendLinkage, appendRuling, latestRulingHash } from '@/lib/data-nest/rulings';
+import { appendLinkage, appendSequenced } from '@/lib/data-nest/rulings';
 import { allow } from '@/lib/rateLimit';
 import { coarsen, isCoarsened } from '@/lib/data-nest/geo';
 
@@ -25,29 +25,37 @@ export async function POST(req: Request) {
     input_canonical_json: body.input_canonical_json,
     gemini: body.gemini ?? null,
     kimi: body.kimi ?? null,
+    payloads: body.payloads ?? null,
   });
   if (!queen.ok) return Response.json({ error: queen.error, code: 'python_unavailable' }, { status: 503 });
-  const prev = await latestRulingHash();
-  const record = runPythonJson(RECORD_CODE, {
-    sealed: {
-      input_sha256: body.input_sha256,
-      report_sha256: body.report_sha256,
-      input_canonical_json: body.input_canonical_json,
-      report_canonical_json: body.report_canonical_json,
-      report: body.report,
-    },
-    queen: queen.data,
-    prev,
-  });
-  if (!record.ok) return Response.json({ queen: queen.data, record: null, stored: false, error: record.error }, { status: 200 });
-  const saved = await appendRuling(record.data as { record_sha256?: string; prev_record_sha256?: string | null; created_at?: string; queen?: { ruling?: string } });
-  const hash = (record.data as { record_sha256?: string }).record_sha256;
+  const sealed = {
+    input_sha256: body.input_sha256,
+    report_sha256: body.report_sha256,
+    input_canonical_json: body.input_canonical_json,
+    report_canonical_json: body.report_canonical_json,
+    report: body.report,
+  };
+  const asRecord = (value: { ok: true; data: unknown } | { ok: false; error: string }) => {
+    if (!value.ok) return value;
+    return { ok: true as const, data: value.data as { record_sha256?: string; prev_record_sha256?: string | null; sequence_number?: number; created_at?: string; queen?: { ruling?: string } } };
+  };
+  const saved = await appendSequenced(
+    (prev, sequence) => asRecord(runPythonJson(RECORD_CODE, { sealed, queen: queen.data, prev, sequence })),
+    () => asRecord(runPythonJson(RECORD_CODE, { op: 'genesis' })),
+  );
+  const fallback = saved.record ? null : asRecord(runPythonJson(RECORD_CODE, { sealed, queen: queen.data, prev: null, sequence: 1 }));
+  const recordData = saved.record ?? (fallback && fallback.ok ? fallback.data as { record_sha256?: string } : null);
+  if (!recordData) {
+    const error = fallback && !fallback.ok ? fallback.error : saved.reason;
+    return Response.json({ queen: queen.data, record: null, stored: false, error }, { status: 200 });
+  }
+  const hash = recordData.record_sha256;
   if (saved.stored && hash && cell) await appendLinkage({ userId: member.id, recordSha: hash, lat: cell.lat, lon: cell.lon });
   return Response.json({
     runtime: 'cpython',
     acted_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
     queen: queen.data,
-    record: record.data,
+    record: recordData,
     stored: saved.stored,
     store_reason: saved.reason || null,
   }, { headers: { 'Cache-Control': 'no-store' } });
