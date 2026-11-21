@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Landing Stone prototype</title>
+<meta name="description" content="One page for the live Landing Stone record. The lights inform. The steward decides.">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #05080f;
+  color: #f2e2c4;
+  font-family: Georgia, "Iowan Old Style", serif;
+  line-height: 1.5;
+  padding: 1.25rem 1rem 3rem;
+}
+main { max-width: 40rem; margin: 0 auto; }
+h1 { font-size: 1.8rem; letter-spacing: 0.04em; color: #fff; }
+h2 { font-size: 1.15rem; margin-bottom: 0.45rem; color: #C9943A; letter-spacing: 0.06em; }
+p, li { font-size: 1.05rem; }
+a { color: #9ad7ff; }
+a:focus-visible, button:focus-visible { outline: 2px solid #C9943A; outline-offset: 3px; }
+.nav, .card { margin-top: 1.25rem; }
+.nav a, button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0.25rem 0.5rem 0.25rem 0;
+}
+button {
+  background: transparent;
+  color: #f2e2c4;
+  border: 1px solid rgba(201, 148, 58, 0.7);
+  border-radius: 4px;
+  padding: 0.4rem 0.8rem;
+  font: inherit;
+  cursor: pointer;
+}
+.card {
+  border-top: 1px solid rgba(201, 148, 58, 0.35);
+  padding-top: 0.9rem;
+}
+.kicker { font-family: ui-monospace, monospace; font-size: 0.75rem; letter-spacing: 0.14em; color: #C9943A; }
+.fold, .steward { font-size: 1.2rem; color: #fff; }
+.hash, .row { font-family: ui-monospace, monospace; font-size: 0.82rem; word-break: break-word; margin-top: 0.35rem; }
+.row { padding: 0.65rem 0; border-bottom: 1px solid rgba(242, 226, 196, 0.12); }
+.state { font-weight: 700; letter-spacing: 0.04em; }
+.note { color: #d9c7a4; margin-top: 0.4rem; }
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">LANDING STONE · PROTOTYPE</p>
+  <h1>One page for the live record</h1>
+  <p class="note">This page reads the same public record as the other pages. It does not invent alerts, votes, or a witness.</p>
+  <nav class="nav" aria-label="Existing pages">
+    <a href="/landing-stone">Landing Stone lights</a>
+    <a href="/data-nest">Data Nest</a>
+    <a href="/data-nest/verify">Check a decision record</a>
+    <a href="/canon/">81 Canon</a>
+  </nav>
+
+  <section class="card">
+    <h2>Steward</h2>
+    <p class="steward">The lights inform. The steward decides.</p>
+  </section>
+
+  <section class="card">
+    <h2>81st fold</h2>
+    <p class="fold">Every fold carries the fingerprint of the one before it. Reality remembers.</p>
+  </section>
+
+  <section class="card">
+    <h2>Delta zero</h2>
+    <p>Personal context stays on this device. Birth year, home region, interests, and the exact point never leave the phone. They are not sent to the server or to an AI, and they are not written into the ruling record.</p>
+    <p class="note">Two people on the same trip can share the route and the public feeds. Each device keeps its own profile. The chain stores fingerprints of decisions and feeds, not the person.</p>
+  </section>
+
+  <section class="card" aria-live="polite">
+    <h2>Lights and the outside witness</h2>
+    <p id="lock" class="state">PENDING</p>
+    <p id="lock-line">Waiting for the ruling log.</p>
+    <div id="lights"></div>
+  </section>
+
+  <section class="card">
+    <h2>Hash chain</h2>
+    <p>The head is the latest tamper-evident decision record. A missing head means no record has been stored yet.</p>
+    <p class="hash" id="head">Head: not available</p>
+    <p class="hash" id="computed">Computed: not available</p>
+  </section>
+
+  <section class="card">
+    <h2>AI seats</h2>
+    <p class="note">A missing key is not configured and does not vote. Fewer than 3 responding seats is QUORUM INCOMPLETE.</p>
+    <div id="seats"><p>Waiting for the slot registry.</p></div>
+  </section>
+
+  <section class="card">
+    <h2>Live feeds</h2>
+    <p>National Weather Service, USGS earthquakes, and CDOT CoTrip. Health, freshness, and fingerprints come from the same check Data Nest uses. An empty feed is not an all-clear.</p>
+    <button type="button" id="load-feeds">Load feeds for my coarsened area</button>
+    <p class="note" id="feed-note">No feed has been requested yet. The exact point stays on this phone. Only a coarsened area is sent, and only after you press the button.</p>
+    <div id="feeds"></div>
+  </section>
+</main>
+<script>
+(function () {
+  var FEEDS = [
+    { id: 'nws_alerts', name: 'National Weather Service alerts' },
+    { id: 'nws_observation', name: 'NWS station observation' },
+    { id: 'usgs', name: 'USGS earthquakes' },
+    { id: 'cdot', name: 'CDOT CoTrip' }
+  ];
+
+  function text(id, value) {
+    var node = document.getElementById(id);
+    if (node) node.textContent = value;
+  }
+
+  function line(label, value) {
+    var p = document.createElement('p');
+    p.className = 'row';
+    p.textContent = label + ': ' + value;
+    return p;
+  }
+
+  function words(status) {
+    if (status === 'pass') return 'fetched inside its own time limit';
+    if (status === 'warn') return 'no published alerts. This is not an all-clear.';
+    if (status === 'degraded') return 'degraded. The feed time is old, or a 200 response did not have the expected shape.';
+    if (status === 'fail') return 'feed unavailable';
+    return 'not requested';
+  }
+
+  function applyLights(data) {
+    if (!data || typeof data !== 'object') {
+      text('lock', 'PENDING');
+      text('lock-line', 'The ruling log could not be read.');
+      return;
+    }
+    var lock = data.continuity_lock === 'ANCHORED' ? 'ANCHORED' : 'PENDING';
+    text('lock', lock);
+    text('lock-line', typeof data.lock_line === 'string' ? data.lock_line : 'PENDING — an independent anchor is not published');
+    var box = document.getElementById('lights');
+    box.textContent = '';
+    [
+      ['Consensus', data.consensus],
+      ['Feed Health', data.feed_health],
+      ['Chain Integrity', data.chain_integrity]
+    ].forEach(function (pair) {
+      var light = pair[1] || {};
+      box.appendChild(line(pair[0], (light.state || 'PENDING') + ' — ' + (light.line || 'Waiting for the ruling log.')));
+    });
+    text('head', 'Head: ' + (typeof data.head_sha256 === 'string' ? data.head_sha256 : 'not available'));
+    text('computed', 'Computed: ' + (typeof data.computed_at === 'string' ? data.computed_at : 'not available'));
+  }
+
+  function applySeats(data) {
+    var box = document.getElementById('seats');
+    var slots = data && Array.isArray(data.slots) ? data.slots : [];
+    box.textContent = '';
+    if (!slots.length) {
+      box.appendChild(line('Seats', 'not configured'));
+      return;
+    }
+    slots.forEach(function (slot) {
+      box.appendChild(line(slot.name || 'seat', 'tier ' + slot.tier + ' · ' + slot.status));
+    });
+  }
+
+  function sourceMap(payload) {
+    var report = payload && payload.package && payload.package.report;
+    var fresh = report && report.freshness && Array.isArray(report.freshness.sources) ? report.freshness.sources : [];
+    var map = {};
+    fresh.forEach(function (src) {
+      if (src && typeof src.id === 'string') map[src.id] = src;
+    });
+    return map;
+  }
+
+  function showFeeds(payload) {
+    var box = document.getElementById('feeds');
+    var map = sourceMap(payload);
+    box.textContent = '';
+    FEEDS.forEach(function (feed) {
+      var src = map[feed.id] || {};
+      var block = document.createElement('div');
+      block.className = 'row';
+      var title = document.createElement('p');
+      title.textContent = feed.name;
+      var detail = document.createElement('p');
+      detail.textContent = words(src.status);
+      var meta = document.createElement('p');
+      meta.className = 'hash';
+      meta.textContent = [
+        'HTTP ' + (src.http_status == null ? 'not available' : src.http_status),
+        'fetched ' + (src.fetched_at || 'not available'),
+        'feed time ' + (src.source_timestamp || 'not available'),
+        'fingerprint ' + (src.payload_sha256 || 'not available')
+      ].join(' · ');
+      block.appendChild(title);
+      block.appendChild(detail);
+      block.appendChild(meta);
+      box.appendChild(block);
+    });
+    var setup = Array.isArray(payload.needsSetup) ? payload.needsSetup : [];
+    setup.forEach(function (item) {
+      if (!item || !item.why) return;
+      box.appendChild(line(item.id || 'setup', item.why));
+    });
+  }
+
+  function coarsen(value) {
+    return Math.round(value * 100) / 100;
+  }
+
+  document.getElementById('load-feeds').addEventListener('click', function () {
+    var note = document.getElementById('feed-note');
+    if (!navigator.geolocation) {
+      note.textContent = 'This browser has no location. No feed was requested. This is not an all-clear.';
+      return;
+    }
+    note.textContent = 'Asking this phone for a point. The exact point stays here.';
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      var cell = { lat: coarsen(pos.coords.latitude), lon: coarsen(pos.coords.longitude) };
+      note.textContent = 'Loading NWS, USGS, and CoTrip for the coarsened area ' + cell.lat.toFixed(2) + ', ' + cell.lon.toFixed(2) + '.';
+      fetch('/api/data-nest/validate', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lat: cell.lat, lon: cell.lon, radiusKm: 80 })
+      }).then(function (response) {
+        return response.json().then(function (body) { return { ok: response.ok, status: response.status, body: body }; });
+      }).then(function (result) {
+        if (result.status === 401 || result.status === 403) {
+          note.textContent = 'Sign in on Data Nest first. This page will not invent an alert.';
+          return;
+        }
+        if (!result.ok) {
+          note.textContent = (result.body && result.body.error) || 'The feed check did not answer. This is not an all-clear.';
+          return;
+        }
+        note.textContent = 'These rows are the live check. An empty row is not an all-clear.';
+        showFeeds(result.body);
+      }).catch(function () {
+        note.textContent = 'The feed check did not answer. This is not an all-clear.';
+      });
+    }, function () {
+      note.textContent = 'This phone did not share a location. No feed was requested. This is not an all-clear.';
+    }, { enableHighAccuracy: false, maximumAge: 60000, timeout: 10000 });
+  });
+
+  fetch('/api/landing-stone/slots', { cache: 'no-store' })
+    .then(function (response) { if (!response.ok) throw new Error('unreachable'); return response.json(); })
+    .then(applySeats)
+    .catch(function () { text('seats', ''); document.getElementById('seats').appendChild(line('Seats', 'not configured')); });
+
+  fetch('/api/data-nest/continuity', { cache: 'no-store' })
+    .then(function (response) { if (!response.ok) throw new Error('unreachable'); return response.json(); })
+    .then(applyLights)
+    .catch(function () { applyLights(null); });
+})();
+</script>
+</body>
+</html>
