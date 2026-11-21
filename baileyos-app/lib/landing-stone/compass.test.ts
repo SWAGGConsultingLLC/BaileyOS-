@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { compassRecord, decideCockpitAct } from './cockpit';
-import { dissentBearings, feedMarks, LIGHTS_WIN, placeSeats, pointOnRing, STEWARD_BEARING } from './compass';
+import { acceptRingCenter, DEFAULT_CENTER, dissentBearings, feedMarks, LIGHTS_WIN, placeRelative, placeSeats, pointOnRing, STEWARD_BEARING } from './compass';
 
 const slots = [
   { id: 'A', name: 'Grok', status: 'not configured' },
@@ -38,6 +38,18 @@ test('sector marks come only from a real veto or a real published alert', () => 
   const alert = feedMarks([{ id: 'cdot', status: 'pass', record_count: 2 }], []);
   assert.equal(alert[0].id, 'cdot');
   assert.equal(feedMarks([{ id: 'crime', status: 'pass', record_count: 4 }], []).length, 0);
+});
+
+test('a point east of the default center sits on the east bearing', () => {
+  assert.equal(DEFAULT_CENTER.name, 'Grand Junction, CO');
+  assert.equal(DEFAULT_CENTER.label, 'default');
+  assert.equal(acceptRingCenter(39.0639, -108.5506), null);
+  assert.deepEqual(acceptRingCenter(39.06, -108.55), { lat: 39.06, lon: -108.55 });
+  const placed = placeRelative(DEFAULT_CENTER, { lat: 39.06, lon: -108.4 });
+  assert.ok(placed);
+  assert.ok(placed && placed.bearing > 80 && placed.bearing < 100);
+  assert.ok(placed && placed.distanceKm > 0);
+  assert.equal(placeRelative(DEFAULT_CENTER, { lat: null, lon: null }), null);
 });
 
 test('the compass point for east is to the right of center', () => {
@@ -77,6 +89,10 @@ test('the cockpit page keeps the lights first and the words honest', () => {
   const page = readFileSync(new URL('../../app/landing-stone/cockpit/page.tsx', import.meta.url), 'utf8');
   const migration = readFileSync(new URL('../../supabase/migrations/20261121060000_steward_cockpit_acts.sql', import.meta.url), 'utf8');
   assert.match(page, /The lights inform\. The steward decides\./);
+  assert.match(page, /Grand Junction, CO/);
+  assert.match(page, /terrain not connected/);
+  assert.match(page, /Question #001/);
+  assert.match(page, />You</);
   assert.match(page, /href="\/data-nest"/);
   assert.match(page, /href="\/landing-stone"/);
   assert.match(page, /href="\/landing-stone\/prototype"/);

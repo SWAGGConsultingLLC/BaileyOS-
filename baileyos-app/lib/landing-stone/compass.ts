@@ -1,5 +1,48 @@
+import { bearingDeg, coarsen, haversineKm, isCoarsened } from '@/lib/data-nest/geo';
+
 export const STEWARD_BEARING = 180;
 export const LIGHTS_WIN = 'If this compass and the lights disagree, the lights win.';
+/** Grand Junction, already coarsened to about a kilometer. Used only when the viewer does not opt in. */
+export const DEFAULT_CENTER = { lat: 39.06, lon: -108.55, name: 'Grand Junction, CO', label: 'default' as const };
+
+export function acceptRingCenter(lat: number, lon: number): { lat: number; lon: number } | null {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || !isCoarsened(lat, lon)) return null;
+  return coarsen(lat, lon);
+}
+
+export function telemetryRadius(distanceKm: number, maxKm = 80): number {
+  const span = Math.max(0, Math.min(distanceKm, maxKm)) / maxKm;
+  return Math.round((48 + span * 58) * 10) / 10;
+}
+
+export function placeRelative(
+  center: { lat: number; lon: number },
+  point: { lat: number | null; lon: number | null },
+): { bearing: number; distanceKm: number; radius: number } | null {
+  if (point.lat == null || point.lon == null || !Number.isFinite(point.lat) || !Number.isFinite(point.lon)) return null;
+  const distanceKm = haversineKm(center.lon, center.lat, point.lon, point.lat);
+  const bearing = bearingDeg(center.lon, center.lat, point.lon, point.lat);
+  return {
+    bearing: Math.round(bearing),
+    distanceKm: Math.round(distanceKm * 10) / 10,
+    radius: telemetryRadius(distanceKm),
+  };
+}
+
+export function terrainImageUrl(lat: number, lon: number): string {
+  const west = (lon - 0.1).toFixed(2);
+  const south = (lat - 0.1).toFixed(2);
+  const east = (lon + 0.1).toFixed(2);
+  const north = (lat + 0.1).toFixed(2);
+  const params = new URLSearchParams({
+    bbox: `${west},${south},${east},${north}`,
+    bboxSR: '4326',
+    size: '256,256',
+    format: 'jpg',
+    f: 'image',
+  });
+  return `https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?${params.toString()}`;
+}
 
 const SEAT_BEARINGS: Record<string, { seat: string; bearing: number }> = {
   A: { seat: '01', bearing: 90 },
