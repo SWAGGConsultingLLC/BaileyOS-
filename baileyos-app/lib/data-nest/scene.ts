@@ -48,40 +48,7 @@ export function sampleNodes(): { id: string; name: string; lon: number; lat: num
 }
 
 export function buildScene(items: LiveItem[], user: { lon: number; lat: number } | null): SceneFeature[] {
-  const features: SceneFeature[] = [{
-    id: 'corridor-sample',
-    layer: 'corridor',
-    title: 'I-70 sample corridor',
-    summary: 'Nine keypoints from Moab to Glenwood Springs. This is the sample file the validator checks, not a live CDOT centerline.',
-    geometry: { type: 'LineString', coordinates: corridorLine() as [number, number][] },
-    live: false,
-    simulated: false,
-    sourceName: 'Sample corridor file',
-    sourceUrl: 'https://github.com/SWAGGConsultingLLC/BaileyOS-',
-    agency: 'BaileyOS sample',
-    issuedAt: null,
-    expiresAt: null,
-    kind: 'corridor',
-    priority: PRIORITY.corridor,
-  }];
-  for (const node of sampleNodes()) {
-    features.push({
-      id: node.id,
-      layer: 'nodes',
-      title: node.name,
-      summary: `${node.type}. Sample node in the validator file.`,
-      geometry: { type: 'Point', coordinates: [node.lon, node.lat] },
-      live: false,
-      simulated: false,
-      sourceName: 'Sample corridor file',
-      sourceUrl: '',
-      agency: 'BaileyOS sample',
-      issuedAt: null,
-      expiresAt: null,
-      kind: 'node',
-      priority: PRIORITY.node,
-    });
-  }
+  const features: SceneFeature[] = [];
   if (user) {
     features.push({
       id: 'user',

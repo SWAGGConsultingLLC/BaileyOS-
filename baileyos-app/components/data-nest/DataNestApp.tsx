@@ -12,7 +12,7 @@ import { linkedInProviderState, suiteConfig } from '@/lib/suite/verify';
 import { prepareSuiteHref } from '@/components/SuiteEntrance';
 import { createClient } from '@supabase/supabase-js';
 import { TuneStep } from '@/components/data-nest/TuneStep';
-import { aheadCards, buildScene, corridorDistanceKm, sampleNodes, type SceneFeature } from '@/lib/data-nest/scene';
+import { aheadCards, buildScene, type SceneFeature } from '@/lib/data-nest/scene';
 import {
   VETERAN_LINKS,
   clearProfile,
@@ -29,7 +29,7 @@ import {
 } from '@/lib/data-nest/profile';
 import { coarsen, shouldAcceptFix } from '@/lib/data-nest/geo';
 import { chatEnabled, nextAutoMode, type NestMode } from '@/lib/data-nest/mode';
-import { feedPayloads, type LiveItem, type NeedsSetup } from '@/lib/data-nest/liveFeeds';
+import { feedPayloads, type FeedRow, type LiveItem, type NeedsSetup } from '@/lib/data-nest/liveFeeds';
 import { Swarm } from './Swarm';
 import { Radar } from './Radar';
 
@@ -52,11 +52,10 @@ type Seal = {
   report_canonical_json: string;
   input_sha256: string;
   input_canonical_json: string;
-  kimi_package: unknown;
 };
 type LogLine = { at: string; hash: string; text: string };
 
-const LAYERS = ['quakes', 'nws', 'roads', 'amber', 'silver', 'observation', 'corridor', 'nodes'] as const;
+const LAYERS = ['quakes', 'nws', 'roads', 'amber', 'silver', 'observation'] as const;
 
 export function DataNestApp() {
   const sb = useMemo(() => browserSupabase(), []);
@@ -77,13 +76,13 @@ export function DataNestApp() {
   const [radiusKm, setRadiusKm] = useState(80);
   const [layers, setLayers] = useState<Record<string, boolean>>(() => Object.fromEntries(LAYERS.map((id) => [id, true])));
   const [items, setItems] = useState<LiveItem[]>([]);
+  const [freshness, setFreshness] = useState<Record<string, FeedRow>>({});
   const [needs, setNeeds] = useState<NeedsSetup[]>([]);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [seal, setSeal] = useState<Seal | null>(null);
   const [gemini, setGemini] = useState<{ at: string; text: string; hash: string } | null>(null);
   const [geminiVote, setGeminiVote] = useState<unknown>(null);
-  const [kimi, setKimi] = useState('');
   const [queen, setQueen] = useState<{ at: string; label: string; hash: string; record?: string } | null>(null);
   const [log, setLog] = useState<LogLine[]>([]);
   const [tab, setTab] = useState<'swarm' | 'radar' | 'corridor' | 'log'>('swarm');
@@ -180,7 +179,6 @@ export function DataNestApp() {
     .sort((a, b) => sectionRank(a.kind, interests) - sectionRank(b.kind, interests) || (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9)), [scene, fix, interests]);
   const orderedItems = useMemo(() => items.slice().sort((a, b) => sectionRank(a.kind, interests) - sectionRank(b.kind, interests)), [items, interests]);
   const largerText = wantsLargerText(interests);
-  const distance = fix ? corridorDistanceKm(fix.lon, fix.lat) : null;
   const typing = mode === 'stationary' && chatEnabled(fix?.speed ?? null, passenger);
   const center = fix ? { lat: fix.lat, lon: fix.lon } : { lat: 39.06, lon: -108.55 };
 
@@ -230,6 +228,7 @@ export function DataNestApp() {
     if (!ok) { setOffline(true); setNote(data.error || 'Live feeds did not answer. Showing the last copy, if there is one.'); return; }
     setOffline(false);
     setItems(data.items || []);
+    setFreshness(data.freshness || {});
     setNeeds(data.needsSetup || []);
     setFetchedAt(data.fetchedAt || null);
     setNote(null);
@@ -244,6 +243,7 @@ export function DataNestApp() {
     if (!ok || !data.package) { setNote(data.error || 'Python did not run.'); return; }
     setSeal(data.package);
     setItems(data.items || items);
+    setFreshness(data.freshness || freshness);
     setNeeds(data.needsSetup || needs);
     setFetchedAt(data.acted_at || null);
     setGemini(null); setGeminiVote(null); setQueen(null);
@@ -255,7 +255,6 @@ export function DataNestApp() {
     setBusy('gemini');
     const conditions = [
       fix ? `Coarsened area ${coarsen(fix.lat, fix.lon).lat}, ${coarsen(fix.lat, fix.lon).lon}` : 'No area',
-      distance != null ? `About ${distance.toFixed(0)} km from the sample corridor` : '',
       fetchedAt ? `Feeds fetched ${fetchedAt}` : 'Feeds not refreshed',
       ...items.slice(0, 8).map((item) => `${item.kind}: ${item.title}`),
     ].filter(Boolean).join('\n');
@@ -282,10 +281,6 @@ export function DataNestApp() {
 
   async function convene() {
     if (!seal) { setNote('Run Python validation first.'); return; }
-    let kimiVote: unknown = null;
-    if (kimi.trim()) {
-      try { kimiVote = JSON.parse(kimi); } catch { kimiVote = { raw_reply: kimi, reviewed_report_sha256: seal.report_sha256, reviewed_input_sha256: seal.input_sha256 }; }
-    }
     setBusy('queen');
     const here = cell();
     const { data } = await authed('/api/data-nest/consensus', {
@@ -294,8 +289,6 @@ export function DataNestApp() {
       input_sha256: seal.input_sha256,
       input_canonical_json: seal.input_canonical_json,
       report: seal.report,
-      gemini: geminiVote,
-      kimi: kimiVote,
       payloads: feedPayloads(items),
       cell: here,
     });
@@ -326,13 +319,6 @@ export function DataNestApp() {
     setChat((lines) => [...lines, { role: 'assistant', content: data.reply || data.error || 'Gemini unavailable, try again' }]);
   }
 
-  async function copyPackage() {
-    if (!seal) return;
-    const text = JSON.stringify(seal.kimi_package, null, 2);
-    try { await navigator.clipboard.writeText(text); setNote('Kimi package copied.'); }
-    catch { setNote('Clipboard was blocked. The package is in the log below.'); pushLog('Kimi package ready', seal.report_sha256); }
-  }
-
   async function lookupPlace() {
     if (!typing) return;
     setBusy('place');
@@ -347,10 +333,10 @@ export function DataNestApp() {
   function wipe() {
     setFix(null);
     setItems([]);
+    setFreshness({});
     setSeal(null);
     setGemini(null);
     setGeminiVote(null);
-    setKimi('');
     setQueen(null);
     setChat([]);
     setLog([]);
@@ -462,7 +448,7 @@ export function DataNestApp() {
               {card.sourceUrl && <a className="mt-2 inline-flex min-h-11 items-center text-cyan-300 underline" href={card.sourceUrl}>{card.sourceName}</a>}
             </article>
           ))}
-          {!ahead.length && <p className="text-slate-300">Nothing ahead yet. Refresh after a location fix.</p>}
+          {!ahead.length && <p className="text-slate-300">{fix ? 'No published alerts ahead. This is not an all-clear.' : 'No fix yet. This is not an all-clear.'}</p>}
           <label className="flex min-h-12 items-center gap-3 text-sm"><input type="checkbox" checked={voice} onChange={(e) => setVoice(e.target.checked)} /> Spoken alerts (this phone only)</label>
         </section>
       ) : (
@@ -497,9 +483,9 @@ export function DataNestApp() {
               <button key={name} type="button" className={`min-h-11 rounded-xl ${tab === name ? 'bg-cyan-300 text-black' : 'border border-slate-700'}`} onClick={() => setTab(name)}>{name}</button>
             ))}
           </div>
-          {tab === 'swarm' && <Swarm overall={seal?.report.summary.overall || null} />}
+          {tab === 'swarm' && <Swarm rows={feedRows(freshness)} />}
           {tab === 'radar' && <Radar blips={quakeBlips(scene, fix)} />}
-          {tab === 'corridor' && <CorridorPanel distance={distance} />}
+          {tab === 'corridor' && <Swarm rows={feedRows(freshness)} />}
           {tab === 'log' && <LogPanel lines={log} />}
           {wantsVeterans(interests) && <VeteranLinks />}
           <FeedList items={orderedItems} fetchedAt={fetchedAt} offline={offline} />
@@ -514,11 +500,7 @@ export function DataNestApp() {
             ))}
             <button type="button" className="min-h-12 w-full rounded-2xl border border-cyan-400/50" onClick={() => void review()}>{busy === 'gemini' ? 'Asking Gemini…' : 'Gemini review'}</button>
             {gemini && <p className="text-sm text-slate-200">{gemini.at} · {gemini.hash.slice(0, 12)} · {gemini.text}</p>}
-            <p className="text-sm font-semibold text-slate-100">Kimi · awaiting Kimi validator</p>
-            <p className="text-xs text-slate-400">Copy the package, paste it to Kimi, and paste the reply here. The reply must name this report hash. The server recomputes both hashes. A mismatch counts as uncertain.</p>
-            <button type="button" className="min-h-12 w-full rounded-2xl border border-slate-600" onClick={() => void copyPackage()}>Copy package for Kimi</button>
-            <label className="block text-sm" htmlFor="kimi">Kimi reply</label>
-            <textarea id="kimi" value={kimi} onChange={(e) => setKimi(e.target.value)} disabled={!typing} rows={4} className="w-full rounded-2xl border border-slate-700 bg-transparent p-3 text-sm" placeholder='{"verdict":"agree","reason":"...","reviewed_report_sha256":"...","reviewed_input_sha256":"..."}' />
+            <p className="text-xs text-slate-400">Convene asks each enabled voter whose key is set. A missing key is not configured and does not vote. Kimi and Claude stay off until the owner enables them.</p>
             <button type="button" className="min-h-12 w-full rounded-2xl border border-cyan-400/50" onClick={() => void convene()}>{busy === 'queen' ? 'Convening…' : 'Convene the Queen'}</button>
             {queen && <p className="text-sm text-slate-100">{queen.at} · {queen.hash.slice(0, 12)} · {queen.label}{queen.record ? ` · record ${queen.record.slice(0, 12)}` : ''}</p>}
           </section>
@@ -564,17 +546,12 @@ function quakeBlips(scene: SceneFeature[], fix: Fix | null) {
   });
 }
 
-function CorridorPanel({ distance }: { distance: number | null }) {
-  return (
-    <section className="rounded-3xl border border-cyan-400/30 p-3 text-sm leading-6 text-slate-200">
-      <p className="text-xs font-bold uppercase tracking-widest text-amber-200">Sample geometry</p>
-      <p className="mt-2">Nine I-70 keypoints from Moab to Glenwood Springs, plus GUARD.LION, QUEEN ANT AGGREGATOR, SIGNAL.ROOSTER, and ORIGIN.BEAR. This is the file the Python validator checks. It is not a live centerline.</p>
-      <p className="mt-2">{distance == null ? 'Set a place to see distance to that line.' : `About ${distance.toFixed(1)} km from the sample line.`}</p>
-      <ul className="mt-2 space-y-1">
-        {sampleNodes().map((node) => <li key={node.id}>{node.name} · sample node</li>)}
-      </ul>
-    </section>
-  );
+function feedRows(freshness: Record<string, FeedRow>) {
+  return Object.entries(freshness).map(([id, row]) => {
+    if (!row.available) return { id, status: 'feed unavailable', detail: row.error || 'The feed did not answer.' };
+    if (!row.record_count) return { id, status: 'no published alerts', detail: 'This is not an all-clear.' };
+    return { id, status: `${row.record_count} published`, detail: row.source_timestamp ? `Newest ${row.source_timestamp}.` : 'A time was not published.' };
+  });
 }
 
 function LogPanel({ lines }: { lines: LogLine[] }) {
@@ -612,7 +589,7 @@ function FeedList({ items, fetchedAt, offline }: { items: LiveItem[]; fetchedAt:
           <a className="text-cyan-300 underline" href={item.sourceUrl}>{item.sourceName}</a>
         </article>
       ))}
-      {!items.length && <p className="text-sm text-slate-400">No live rows yet.</p>}
+      {!items.length && <p className="text-sm text-slate-400">No published alerts in this area. This is not an all-clear.</p>}
     </section>
   );
 }

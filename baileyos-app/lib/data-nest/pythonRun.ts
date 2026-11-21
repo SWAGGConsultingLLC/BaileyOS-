@@ -45,11 +45,11 @@ export function runPythonJson(code: string, payload: unknown): { ok: true; data:
 
 export const SEAL_CODE = `
 import json, sys
-from _validate_corridor import seal
+from _validate_corridor import seal_live
 from _ruling import attach_feed_fingerprints
 d = json.load(sys.stdin)
 fresh = attach_feed_fingerprints(d.get("freshness") or {}, d.get("payloads") or {})
-json.dump(seal({"corridor": d.get("corridor"), "nodes": d.get("nodes"), "freshness": fresh}), sys.stdout)
+json.dump(seal_live(d.get("cell") or {}, fresh), sys.stdout)
 `;
 
 export const CONVENE_CODE = `
@@ -75,5 +75,5 @@ elif op == "lights":
     json.dump(continuity_lights(d.get("records") or [], configured=bool(d.get("configured")), anchored_today=False, error=d.get("error")), sys.stdout)
 else:
     now = datetime.now(timezone.utc)
-    json.dump(build_ruling_record(d["sealed"], d["queen"], prev_record_sha256=d.get("prev"), sequence_number=d.get("sequence"), now=now), sys.stdout)
+    json.dump(build_ruling_record(d["sealed"], d["queen"], prev_record_sha256=d.get("prev"), sequence_number=d.get("sequence"), env_flags=d.get("env_flags"), slot_answers=d.get("slot_answers"), now=now), sys.stdout)
 `;

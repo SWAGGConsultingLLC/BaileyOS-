@@ -7,6 +7,8 @@ export type SlotConfig = {
   tier: 'free' | 'paid';
   enabled: boolean;
   env?: string;
+  oracle?: string;
+  model?: string;
   placeholder?: boolean;
 };
 

@@ -526,6 +526,70 @@ def seal(data, now: datetime | None = None) -> dict:
     }
 
 
+def seal_live(cell, freshness, now: datetime | None = None) -> dict:
+    """Seal the feeds fetched for one coarsened area. An empty or failed feed is not an all-clear."""
+    when = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    raw_cell = cell if isinstance(cell, dict) else {}
+    try:
+        lat = round(float(raw_cell.get("lat")), 2)
+        lon = round(float(raw_cell.get("lon")), 2)
+    except (TypeError, ValueError):
+        lat, lon = None, None
+    table = {}
+    skipped = []
+    if isinstance(freshness, dict):
+        for key, row in freshness.items():
+            error = row.get("error") if isinstance(row, dict) else None
+            if isinstance(error, str) and error.lower().startswith("needs setup"):
+                skipped.append(key)
+                continue
+            table[key] = row
+    fresh = evaluate_freshness(table, when)
+    sane = evaluate_sanity(table, when)
+    checks = [
+        _check("C7", "data_freshness", fresh["check_status"],
+               {"limits": fresh["limits"], "sources": fresh["sources"], "blocks_consensus": fresh["blocks_consensus"]},
+               fresh["detail"]),
+        _check("C8", "value_sanity", sane["check_status"],
+               {"checked_items": sane["checked_items"], "problems": sane["problems"], "blocks_consensus": sane["blocks_consensus"]},
+               sane["detail"]),
+    ]
+    passed = sum(1 for check in checks if check["status"] == "PASS")
+    failed = sum(1 for check in checks if check["status"] == "FAIL")
+    warned = sum(1 for check in checks if check["status"] == "WARN")
+    if failed:
+        overall = "FAIL"
+    elif warned:
+        overall = "WARN"
+    else:
+        overall = "PASS"
+    payload_obj = {"cell": {"lat": lat, "lon": lon}, "freshness": table, "skipped_needs_setup": skipped}
+    payload = canonical_json(payload_obj)
+    input_sha = sha256_hex(payload)
+    report = {
+        "schema_version": SCHEMA_VERSION,
+        "validator": {"name": VALIDATOR_NAME, "version": VALIDATOR_VERSION, "language": "python", "mode": "live_feeds"},
+        "generated_at": when.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "input_sha256": input_sha,
+        "freshness": {"limits": fresh["limits"], "sources": fresh["sources"], "blocks_consensus": fresh["blocks_consensus"]},
+        "checks": checks,
+        "summary": {"total": len(checks), "passed": passed, "failed": failed, "warned": warned, "overall": overall},
+        "note": "An empty or failed feed is not a statement that the road is clear. Feeds that need a key are omitted from this check and listed as needs setup.",
+    }
+    report = _r(report)
+    canon = canonical_json(report)
+    report_sha = sha256_hex(canon)
+    return {
+        "report": report,
+        "report_sha256": report_sha,
+        "report_canonical_json": canon,
+        "input_sha256": input_sha,
+        "input_canonical_json": payload,
+        "canonicalization": CANONICALIZATION,
+        "skipped_needs_setup": skipped,
+    }
+
+
 def main(argv) -> int:
     args = [a for a in argv[1:] if not a.startswith("--")]
     if not args:
