@@ -214,7 +214,7 @@ def build_genesis_record(now: datetime | None = None) -> dict:
     return _seal_v11(record)
 
 
-def build_ruling_record(sealed: dict, queen: dict, prev_record_sha256=None, sequence_number=None, idempotency_key=None, env_flags=None, now: datetime | None = None) -> dict:
+def build_ruling_record(sealed: dict, queen: dict, prev_record_sha256=None, sequence_number=None, idempotency_key=None, env_flags=None, slot_answers=None, now: datetime | None = None) -> dict:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     report = sealed.get("report") if isinstance(sealed.get("report"), dict) else {}
     verdicts = [_verdict("python", "agree", "Python produced this report and agrees with its own checks.")]
@@ -273,7 +273,7 @@ def build_ruling_record(sealed: dict, queen: dict, prev_record_sha256=None, sequ
         "queen_sha256": sha256_hex(canonical_json(queen_view)),
         "note": SEAL_NOTE,
         "chain_formula": CHAIN_FORMULA,
-        "voter_slots": voter_roster(env_flags, answers_from_queen(queen), sealed.get("report_sha256")),
+        "voter_slots": voter_roster(env_flags, {**answers_from_queen(queen), **(slot_answers if isinstance(slot_answers, dict) else {})}, sealed.get("report_sha256")),
     }
     return _seal_v11(record)
 

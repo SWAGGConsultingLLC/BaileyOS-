@@ -97,6 +97,20 @@ class ValidatorTests(unittest.TestCase):
         self.assertEqual(r["summary"]["overall"], "WARN")
         self.assertNotEqual(r["summary"]["overall"], "PASS")
 
+    def test_live_feed_report_does_not_call_an_empty_feed_all_clear(self):
+        from _validate_corridor import seal_live
+        fresh = {
+            "nws_alerts": {"available": True, "fetched_at": "2026-11-14T12:00:00Z", "record_count": 0},
+            "cdot": {"available": False, "fetched_at": "2026-11-14T12:00:00Z", "record_count": 0, "error": "fetch failed"},
+            "crime": {"available": False, "record_count": 0, "error": "needs setup: DATA_GOV_API_KEY"},
+        }
+        sealed = seal_live({"lat": 39.0639, "lon": -108.5506}, fresh, now=NOW)
+        self.assertNotEqual(sealed["report"]["summary"]["overall"], "PASS")
+        self.assertNotIn("all-clear", json.dumps(sealed).lower())
+        self.assertNotIn("all clear", json.dumps(sealed).lower())
+        self.assertIn("crime", sealed["skipped_needs_setup"])
+        self.assertEqual(sealed["report"]["validator"]["mode"], "live_feeds")
+
     def test_quake_magnitude_outside_range_fails_sanity(self):
         bad = copy.deepcopy(SAMPLE)
         bad["freshness"]["usgs"]["items"] = [{"mag": 12, "lat": 39.06, "lon": -108.55, "time": "2026-11-14T11:40:00Z"}]

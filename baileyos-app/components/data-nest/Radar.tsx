@@ -4,8 +4,8 @@ export function Radar({ blips }: { blips: { id: string; bearing: number; distanc
   return (
     <figure className="relative overflow-hidden rounded-3xl border border-cyan-400/30 bg-[#07111f] p-3">
       <figcaption className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-cyan-200">
-        <span>Radar</span>
-        <span className="rounded-full border border-amber-300/60 px-2 py-1 text-amber-200">SIMULATED sweep</span>
+        <span>Quakes</span>
+        <span className="rounded-full border border-cyan-300/50 px-2 py-1 text-cyan-100">Live USGS</span>
       </figcaption>
       <div className="relative mx-auto mt-3 h-64 w-64">
         <svg viewBox="0 0 100 100" className="h-full w-full">
@@ -18,9 +18,8 @@ export function Radar({ blips }: { blips: { id: string; bearing: number; distanc
             return <circle key={blip.id} cx={50 + Math.cos(rad) * reach} cy={50 + Math.sin(rad) * reach} r="1.8" fill="#22d3ee" />;
           })}
         </svg>
-        <div className="nest-sweep pointer-events-none absolute inset-0" aria-hidden="true" />
       </div>
-      <p className="text-sm text-slate-300">The sweep is simulated. Cyan dots are live USGS quakes relative to you, when a fix is on this device.</p>
+      <p className="text-sm text-slate-300">{blips.length ? 'Cyan dots are published USGS earthquakes relative to this phone.' : 'No published earthquakes in this area. This is not an all-clear.'}</p>
     </figure>
   );
 }

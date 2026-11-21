@@ -1,5 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { memberId } from '@/lib/data-nest/member';
 import { feedPayloads, loadLive } from '@/lib/data-nest/liveFeeds';
 import { isCoarsened } from '@/lib/data-nest/geo';
@@ -24,11 +22,9 @@ export async function POST(req: Request) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || !isCoarsened(lat, lon)) {
     return Response.json({ error: 'Send a coarsened area (2 decimal degrees).', code: 'bad_request' }, { status: 400 });
   }
-  const sample = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'validation', 'sample_input.json'), 'utf8')) as { corridor: unknown; nodes: unknown };
   const live = await loadLive(lat, lon, Number.isFinite(radiusKm) ? radiusKm : 80);
   const sealed = runPythonJson(SEAL_CODE, {
-    corridor: sample.corridor,
-    nodes: sample.nodes,
+    cell: live.cell,
     freshness: live.freshness,
     payloads: feedPayloads(live.items),
   });
@@ -41,6 +37,7 @@ export async function POST(req: Request) {
     cell: live.cell,
     needsSetup: live.needsSetup,
     items: live.items,
+    freshness: live.freshness,
     package: sealed.data,
   }, { headers: { 'Cache-Control': 'no-store' } });
 }

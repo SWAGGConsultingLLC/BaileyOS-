@@ -4,7 +4,7 @@ export default {
   experimental: {
     outputFileTracingIncludes: {
       '/api/data-nest/validate': ['./api/**/*', './validation/freshness_limits.json', './validation/sample_input.json', './vendor/python/**/*'],
-      '/api/data-nest/consensus': ['./api/**/*', './validation/freshness_limits.json', './vendor/python/**/*'],
+      '/api/data-nest/consensus': ['./api/**/*', './validation/freshness_limits.json', './validation/voter_slots.json', './vendor/python/**/*'],
       '/api/data-nest/verify': ['./api/**/*', './vendor/python/**/*'],
       '/api/data-nest/anchor': ['./api/**/*', './vendor/python/**/*'],
       '/api/data-nest/continuity': ['./api/**/*', './vendor/python/**/*'],

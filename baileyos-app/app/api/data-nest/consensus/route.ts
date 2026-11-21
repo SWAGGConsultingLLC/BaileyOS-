@@ -1,4 +1,5 @@
 import { memberId } from '@/lib/data-nest/member';
+import { askConfiguredVoters } from '@/lib/data-nest/liveVoters';
 import { CONVENE_CODE, RECORD_CODE, runPythonJson } from '@/lib/data-nest/pythonRun';
 import { appendLinkage, appendSequenced } from '@/lib/data-nest/rulings';
 import { allow } from '@/lib/rateLimit';
@@ -19,12 +20,18 @@ export async function POST(req: Request) {
   const lat = Number((body.cell as { lat?: unknown } | undefined)?.lat);
   const lon = Number((body.cell as { lon?: unknown } | undefined)?.lon);
   const cell = Number.isFinite(lat) && Number.isFinite(lon) && isCoarsened(lat, lon) ? coarsen(lat, lon) : null;
+  const reportText = typeof body.report_canonical_json === 'string' ? body.report_canonical_json : '';
+  const reportSha = typeof body.report_sha256 === 'string' ? body.report_sha256 : '';
+  const inputSha = typeof body.input_sha256 === 'string' ? body.input_sha256 : '';
+  const asked = reportText && reportSha
+    ? await askConfiguredVoters({ report: reportText, reportSha, inputSha, req })
+    : { gemini: null, answers: {}, envFlags: {}, called: [] as string[] };
   const queen = runPythonJson(CONVENE_CODE, {
     report_canonical_json: body.report_canonical_json,
     report_sha256: body.report_sha256,
     input_canonical_json: body.input_canonical_json,
-    gemini: body.gemini ?? null,
-    kimi: body.kimi ?? null,
+    gemini: asked.gemini,
+    kimi: null,
     payloads: body.payloads ?? null,
   });
   if (!queen.ok) return Response.json({ error: queen.error, code: 'python_unavailable' }, { status: 503 });
@@ -40,7 +47,7 @@ export async function POST(req: Request) {
     return { ok: true as const, data: value.data as { record_sha256?: string; prev_record_sha256?: string | null; sequence_number?: number; created_at?: string; queen?: { ruling?: string } } };
   };
   const saved = await appendSequenced(
-    (prev, sequence) => asRecord(runPythonJson(RECORD_CODE, { sealed, queen: queen.data, prev, sequence })),
+    (prev, sequence) => asRecord(runPythonJson(RECORD_CODE, { sealed, queen: queen.data, prev, sequence, env_flags: asked.envFlags, slot_answers: asked.answers })),
     () => asRecord(runPythonJson(RECORD_CODE, { op: 'genesis' })),
   );
   const fallback = saved.record ? null : asRecord(runPythonJson(RECORD_CODE, { sealed, queen: queen.data, prev: null, sequence: 1 }));
@@ -58,5 +65,6 @@ export async function POST(req: Request) {
     record: recordData,
     stored: saved.stored,
     store_reason: saved.reason || null,
+    voters_called: asked.called,
   }, { headers: { 'Cache-Control': 'no-store' } });
 }
