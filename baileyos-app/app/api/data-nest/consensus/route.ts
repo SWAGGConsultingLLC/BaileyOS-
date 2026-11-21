@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   const reportSha = typeof body.report_sha256 === 'string' ? body.report_sha256 : '';
   const inputSha = typeof body.input_sha256 === 'string' ? body.input_sha256 : '';
   const asked = reportText && reportSha
-    ? await askConfiguredVoters({ report: reportText, reportSha, inputSha, req })
+    ? await askConfiguredVoters({ report: reportText, reportSha, inputSha, req, userId: member.id })
     : { gemini: null, answers: {}, envFlags: {}, called: [] as string[], seats: [] as { reviewer: string; configured: true; vote: unknown }[] };
   const queen = runPythonJson(CONVENE_CODE, {
     report_canonical_json: body.report_canonical_json,
